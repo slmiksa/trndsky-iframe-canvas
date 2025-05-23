@@ -186,6 +186,38 @@ export type Database = {
           },
         ]
       }
+      renewal_notifications: {
+        Row: {
+          account_id: string
+          created_at: string
+          id: string
+          notification_type: string
+          sent_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          id?: string
+          notification_type: string
+          sent_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          id?: string
+          notification_type?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_notifications_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           account_id: string | null
