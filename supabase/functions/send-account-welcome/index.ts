@@ -264,7 +264,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "نظام إدارة الحسابات <onboarding@resend.dev>",
+      from: "نظام إدارة الحسابات <noreply@mail.trndsky.com>",
       to: [email],
       subject: `🎉 مرحباً ${name} - تم إنشاء حسابك بنجاح`,
       html: emailHtml,
