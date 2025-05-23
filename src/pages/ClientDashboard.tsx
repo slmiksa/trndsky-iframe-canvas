@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
+import Footer from '@/components/Footer';
 
 interface Website {
   id: string;
@@ -468,6 +469,8 @@ const ClientDashboard = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Footer />
     </div>
   );
 };
