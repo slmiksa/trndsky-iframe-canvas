@@ -52,33 +52,42 @@ export type Database = {
       }
       accounts: {
         Row: {
+          activation_end_date: string | null
+          activation_start_date: string | null
           created_at: string | null
           created_by: string | null
           database_name: string
           email: string
           id: string
+          is_subscription_active: boolean | null
           name: string
           password_hash: string
           status: Database["public"]["Enums"]["account_status"] | null
           updated_at: string | null
         }
         Insert: {
+          activation_end_date?: string | null
+          activation_start_date?: string | null
           created_at?: string | null
           created_by?: string | null
           database_name: string
           email: string
           id?: string
+          is_subscription_active?: boolean | null
           name: string
           password_hash: string
           status?: Database["public"]["Enums"]["account_status"] | null
           updated_at?: string | null
         }
         Update: {
+          activation_end_date?: string | null
+          activation_start_date?: string | null
           created_at?: string | null
           created_by?: string | null
           database_name?: string
           email?: string
           id?: string
+          is_subscription_active?: boolean | null
           name?: string
           password_hash?: string
           status?: Database["public"]["Enums"]["account_status"] | null

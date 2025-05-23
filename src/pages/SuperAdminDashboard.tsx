@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Users, Globe, Settings, Clock } from 'lucide-react';
+import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { hashPassword } from '@/utils/authUtils';
 import NotificationManager from '@/components/NotificationManager';
@@ -20,6 +21,9 @@ interface Account {
   database_name: string;
   status: 'active' | 'suspended' | 'pending';
   created_at: string;
+  activation_start_date: string | null;
+  activation_end_date: string | null;
+  is_subscription_active: boolean | null;
 }
 
 const SuperAdminDashboard = () => {
@@ -29,11 +33,14 @@ const SuperAdminDashboard = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers'>('accounts');
+  const [editingActivation, setEditingActivation] = useState<string | null>(null);
   const [newAccount, setNewAccount] = useState({
     name: '',
     email: '',
     password: '',
     database_name: '',
+    activation_start_date: '',
+    activation_end_date: '',
   });
 
   // Redirect if not super admin
@@ -43,11 +50,25 @@ const SuperAdminDashboard = () => {
     }
   }, [userRole]);
 
+  // Check if account subscription is expired
+  const isSubscriptionExpired = (account: Account) => {
+    if (!account.activation_end_date) return false;
+    return new Date(account.activation_end_date) < new Date();
+  };
+
+  // Check if subscription is expiring soon (within 7 days)
+  const isSubscriptionExpiringSoon = (account: Account) => {
+    if (!account.activation_end_date) return false;
+    const endDate = new Date(account.activation_end_date);
+    const now = new Date();
+    const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilExpiry <= 7 && daysUntilExpiry > 0;
+  };
+
   const fetchAccounts = async () => {
     try {
       console.log('🔍 جاري تحميل الحسابات...');
       
-      // Direct query to accounts table instead of RPC
       const { data, error } = await supabase
         .from('accounts')
         .select('*')
@@ -68,7 +89,6 @@ const SuperAdminDashboard = () => {
         variant: "destructive",
       });
       
-      // Set empty array to prevent infinite loading
       setAccounts([]);
     } finally {
       setLoading(false);
@@ -98,22 +118,22 @@ const SuperAdminDashboard = () => {
     setLoading(true);
 
     try {
-      // تشفير كلمة المرور
-      console.log('🔐 جاري تشفير كلمة المرور...');
       const passwordHash = await hashPassword(newAccount.password);
-      console.log('✅ تم تشفير كلمة المرور بنجاح');
+      
+      const accountData = {
+        name: newAccount.name,
+        email: newAccount.email,
+        password_hash: passwordHash,
+        database_name: newAccount.database_name,
+        status: 'active' as const,
+        activation_start_date: newAccount.activation_start_date || null,
+        activation_end_date: newAccount.activation_end_date || null,
+        is_subscription_active: true
+      };
 
-      // Direct insert instead of RPC
-      console.log('💾 جاري إدراج الحساب في قاعدة البيانات...');
-      const { data: accountData, error: accountError } = await supabase
+      const { data: createdAccount, error: accountError } = await supabase
         .from('accounts')
-        .insert({
-          name: newAccount.name,
-          email: newAccount.email,
-          password_hash: passwordHash,
-          database_name: newAccount.database_name,
-          status: 'active'
-        })
+        .insert(accountData)
         .select()
         .single();
 
@@ -122,18 +142,23 @@ const SuperAdminDashboard = () => {
         throw accountError;
       }
 
-      console.log('✅ تم إنشاء الحساب بنجاح:', accountData);
+      console.log('✅ تم إنشاء الحساب بنجاح:', createdAccount);
 
       toast({
         title: "تم إنشاء الحساب بنجاح",
         description: `تم إنشاء حساب ${newAccount.name}`,
       });
 
-      // إعادة تعيين النموذج
-      setNewAccount({ name: '', email: '', password: '', database_name: '' });
+      setNewAccount({ 
+        name: '', 
+        email: '', 
+        password: '', 
+        database_name: '',
+        activation_start_date: '',
+        activation_end_date: ''
+      });
       setShowCreateForm(false);
       
-      // تحديث قائمة الحسابات
       await fetchAccounts();
       
     } catch (error: any) {
@@ -162,11 +187,47 @@ const SuperAdminDashboard = () => {
     }
   };
 
+  const updateAccountActivation = async (accountId: string, startDate: string, endDate: string) => {
+    try {
+      console.log(`🔄 جاري تحديث فترة التنشيط للحساب ${accountId}`);
+      
+      const { error } = await supabase
+        .from('accounts')
+        .update({ 
+          activation_start_date: startDate || null,
+          activation_end_date: endDate || null,
+          is_subscription_active: true
+        })
+        .eq('id', accountId);
+
+      if (error) {
+        console.error('❌ خطأ في تحديث فترة التنشيط:', error);
+        throw error;
+      }
+
+      console.log('✅ تم تحديث فترة التنشيط بنجاح');
+      
+      toast({
+        title: "تم تحديث فترة التنشيط",
+        description: "تم تحديث فترة التنشيط بنجاح",
+      });
+
+      setEditingActivation(null);
+      await fetchAccounts();
+    } catch (error: any) {
+      console.error('❌ خطأ في تحديث فترة التنشيط:', error);
+      toast({
+        title: "خطأ في تحديث فترة التنشيط",
+        description: error.message || 'حدث خطأ غير متوقع',
+        variant: "destructive",
+      });
+    }
+  };
+
   const updateAccountStatus = async (accountId: string, status: 'active' | 'suspended') => {
     try {
       console.log(`🔄 جاري تحديث حالة الحساب ${accountId} إلى ${status}`);
       
-      // Direct update instead of RPC
       const { error } = await supabase
         .from('accounts')
         .update({ status })
@@ -204,6 +265,24 @@ const SuperAdminDashboard = () => {
 
     const config = statusConfig[status as keyof typeof statusConfig];
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getSubscriptionBadge = (account: Account) => {
+    if (isSubscriptionExpired(account)) {
+      return <Badge variant="destructive">منتهي الصلاحية</Badge>;
+    }
+    if (isSubscriptionExpiringSoon(account)) {
+      return <Badge variant="secondary">ينتهي قريباً</Badge>;
+    }
+    if (account.activation_end_date) {
+      return <Badge variant="default">نشط</Badge>;
+    }
+    return <Badge variant="outline">غير محدد</Badge>;
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'غير محدد';
+    return new Date(dateString).toLocaleDateString('ar-SA');
   };
 
   // Show loading while checking user role
@@ -245,7 +324,7 @@ const SuperAdminDashboard = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -265,7 +344,7 @@ const SuperAdminDashboard = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">الحسابات النشطة</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {accounts.filter(acc => acc.status === 'active').length}
+                    {accounts.filter(acc => acc.status === 'active' && !isSubscriptionExpired(acc)).length}
                   </p>
                 </div>
               </div>
@@ -275,11 +354,25 @@ const SuperAdminDashboard = () => {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
-                <Settings className="h-8 w-8 text-orange-600" />
+                <AlertCircle className="h-8 w-8 text-red-600" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">الحسابات المعلقة</p>
+                  <p className="text-sm font-medium text-gray-600">منتهية الصلاحية</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {accounts.filter(acc => acc.status === 'suspended').length}
+                    {accounts.filter(isSubscriptionExpired).length}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Calendar className="h-8 w-8 text-orange-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">تنتهي قريباً</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {accounts.filter(isSubscriptionExpiringSoon).length}
                   </p>
                 </div>
               </div>
@@ -415,6 +508,26 @@ const SuperAdminDashboard = () => {
                         dir="ltr"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="activation_start_date">تاريخ بداية التنشيط</Label>
+                      <Input
+                        id="activation_start_date"
+                        type="date"
+                        value={newAccount.activation_start_date}
+                        onChange={(e) => setNewAccount({...newAccount, activation_start_date: e.target.value})}
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="activation_end_date">تاريخ انتهاء التنشيط</Label>
+                      <Input
+                        id="activation_end_date"
+                        type="date"
+                        value={newAccount.activation_end_date}
+                        onChange={(e) => setNewAccount({...newAccount, activation_end_date: e.target.value})}
+                        dir="ltr"
+                      />
+                    </div>
                   </div>
                   <div className="flex gap-2 mt-4">
                     <Button type="submit" disabled={loading}>
@@ -444,38 +557,102 @@ const SuperAdminDashboard = () => {
                   </div>
                 ) : (
                   accounts.map((account) => (
-                    <div key={account.id} className="border rounded-lg p-4 flex justify-between items-center">
-                      <div>
-                        <h3 className="font-semibold">{account.name}</h3>
-                        <p className="text-sm text-gray-600">{account.email}</p>
-                        <p className="text-sm text-gray-500">قاعدة البيانات: {account.database_name}</p>
-                        <p className="text-xs text-gray-400">
-                          تاريخ الإنشاء: {new Date(account.created_at).toLocaleDateString('ar-SA')}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {getStatusBadge(account.status)}
-                        <div className="flex gap-2">
-                          {account.status === 'active' ? (
+                    <div key={account.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-semibold">{account.name}</h3>
+                            {getStatusBadge(account.status)}
+                            {getSubscriptionBadge(account)}
+                            {isSubscriptionExpired(account) && (
+                              <AlertCircle className="h-4 w-4 text-red-500" />
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">{account.email}</p>
+                          <p className="text-sm text-gray-500">قاعدة البيانات: {account.database_name}</p>
+                          <div className="text-xs text-gray-400 mt-1">
+                            <p>تاريخ الإنشاء: {new Date(account.created_at).toLocaleDateString('ar-SA')}</p>
+                            <p>بداية التنشيط: {formatDate(account.activation_start_date)}</p>
+                            <p>انتهاء التنشيط: {formatDate(account.activation_end_date)}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <div className="flex gap-2">
+                            {account.status === 'active' ? (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => updateAccountStatus(account.id, 'suspended')}
+                                disabled={loading}
+                              >
+                                إيقاف
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => updateAccountStatus(account.id, 'active')}
+                                disabled={loading}
+                              >
+                                تفعيل
+                              </Button>
+                            )}
                             <Button
                               size="sm"
-                              variant="destructive"
-                              onClick={() => updateAccountStatus(account.id, 'suspended')}
+                              variant="outline"
+                              onClick={() => setEditingActivation(account.id)}
                               disabled={loading}
                             >
-                              إيقاف
+                              <Calendar className="h-4 w-4 mr-1" />
+                              إدارة التنشيط
                             </Button>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => updateAccountStatus(account.id, 'active')}
-                              disabled={loading}
-                            >
-                              تفعيل
-                            </Button>
-                          )}
+                          </div>
                         </div>
                       </div>
+
+                      {editingActivation === account.id && (
+                        <div className="mt-4 p-4 bg-gray-50 rounded border">
+                          <h4 className="font-medium mb-3">تحديث فترة التنشيط</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor={`start-${account.id}`}>تاريخ البداية</Label>
+                              <Input
+                                id={`start-${account.id}`}
+                                type="date"
+                                defaultValue={account.activation_start_date ? account.activation_start_date.split('T')[0] : ''}
+                                dir="ltr"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`end-${account.id}`}>تاريخ الانتهاء</Label>
+                              <Input
+                                id={`end-${account.id}`}
+                                type="date"
+                                defaultValue={account.activation_end_date ? account.activation_end_date.split('T')[0] : ''}
+                                dir="ltr"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                const startInput = document.getElementById(`start-${account.id}`) as HTMLInputElement;
+                                const endInput = document.getElementById(`end-${account.id}`) as HTMLInputElement;
+                                updateAccountActivation(account.id, startInput.value, endInput.value);
+                              }}
+                            >
+                              حفظ
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingActivation(null)}
+                            >
+                              إلغاء
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
