@@ -27,18 +27,29 @@ const SUPER_ADMIN_CREDENTIALS: SuperAdminCredentials = {
 export const authenticateUser = async (credentials: LoginCredentials) => {
   const { username, password } = credentials;
 
+  console.log('Attempting authentication for:', username);
+
   // التحقق من السوبر أدمن
   if (username === SUPER_ADMIN_CREDENTIALS.username) {
+    console.log('Checking super admin credentials');
+    console.log('Expected hash:', SUPER_ADMIN_CREDENTIALS.password_hash);
+    
     const isValidPassword = await bcrypt.compare(password, SUPER_ADMIN_CREDENTIALS.password_hash);
+    console.log('Password validation result:', isValidPassword);
+    
     if (isValidPassword) {
+      console.log('Super admin login successful');
       return {
         user: SUPER_ADMIN_CREDENTIALS,
         role: 'super_admin',
         account_id: null
       };
+    } else {
+      console.log('Super admin password incorrect');
     }
   }
 
+  console.log('Checking regular account credentials');
   // التحقق من حسابات العملاء
   const { data: account, error } = await supabase
     .from('accounts')
@@ -48,14 +59,17 @@ export const authenticateUser = async (credentials: LoginCredentials) => {
     .single();
 
   if (error || !account) {
+    console.log('Account not found or error:', error);
     throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
   }
 
   const isValidPassword = await bcrypt.compare(password, account.password_hash);
   if (!isValidPassword) {
+    console.log('Account password incorrect');
     throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة');
   }
 
+  console.log('Regular account login successful');
   return {
     user: account,
     role: 'account_user',
