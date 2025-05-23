@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from '@/hooks/use-toast';
 import { Plus, Eye, EyeOff, Trash2, Upload } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Notification {
   id: string;
@@ -27,6 +28,34 @@ interface NotificationManagerProps {
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) => {
   console.log('🔍 NotificationManager rendered with accountId:', accountId);
+  
+  // Check auth on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      console.log('🔐 Auth status in NotificationManager:', data.session ? `Logged in as ${data.session.user.id}` : 'Not logged in');
+      
+      if (error) {
+        console.error('❌ Auth error:', error);
+      }
+      
+      // Check for user roles
+      if (data.session?.user) {
+        const { data: roles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('*')
+          .eq('user_id', data.session.user.id);
+        
+        console.log('👤 User roles:', roles);
+        
+        if (rolesError) {
+          console.error('❌ Error fetching user roles:', rolesError);
+        }
+      }
+    };
+    
+    checkAuth();
+  }, []);
   
   const {
     notifications,
@@ -90,6 +119,20 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       });
       return;
     }
+    
+    // Check auth before submission
+    const { data: session } = await supabase.auth.getSession();
+    if (!session.session) {
+      console.error('❌ User not authenticated');
+      toast({
+        title: "خطأ في المصادقة",
+        description: "يجب تسجيل الدخول لإنشاء إشعار",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('🔐 User authenticated as:', session.session.user.id);
 
     setIsSubmitting(true);
 
@@ -118,9 +161,9 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
 
       console.log('💾 Creating notification with data:', notificationData);
 
-      await createNotification(notificationData);
+      const result = await createNotification(notificationData);
 
-      console.log('✅ Notification created successfully');
+      console.log('✅ Notification created successfully:', result);
       toast({
         title: "تم إنشاء الإشعار",
         description: "تم إنشاء الإشعار بنجاح",

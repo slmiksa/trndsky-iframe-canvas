@@ -25,6 +25,10 @@ export const useNotifications = (accountId?: string) => {
     try {
       console.log('🔍 Fetching notifications for account:', accountId);
       
+      // Get current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('🔑 Current session:', sessionData?.session ? 'Valid session' : 'No session');
+      
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -73,17 +77,39 @@ export const useNotifications = (accountId?: string) => {
     try {
       console.log('➕ Creating notification:', notificationData);
       
-      const { error } = await supabase
+      // Get current session before creating notification
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('🔑 Session before creating notification:', 
+                 sessionData?.session ? `Authenticated as ${sessionData?.session?.user?.id}` : 'No session');
+      
+      // Check if user roles exist for current user
+      if (sessionData?.session?.user?.id) {
+        const { data: userRoles, error: userRolesError } = await supabase
+          .from('user_roles')
+          .select('*')
+          .eq('user_id', sessionData.session.user.id)
+          .eq('account_id', notificationData.account_id);
+          
+        console.log('👤 User roles for current user:', userRoles);
+        
+        if (userRolesError) {
+          console.error('❌ Error checking user roles:', userRolesError);
+        }
+      }
+      
+      const { data, error } = await supabase
         .from('notifications')
-        .insert(notificationData);
+        .insert(notificationData)
+        .select();
 
       if (error) {
         console.error('❌ Error creating notification:', error);
         throw error;
       }
 
-      console.log('✅ Notification created successfully');
+      console.log('✅ Notification created successfully:', data);
       fetchNotifications();
+      return data;
     } catch (error) {
       console.error('❌ Error in createNotification:', error);
       throw error;
@@ -163,6 +189,13 @@ export const useNotifications = (accountId?: string) => {
   };
 
   useEffect(() => {
+    // Check auth state on mount
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      console.log('🔑 Auth check on hook mount:', data?.session ? 'Authenticated' : 'Not authenticated');
+    };
+    
+    checkAuth();
     fetchNotifications();
   }, [accountId]);
 
