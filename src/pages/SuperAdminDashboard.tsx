@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Users, Globe, Settings } from 'lucide-react';
+import { Plus, Users, Globe, Settings, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { hashPassword } from '@/utils/authUtils';
+import NotificationManager from '@/components/NotificationManager';
+import BreakTimerManager from '@/components/BreakTimerManager';
 
 interface Account {
   id: string;
@@ -25,6 +27,8 @@ const SuperAdminDashboard = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers'>('accounts');
   const [newAccount, setNewAccount] = useState({
     name: '',
     email: '',
@@ -240,6 +244,7 @@ const SuperAdminDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
@@ -282,133 +287,228 @@ const SuperAdminDashboard = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>إدارة الحسابات</CardTitle>
-              <Button onClick={() => setShowCreateForm(true)} disabled={loading}>
-                <Plus className="h-4 w-4 mr-2" />
-                إنشاء حساب جديد
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {showCreateForm && (
-              <form onSubmit={createAccount} className="mb-6 p-4 border rounded-lg bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="name">اسم الحساب *</Label>
-                    <Input
-                      id="name"
-                      value={newAccount.name}
-                      onChange={(e) => setNewAccount({...newAccount, name: e.target.value})}
-                      required
-                      placeholder="أدخل اسم الحساب"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">البريد الإلكتروني *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={newAccount.email}
-                      onChange={(e) => setNewAccount({...newAccount, email: e.target.value})}
-                      required
-                      placeholder="example@domain.com"
-                      dir="ltr"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="password">كلمة المرور *</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={newAccount.password}
-                      onChange={(e) => setNewAccount({...newAccount, password: e.target.value})}
-                      required
-                      placeholder="أدخل كلمة مرور قوية"
-                      dir="ltr"
-                      minLength={6}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="database_name">اسم قاعدة البيانات *</Label>
-                    <Input
-                      id="database_name"
-                      value={newAccount.database_name}
-                      onChange={(e) => setNewAccount({...newAccount, database_name: e.target.value})}
-                      required
-                      placeholder="database_name"
-                      dir="ltr"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? 'جاري الإنشاء...' : 'إنشاء الحساب'}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setShowCreateForm(false)}
-                    disabled={loading}
-                  >
-                    إلغاء
-                  </Button>
-                </div>
-              </form>
-            )}
+        {/* Navigation Tabs */}
+        <div className="mb-6">
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('accounts')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'accounts'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Users className="h-4 w-4 inline mr-2" />
+              الحسابات
+            </button>
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'notifications'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Settings className="h-4 w-4 inline mr-2" />
+              الإشعارات
+            </button>
+            <button
+              onClick={() => setActiveTab('timers')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'timers'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Clock className="h-4 w-4 inline mr-2" />
+              المؤقتات
+            </button>
+          </div>
+        </div>
 
-            <div className="space-y-4">
-              {loading && accounts.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-gray-600">جاري التحميل...</p>
+        {/* Account Selector for Notifications and Timers */}
+        {(activeTab === 'notifications' || activeTab === 'timers') && (
+          <div className="mb-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <Label htmlFor="account-select" className="text-sm font-medium">
+                    اختر الحساب:
+                  </Label>
+                  <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="اختر حساب..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              ) : accounts.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">لا توجد حسابات بعد</p>
-                  <p className="text-sm text-gray-500">ابدأ بإنشاء حساب جديد</p>
-                </div>
-              ) : (
-                accounts.map((account) => (
-                  <div key={account.id} className="border rounded-lg p-4 flex justify-between items-center">
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Content based on active tab */}
+        {activeTab === 'accounts' && (
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>إدارة الحسابات</CardTitle>
+                <Button onClick={() => setShowCreateForm(true)} disabled={loading}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  إنشاء حساب جديد
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {showCreateForm && (
+                <form onSubmit={createAccount} className="mb-6 p-4 border rounded-lg bg-gray-50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h3 className="font-semibold">{account.name}</h3>
-                      <p className="text-sm text-gray-600">{account.email}</p>
-                      <p className="text-sm text-gray-500">قاعدة البيانات: {account.database_name}</p>
-                      <p className="text-xs text-gray-400">
-                        تاريخ الإنشاء: {new Date(account.created_at).toLocaleDateString('ar-SA')}
-                      </p>
+                      <Label htmlFor="name">اسم الحساب *</Label>
+                      <Input
+                        id="name"
+                        value={newAccount.name}
+                        onChange={(e) => setNewAccount({...newAccount, name: e.target.value})}
+                        required
+                        placeholder="أدخل اسم الحساب"
+                      />
                     </div>
-                    <div className="flex items-center gap-4">
-                      {getStatusBadge(account.status)}
-                      <div className="flex gap-2">
-                        {account.status === 'active' ? (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => updateAccountStatus(account.id, 'suspended')}
-                            disabled={loading}
-                          >
-                            إيقاف
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => updateAccountStatus(account.id, 'active')}
-                            disabled={loading}
-                          >
-                            تفعيل
-                          </Button>
-                        )}
+                    <div>
+                      <Label htmlFor="email">البريد الإلكتروني *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={newAccount.email}
+                        onChange={(e) => setNewAccount({...newAccount, email: e.target.value})}
+                        required
+                        placeholder="example@domain.com"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="password">كلمة المرور *</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={newAccount.password}
+                        onChange={(e) => setNewAccount({...newAccount, password: e.target.value})}
+                        required
+                        placeholder="أدخل كلمة مرور قوية"
+                        dir="ltr"
+                        minLength={6}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="database_name">اسم قاعدة البيانات *</Label>
+                      <Input
+                        id="database_name"
+                        value={newAccount.database_name}
+                        onChange={(e) => setNewAccount({...newAccount, database_name: e.target.value})}
+                        required
+                        placeholder="database_name"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <Button type="submit" disabled={loading}>
+                      {loading ? 'جاري الإنشاء...' : 'إنشاء الحساب'}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setShowCreateForm(false)}
+                      disabled={loading}
+                    >
+                      إلغاء
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              <div className="space-y-4">
+                {loading && accounts.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-gray-600">جاري التحميل...</p>
+                  </div>
+                ) : accounts.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">لا توجد حسابات بعد</p>
+                    <p className="text-sm text-gray-500">ابدأ بإنشاء حساب جديد</p>
+                  </div>
+                ) : (
+                  accounts.map((account) => (
+                    <div key={account.id} className="border rounded-lg p-4 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold">{account.name}</h3>
+                        <p className="text-sm text-gray-600">{account.email}</p>
+                        <p className="text-sm text-gray-500">قاعدة البيانات: {account.database_name}</p>
+                        <p className="text-xs text-gray-400">
+                          تاريخ الإنشاء: {new Date(account.created_at).toLocaleDateString('ar-SA')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        {getStatusBadge(account.status)}
+                        <div className="flex gap-2">
+                          {account.status === 'active' ? (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => updateAccountStatus(account.id, 'suspended')}
+                              disabled={loading}
+                            >
+                              إيقاف
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => updateAccountStatus(account.id, 'active')}
+                              disabled={loading}
+                            >
+                              تفعيل
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'notifications' && selectedAccount && (
+          <NotificationManager accountId={selectedAccount} />
+        )}
+
+        {activeTab === 'notifications' && !selectedAccount && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">يرجى اختيار حساب لإدارة الإشعارات</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'timers' && selectedAccount && (
+          <BreakTimerManager accountId={selectedAccount} />
+        )}
+
+        {activeTab === 'timers' && !selectedAccount && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">يرجى اختيار حساب لإدارة المؤقتات</p>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

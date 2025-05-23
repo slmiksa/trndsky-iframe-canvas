@@ -1,216 +1,274 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Globe, ArrowLeft } from 'lucide-react';
-import NotificationPopup from '@/components/NotificationPopup';
 import { useNotifications } from '@/hooks/useNotifications';
-
-interface Website {
-  id: string;
-  website_url: string;
-  website_title: string | null;
-  is_active: boolean;
-  created_at: string;
-}
+import { useBreakTimers } from '@/hooks/useBreakTimers';
+import NotificationPopup from '@/components/NotificationPopup';
+import BreakTimerDisplay from '@/components/BreakTimerDisplay';
 
 interface Account {
   id: string;
   name: string;
   email: string;
+  database_name: string;
+  status: 'active' | 'suspended' | 'pending';
+}
+
+interface Website {
+  id: string;
+  website_url: string;
+  website_title: string | null;
+  iframe_content: string | null;
+  is_active: boolean;
 }
 
 interface Notification {
   id: string;
-  account_id: string;
   title: string;
   message: string | null;
   image_url: string | null;
-  is_active: boolean;
   position: string;
   display_duration: number;
-  created_at: string;
+}
+
+interface BreakTimer {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  position: string;
 }
 
 const ClientPublicPage = () => {
-  const { clientName } = useParams<{ clientName: string }>();
-  const navigate = useNavigate();
+  const { accountId } = useParams<{ accountId: string }>();
   const [account, setAccount] = useState<Account | null>(null);
-  const [website, setWebsite] = useState<Website | null>(null);
+  const [websites, setWebsites] = useState<Website[]>([]);
+  const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
-  const [displayedNotifications, setDisplayedNotifications] = useState<string[]>([]);
+  const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
+  const [shownNotifications, setShownNotifications] = useState<Set<string>>(new Set());
+
   const { fetchActiveNotifications } = useNotifications();
+  const { fetchActiveTimers } = useBreakTimers();
 
-  useEffect(() => {
-    if (clientName) {
-      fetchClientData();
-    }
-  }, [clientName]);
-
-  // Set up realtime subscription for notifications
-  useEffect(() => {
-    if (!account?.id) return;
-
-    console.log('🔔 Setting up realtime subscription for notifications');
+  // Function to check if current time is within timer range
+  const isTimerActive = (timer: BreakTimer) => {
+    const now = new Date();
+    const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
     
-    const channel = supabase
-      .channel('notifications-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `account_id=eq.${account.id}`,
-        },
-        (payload) => {
-          console.log('🔔 Notification change received:', payload);
-          loadActiveNotifications();
-        }
-      )
-      .subscribe();
+    const [startHours, startMinutes] = timer.start_time.split(':').map(Number);
+    const startTimeSeconds = startHours * 3600 + startMinutes * 60;
+    
+    const [endHours, endMinutes] = timer.end_time.split(':').map(Number);
+    const endTimeSeconds = endHours * 3600 + endMinutes * 60;
+    
+    return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
+  };
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [account?.id]);
-
-  const fetchClientData = async () => {
-    try {
-      console.log('🔍 Fetching client data for:', clientName);
-      
-      // Fetch account by name
-      const { data: accountData, error: accountError } = await supabase
-        .from('accounts')
-        .select('id, name, email')
-        .eq('name', clientName)
-        .eq('status', 'active')
-        .single();
-
-      if (accountError) {
-        console.error('❌ Error fetching account:', accountError);
-        if (accountError.code === 'PGRST116') {
-          setError('العميل غير موجود');
-        } else {
-          throw accountError;
-        }
+  useEffect(() => {
+    const fetchAccountData = async () => {
+      if (!accountId) {
+        setError('معرف الحساب غير صحيح');
+        setLoading(false);
         return;
       }
 
-      console.log('✅ Account found:', accountData);
-      setAccount(accountData);
+      try {
+        console.log('🔍 Fetching account data for:', accountId);
+        
+        const { data: accountData, error: accountError } = await supabase
+          .from('accounts')
+          .select('*')
+          .eq('id', accountId)
+          .eq('status', 'active')
+          .single();
 
-      // Fetch first active website for this account
-      const { data: websitesData, error: websitesError } = await supabase
-        .from('account_websites')
-        .select('*')
-        .eq('account_id', accountData.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
+        if (accountError) {
+          console.error('❌ Error fetching account:', accountError);
+          setError('لم يتم العثور على الحساب أو أنه غير نشط');
+          setLoading(false);
+          return;
+        }
 
-      if (websitesError) {
-        console.error('❌ Error fetching websites:', websitesError);
-        throw websitesError;
+        console.log('✅ Account data fetched:', accountData);
+        setAccount(accountData);
+
+        const { data: websiteData, error: websiteError } = await supabase
+          .from('account_websites')
+          .select('*')
+          .eq('account_id', accountId)
+          .eq('is_active', true);
+
+        if (websiteError) {
+          console.error('❌ Error fetching websites:', websiteError);
+        } else {
+          console.log('✅ Websites data fetched:', websiteData);
+          setWebsites(websiteData || []);
+        }
+
+      } catch (error) {
+        console.error('❌ Error in fetchAccountData:', error);
+        setError('حدث خطأ في تحميل البيانات');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      console.log('✅ Website fetched:', websitesData);
-      
-      if (websitesData && websitesData.length > 0) {
-        setWebsite(websitesData[0]);
-      } else {
-        setError('لا توجد مواقع نشطة');
+    fetchAccountData();
+  }, [accountId]);
+
+  // Check for active notifications
+  useEffect(() => {
+    const checkNotifications = async () => {
+      if (!accountId) return;
+
+      try {
+        const notifications = await fetchActiveNotifications(accountId);
+        setActiveNotifications(notifications);
+      } catch (error) {
+        console.error('❌ Error fetching notifications:', error);
       }
+    };
 
-      // Load notifications
-      await loadActiveNotifications(accountData.id);
+    checkNotifications();
+    const notificationInterval = setInterval(checkNotifications, 30000); // Check every 30 seconds
 
-    } catch (error: any) {
-      console.error('❌ Error in fetchClientData:', error);
-      setError('حدث خطأ في تحميل البيانات');
-    } finally {
-      setLoading(false);
-    }
+    return () => clearInterval(notificationInterval);
+  }, [accountId, fetchActiveNotifications]);
+
+  // Check for active timers
+  useEffect(() => {
+    const checkTimers = async () => {
+      if (!accountId) return;
+
+      try {
+        const timers = await fetchActiveTimers(accountId);
+        const currentActiveTimers = timers.filter(isTimerActive);
+        setActiveTimers(currentActiveTimers);
+      } catch (error) {
+        console.error('❌ Error fetching timers:', error);
+      }
+    };
+
+    checkTimers();
+    const timerInterval = setInterval(checkTimers, 10000); // Check every 10 seconds
+
+    return () => clearInterval(timerInterval);
+  }, [accountId, fetchActiveTimers]);
+
+  // Website rotation
+  useEffect(() => {
+    if (websites.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
+    }, 30000); // Switch every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [websites.length]);
+
+  const handleNotificationClose = (notificationId: string) => {
+    setShownNotifications(prev => new Set([...prev, notificationId]));
+    setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
   };
 
-  const loadActiveNotifications = async (accountId?: string) => {
-    const targetAccountId = accountId || account?.id;
-    if (!targetAccountId) return;
-
-    try {
-      const notifications = await fetchActiveNotifications(targetAccountId);
-      console.log('🔔 Active notifications loaded:', notifications);
-      
-      // Filter notifications that haven't been displayed yet
-      const newNotifications = notifications.filter(
-        (notification) => !displayedNotifications.includes(notification.id)
-      );
-      
-      setActiveNotifications(newNotifications);
-      
-      // Mark new notifications as displayed
-      if (newNotifications.length > 0) {
-        setDisplayedNotifications(prev => [
-          ...prev,
-          ...newNotifications.map(n => n.id)
-        ]);
-      }
-    } catch (error) {
-      console.error('❌ Error loading active notifications:', error);
-    }
-  };
-
-  const handleCloseNotification = (notificationId: string) => {
-    setActiveNotifications(prev => 
-      prev.filter(notification => notification.id !== notificationId)
-    );
+  const handleTimerClose = (timerId: string) => {
+    setActiveTimers(prev => prev.filter(t => t.id !== timerId));
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-lg">جاري التحميل...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">جاري التحميل...</p>
         </div>
       </div>
     );
   }
 
-  if (error || !account || !website) {
+  if (error || !account) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <Globe className="h-24 w-24 mx-auto mb-4 text-gray-400" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">غير متاح</h1>
-          <p className="text-gray-600 mb-6">{error || 'لم يتم العثور على الموقع'}</p>
-          <Button onClick={() => navigate('/')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            العودة للرئيسية
-          </Button>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">خطأ</h1>
+          <p className="text-gray-600">{error || 'لم يتم العثور على الحساب'}</p>
         </div>
       </div>
     );
   }
+
+  const currentWebsite = websites[currentWebsiteIndex];
 
   return (
-    <div className="h-screen w-full overflow-hidden relative">
-      <iframe
-        src={website.website_url}
-        className="w-full h-full border-0"
-        title={website.website_title || `موقع ${account.name}`}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"
-      />
-      
-      {/* عرض الإشعارات */}
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <h1 className="text-2xl font-bold text-gray-900">{account.name}</h1>
+            {websites.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  الموقع {currentWebsiteIndex + 1} من {websites.length}
+                </span>
+                <div className="flex gap-1">
+                  {websites.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`w-2 h-2 rounded-full ${
+                        index === currentWebsiteIndex ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1">
+        {websites.length === 0 ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                مرحباً بك في {account.name}
+              </h2>
+              <p className="text-gray-600">لا توجد مواقع مُعرّفة حالياً</p>
+            </div>
+          </div>
+        ) : currentWebsite ? (
+          <div className="h-[calc(100vh-80px)]">
+            <iframe
+              src={currentWebsite.website_url}
+              title={currentWebsite.website_title || currentWebsite.website_url}
+              className="w-full h-full border-0"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
+            />
+          </div>
+        ) : null}
+      </main>
+
+      {/* Active Notifications */}
       {activeNotifications.map((notification) => (
         <NotificationPopup
           key={notification.id}
           notification={notification}
-          onClose={() => handleCloseNotification(notification.id)}
+          onClose={() => handleNotificationClose(notification.id)}
+        />
+      ))}
+
+      {/* Active Timers */}
+      {activeTimers.map((timer) => (
+        <BreakTimerDisplay
+          key={timer.id}
+          timer={timer}
+          onClose={() => handleTimerClose(timer.id)}
         />
       ))}
     </div>
