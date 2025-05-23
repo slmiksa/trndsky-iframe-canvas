@@ -22,7 +22,7 @@ interface Account {
 }
 
 const SuperAdminDashboard = () => {
-  const { signOut } = useAuth();
+  const { signOut, userRole } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -33,17 +33,36 @@ const SuperAdminDashboard = () => {
     database_name: '',
   });
 
+  // Redirect if not super admin
+  useEffect(() => {
+    if (userRole && userRole !== 'super_admin') {
+      window.location.href = '/login';
+    }
+  }, [userRole]);
+
   const fetchAccounts = async () => {
     try {
       console.log('🔍 جاري تحميل الحسابات...');
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*')
-        .order('created_at', { ascending: false });
+      
+      // Use RPC call to bypass RLS for super admin
+      const { data, error } = await supabase.rpc('get_all_accounts_for_super_admin');
 
       if (error) {
         console.error('❌ خطأ في تحميل الحسابات:', error);
-        throw error;
+        
+        // Fallback to direct table access if RPC doesn't exist
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('accounts')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (fallbackError) {
+          throw fallbackError;
+        }
+        
+        console.log('✅ تم تحميل الحسابات بنجاح (fallback):', fallbackData);
+        setAccounts(fallbackData || []);
+        return;
       }
       
       console.log('✅ تم تحميل الحسابات بنجاح:', data);
@@ -52,16 +71,22 @@ const SuperAdminDashboard = () => {
       console.error('Error fetching accounts:', error);
       toast({
         title: "خطأ في تحميل الحسابات",
+        description: "سيتم المحاولة مرة أخرى...",
         variant: "destructive",
       });
+      
+      // Set empty array to prevent infinite loading
+      setAccounts([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAccounts();
-  }, []);
+    if (userRole === 'super_admin') {
+      fetchAccounts();
+    }
+  }, [userRole]);
 
   const createAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,26 +110,40 @@ const SuperAdminDashboard = () => {
       const passwordHash = await hashPassword(newAccount.password);
       console.log('✅ تم تشفير كلمة المرور بنجاح');
 
-      // إنشاء الحساب في جدول accounts مباشرة
+      // Use RPC call to create account as super admin
       console.log('💾 جاري إدراج الحساب في قاعدة البيانات...');
-      const { data: accountData, error: accountError } = await supabase
-        .from('accounts')
-        .insert({
-          name: newAccount.name,
-          email: newAccount.email,
-          password_hash: passwordHash,
-          database_name: newAccount.database_name,
-          status: 'active',
-        })
-        .select()
-        .single();
+      const { data: accountData, error: accountError } = await supabase.rpc('create_account_as_super_admin', {
+        account_name: newAccount.name,
+        account_email: newAccount.email,
+        account_password_hash: passwordHash,
+        account_database_name: newAccount.database_name
+      });
 
       if (accountError) {
-        console.error('❌ خطأ في إنشاء الحساب:', accountError);
-        throw accountError;
-      }
+        console.error('❌ خطأ في إنشاء الحساب (RPC):', accountError);
+        
+        // Fallback to direct insert if RPC doesn't work
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('accounts')
+          .insert({
+            name: newAccount.name,
+            email: newAccount.email,
+            password_hash: passwordHash,
+            database_name: newAccount.database_name,
+            status: 'active',
+          })
+          .select()
+          .single();
 
-      console.log('✅ تم إنشاء الحساب بنجاح:', accountData);
+        if (fallbackError) {
+          console.error('❌ خطأ في إنشاء الحساب (fallback):', fallbackError);
+          throw fallbackError;
+        }
+
+        console.log('✅ تم إنشاء الحساب بنجاح (fallback):', fallbackData);
+      } else {
+        console.log('✅ تم إنشاء الحساب بنجاح (RPC):', accountData);
+      }
 
       toast({
         title: "تم إنشاء الحساب بنجاح",
@@ -123,10 +162,12 @@ const SuperAdminDashboard = () => {
       
       let errorMessage = 'حدث خطأ غير متوقع';
       if (error.message) {
-        if (error.message.includes('duplicate')) {
+        if (error.message.includes('duplicate') || error.message.includes('unique')) {
           errorMessage = 'البريد الإلكتروني مستخدم مسبقاً';
         } else if (error.message.includes('invalid')) {
           errorMessage = 'البيانات المدخلة غير صحيحة';
+        } else if (error.message.includes('policy')) {
+          errorMessage = 'خطأ في صلاحيات قاعدة البيانات';
         } else {
           errorMessage = error.message;
         }
@@ -146,14 +187,25 @@ const SuperAdminDashboard = () => {
     try {
       console.log(`🔄 جاري تحديث حالة الحساب ${accountId} إلى ${status}`);
       
-      const { error } = await supabase
-        .from('accounts')
-        .update({ status })
-        .eq('id', accountId);
+      // Use RPC call for updating as super admin
+      const { error } = await supabase.rpc('update_account_status_as_super_admin', {
+        account_id: accountId,
+        new_status: status
+      });
 
       if (error) {
-        console.error('❌ خطأ في تحديث حالة الحساب:', error);
-        throw error;
+        console.error('❌ خطأ في تحديث حالة الحساب (RPC):', error);
+        
+        // Fallback to direct update
+        const { error: fallbackError } = await supabase
+          .from('accounts')
+          .update({ status })
+          .eq('id', accountId);
+
+        if (fallbackError) {
+          console.error('❌ خطأ في تحديث حالة الحساب (fallback):', fallbackError);
+          throw fallbackError;
+        }
       }
 
       console.log('✅ تم تحديث حالة الحساب بنجاح');
@@ -184,6 +236,30 @@ const SuperAdminDashboard = () => {
     const config = statusConfig[status as keyof typeof statusConfig];
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
+
+  // Show loading while checking user role
+  if (!userRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+          <p className="mt-4">جاري التحميل...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show unauthorized if not super admin
+  if (userRole !== 'super_admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">غير مصرح</h1>
+          <p className="text-gray-600">ليس لديك صلاحية للوصول إلى هذه الصفحة</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
