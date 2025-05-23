@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -176,14 +175,26 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes
+  // Setup realtime listener for website changes - IMPROVED VERSION
   useEffect(() => {
-    if (!account?.id || subscriptionExpired) return;
+    if (!account?.id || subscriptionExpired) {
+      console.log('⏭️ Skipping realtime setup - no account or subscription expired');
+      return;
+    }
 
     console.log('🔄 Setting up realtime listener for websites');
+    console.log('🔄 Account ID:', account.id);
+    
+    // Create a unique channel name
+    const channelName = `account-websites-${account.id}`;
     
     const channel = supabase
-      .channel('account-websites-changes')
+      .channel(channelName, {
+        config: {
+          broadcast: { self: true },
+          presence: { key: account.id }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -197,17 +208,29 @@ const ClientPublicPage = () => {
           console.log('🔄 Event type:', payload.eventType);
           console.log('🔄 New record:', payload.new);
           console.log('🔄 Old record:', payload.old);
+          console.log('🔄 Timestamp:', new Date().toISOString());
           
-          // Re-fetch websites to get the latest data
+          // Force re-fetch websites to get the latest data
+          console.log('🔄 Re-fetching websites due to change...');
           fetchWebsites(account);
         }
       )
       .subscribe((status) => {
         console.log('🔄 Realtime subscription status:', status);
+        console.log('🔄 Channel name:', channelName);
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to realtime updates!');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Error subscribing to realtime updates');
+        } else if (status === 'TIMED_OUT') {
+          console.error('⏰ Realtime subscription timed out');
+        }
       });
 
     return () => {
       console.log('🔄 Cleaning up realtime listener');
+      console.log('🔄 Removing channel:', channelName);
       supabase.removeChannel(channel);
     };
   }, [account?.id, subscriptionExpired]);
@@ -366,6 +389,9 @@ const ClientPublicPage = () => {
                 مرحباً بك في {account.name}
               </h2>
               <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
+              <p className="text-sm text-gray-400 mt-2">
+                🔄 الاستماع للتحديثات المباشرة نشط
+              </p>
             </div>
           </div>
         ) : currentWebsite ? (
