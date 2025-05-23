@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { testSuperAdminPassword } from '@/utils/testAuth';
+import { generateCorrectHash } from '@/utils/generateHash';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -33,6 +34,12 @@ const Login = () => {
     console.log('Testing super admin password...');
     const result = await testSuperAdminPassword();
     console.log('Test completed, result:', result);
+  };
+
+  const handleGenerateHash = async () => {
+    console.log('Generating new hash...');
+    const newHash = await generateCorrectHash();
+    console.log('New hash ready to use:', newHash);
   };
 
   return (
@@ -77,15 +84,26 @@ const Login = () => {
             <h3 className="text-sm font-medium text-gray-700 mb-2">بيانات تسجيل الدخول للمدير العام:</h3>
             <p className="text-xs text-gray-600">اسم المستخدم: trndsky</p>
             <p className="text-xs text-gray-600">كلمة المرور: Salem_ss1412</p>
-            <Button 
-              onClick={handleTestPassword}
-              variant="outline" 
-              size="sm" 
-              className="mt-2 w-full"
-              type="button"
-            >
-              اختبار كلمة المرور
-            </Button>
+            <div className="flex gap-2 mt-2">
+              <Button 
+                onClick={handleTestPassword}
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                type="button"
+              >
+                اختبار كلمة المرور
+              </Button>
+              <Button 
+                onClick={handleGenerateHash}
+                variant="outline" 
+                size="sm" 
+                className="flex-1"
+                type="button"
+              >
+                توليد هاش جديد
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
