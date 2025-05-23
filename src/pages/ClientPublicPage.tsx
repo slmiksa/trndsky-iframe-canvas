@@ -78,6 +78,36 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
+  // Function to fetch websites
+  const fetchWebsites = async (accountData: Account) => {
+    try {
+      console.log('🔍 Fetching websites for account:', accountData.id);
+      
+      const { data: websiteData, error: websiteError } = await supabase
+        .from('account_websites')
+        .select('*')
+        .eq('account_id', accountData.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true });
+
+      if (websiteError) {
+        console.error('❌ Error fetching websites:', websiteError);
+      } else {
+        console.log('✅ Websites data fetched:', websiteData);
+        setWebsites(websiteData || []);
+        
+        // Reset current website index if needed
+        if (websiteData && websiteData.length > 0) {
+          setCurrentWebsiteIndex(prev => prev >= websiteData.length ? 0 : prev);
+        } else {
+          setCurrentWebsiteIndex(0);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchWebsites:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchAccountData = async () => {
       if (!accountId) {
@@ -128,19 +158,7 @@ const ClientPublicPage = () => {
         }
 
         setAccount(accountData);
-
-        const { data: websiteData, error: websiteError } = await supabase
-          .from('account_websites')
-          .select('*')
-          .eq('account_id', accountData.id)
-          .eq('is_active', true);
-
-        if (websiteError) {
-          console.error('❌ Error fetching websites:', websiteError);
-        } else {
-          console.log('✅ Websites data fetched:', websiteData);
-          setWebsites(websiteData || []);
-        }
+        await fetchWebsites(accountData);
 
       } catch (error) {
         console.error('❌ Error in fetchAccountData:', error);
@@ -152,6 +170,37 @@ const ClientPublicPage = () => {
 
     fetchAccountData();
   }, [accountId]);
+
+  // Setup realtime listener for website changes
+  useEffect(() => {
+    if (!account?.id || subscriptionExpired) return;
+
+    console.log('🔄 Setting up realtime listener for websites');
+    
+    const channel = supabase
+      .channel('account-websites-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'account_websites',
+          filter: `account_id=eq.${account.id}`
+        },
+        (payload) => {
+          console.log('🔄 Website change detected:', payload);
+          
+          // Re-fetch websites to get the latest data
+          fetchWebsites(account);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔄 Cleaning up realtime listener');
+      supabase.removeChannel(channel);
+    };
+  }, [account?.id, subscriptionExpired]);
 
   // Check for active notifications - modify this to not auto-dismiss
   useEffect(() => {
