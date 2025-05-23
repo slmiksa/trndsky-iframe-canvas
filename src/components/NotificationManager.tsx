@@ -41,7 +41,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     title: '',
     message: '',
     position: 'top-right',
-    display_duration: 5000,
+    display_duration: 5, // Changed to minutes (default 5 minutes)
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -79,6 +79,9 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
         imageUrl = await uploadImage(selectedImage, accountId);
       }
 
+      // Convert minutes to milliseconds for storage
+      const durationInMs = newNotification.display_duration * 60 * 1000;
+
       await createNotification({
         account_id: accountId,
         title: newNotification.title,
@@ -86,7 +89,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
         image_url: imageUrl,
         is_active: true,
         position: newNotification.position,
-        display_duration: newNotification.display_duration,
+        display_duration: durationInMs,
       });
 
       toast({
@@ -99,7 +102,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
         title: '',
         message: '',
         position: 'top-right',
-        display_duration: 5000,
+        display_duration: 5,
       });
       setSelectedImage(null);
       setImagePreview(null);
@@ -149,6 +152,12 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
         variant: "destructive",
       });
     }
+  };
+
+  // Convert milliseconds to minutes for display
+  const formatDuration = (durationMs: number) => {
+    const minutes = Math.round(durationMs / (60 * 1000));
+    return `${minutes} دقيقة`;
   };
 
   if (loading) {
@@ -216,14 +225,14 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                 </div>
 
                 <div>
-                  <Label htmlFor="duration">مدة العرض (بالميللي ثانية)</Label>
+                  <Label htmlFor="duration">مدة العرض (بالدقائق)</Label>
                   <Input
                     id="duration"
                     type="number"
-                    min="1000"
-                    step="1000"
+                    min="1"
+                    step="1"
                     value={newNotification.display_duration}
-                    onChange={(e) => setNewNotification({ ...newNotification, display_duration: parseInt(e.target.value) })}
+                    onChange={(e) => setNewNotification({ ...newNotification, display_duration: parseInt(e.target.value) || 1 })}
                   />
                 </div>
 
@@ -323,7 +332,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                 )}
                 <div className="flex gap-4 text-xs text-gray-500">
                   <span>الموضع: {notification.position}</span>
-                  <span>المدة: {notification.display_duration}ms</span>
+                  <span>المدة: {formatDuration(notification.display_duration)}</span>
                   <span>{new Date(notification.created_at).toLocaleDateString('ar-SA')}</span>
                 </div>
               </div>
