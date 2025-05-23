@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from '@/hooks/use-toast';
 import { Plus, Eye, EyeOff, Trash2, Upload } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Notification {
   id: string;
@@ -29,33 +30,7 @@ interface NotificationManagerProps {
 const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) => {
   console.log('🔍 NotificationManager rendered with accountId:', accountId);
   
-  // Check auth on component mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      console.log('🔐 Auth status in NotificationManager:', data.session ? `Logged in as ${data.session.user.id}` : 'Not logged in');
-      
-      if (error) {
-        console.error('❌ Auth error:', error);
-      }
-      
-      // Check for user roles
-      if (data.session?.user) {
-        const { data: roles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', data.session.user.id);
-        
-        console.log('👤 User roles:', roles);
-        
-        if (rolesError) {
-          console.error('❌ Error fetching user roles:', rolesError);
-        }
-      }
-    };
-    
-    checkAuth();
-  }, []);
+  const { user } = useAuth();
   
   const {
     notifications,
@@ -71,7 +46,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     title: '',
     message: '',
     position: 'top-right',
-    display_duration: 5, // Changed to minutes (default 5 minutes)
+    display_duration: 5,
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -98,7 +73,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       message: newNotification.message,
       position: newNotification.position,
       display_duration: newNotification.display_duration,
-      hasImage: !!selectedImage
+      hasImage: !!selectedImage,
+      user: user
     });
 
     if (!newNotification.title.trim()) {
@@ -119,11 +95,9 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       });
       return;
     }
-    
-    // Check auth before submission
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) {
-      console.error('❌ User not authenticated');
+
+    if (!user) {
+      console.error('❌ User not authenticated in custom auth');
       toast({
         title: "خطأ في المصادقة",
         description: "يجب تسجيل الدخول لإنشاء إشعار",
@@ -132,7 +106,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       return;
     }
 
-    console.log('🔐 User authenticated as:', session.session.user.id);
+    console.log('🔐 User authenticated in custom system:', user);
 
     setIsSubmitting(true);
 
@@ -145,7 +119,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
         console.log('✅ Image uploaded successfully:', imageUrl);
       }
 
-      // Convert minutes to milliseconds for storage
       const durationInMs = newNotification.display_duration * 60 * 1000;
       console.log('⏱️ Duration converted from', newNotification.display_duration, 'minutes to', durationInMs, 'milliseconds');
 
@@ -227,7 +200,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     }
   };
 
-  // Convert milliseconds to minutes for display
   const formatDuration = (durationMs: number) => {
     const minutes = Math.round(durationMs / (60 * 1000));
     return `${minutes} دقيقة`;
