@@ -79,18 +79,32 @@ const ClientPublicPage = () => {
       try {
         console.log('🔍 Fetching account data for:', accountId);
         
-        const { data: accountData, error: accountError } = await supabase
+        // أولاً نحاول البحث بالـ ID
+        let { data: accountData, error: accountError } = await supabase
           .from('accounts')
           .select('*')
           .eq('id', accountId)
           .eq('status', 'active')
           .single();
 
-        if (accountError) {
-          console.error('❌ Error fetching account:', accountError);
-          setError('لم يتم العثور على الحساب أو أنه غير نشط');
-          setLoading(false);
-          return;
+        // إذا لم نجد شيئاً، نبحث بالاسم
+        if (accountError || !accountData) {
+          console.log('🔍 Searching by name:', accountId);
+          const { data: accountByName, error: nameError } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq('name', accountId)
+            .eq('status', 'active')
+            .single();
+            
+          if (nameError || !accountByName) {
+            console.error('❌ Error fetching account:', nameError);
+            setError('لم يتم العثور على الحساب أو أنه غير نشط');
+            setLoading(false);
+            return;
+          }
+          
+          accountData = accountByName;
         }
 
         console.log('✅ Account data fetched:', accountData);
@@ -99,7 +113,7 @@ const ClientPublicPage = () => {
         const { data: websiteData, error: websiteError } = await supabase
           .from('account_websites')
           .select('*')
-          .eq('account_id', accountId)
+          .eq('account_id', accountData.id)
           .eq('is_active', true);
 
         if (websiteError) {
@@ -123,10 +137,10 @@ const ClientPublicPage = () => {
   // Check for active notifications
   useEffect(() => {
     const checkNotifications = async () => {
-      if (!accountId) return;
+      if (!account?.id) return;
 
       try {
-        const notifications = await fetchActiveNotifications(accountId);
+        const notifications = await fetchActiveNotifications(account.id);
         setActiveNotifications(notifications);
       } catch (error) {
         console.error('❌ Error fetching notifications:', error);
@@ -137,15 +151,15 @@ const ClientPublicPage = () => {
     const notificationInterval = setInterval(checkNotifications, 30000); // Check every 30 seconds
 
     return () => clearInterval(notificationInterval);
-  }, [accountId, fetchActiveNotifications]);
+  }, [account?.id, fetchActiveNotifications]);
 
   // Check for active timers
   useEffect(() => {
     const checkTimers = async () => {
-      if (!accountId) return;
+      if (!account?.id) return;
 
       try {
-        const timers = await fetchActiveTimers(accountId);
+        const timers = await fetchActiveTimers(account.id);
         const currentActiveTimers = timers.filter(isTimerActive);
         setActiveTimers(currentActiveTimers);
       } catch (error) {
@@ -157,7 +171,7 @@ const ClientPublicPage = () => {
     const timerInterval = setInterval(checkTimers, 10000); // Check every 10 seconds
 
     return () => clearInterval(timerInterval);
-  }, [accountId, fetchActiveTimers]);
+  }, [account?.id, fetchActiveTimers]);
 
   // Website rotation
   useEffect(() => {
