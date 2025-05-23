@@ -263,6 +263,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                     <option value="top-right">أعلى اليمين</option>
                     <option value="top-left">أعلى اليسار</option>
                     <option value="top-center">أعلى الوسط</option>
+                    <option value="center">المنتصف</option>
                     <option value="bottom-right">أسفل اليمين</option>
                     <option value="bottom-left">أسفل اليسار</option>
                     <option value="bottom-center">أسفل الوسط</option>
