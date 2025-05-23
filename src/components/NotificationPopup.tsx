@@ -106,7 +106,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
                 className={`rounded-xl shadow-lg ${
                   notification.position === 'center' 
                     ? 'w-[85%] max-h-[70vh] object-contain' 
-                    : 'w-full h-32 object-cover'
+                    : 'w-[85%] max-h-32 object-cover'
                 }`}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -118,7 +118,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
           {/* الرسالة */}
           {notification.message && (
             <div className={`text-center`}>
-              <p className={`text-gray-700 leading-relaxed whitespace-pre-wrap ${
+              <p className={`text-gray-700 leading-relaxed whitespace-pre-line ${
                 notification.position === 'center' 
                   ? 'text-2xl max-w-4xl mx-auto' 
                   : 'text-sm'
