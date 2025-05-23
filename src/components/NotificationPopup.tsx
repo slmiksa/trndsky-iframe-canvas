@@ -61,7 +61,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
 
   const getSizeClasses = () => {
     if (notification.position === 'center') {
-      return 'w-[95vw] max-w-6xl min-h-[85vh]';
+      return 'w-[85vw] max-w-7xl min-h-[80vh]';
     }
     return 'max-w-md min-w-80';
   };
@@ -105,7 +105,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
                 alt={notification.title}
                 className={`rounded-xl shadow-lg ${
                   notification.position === 'center' 
-                    ? 'max-w-full max-h-[40vh] w-auto h-auto object-contain' 
+                    ? 'max-w-full max-h-[60vh] w-auto h-auto object-contain' 
                     : 'w-full h-32 object-cover'
                 }`}
                 onError={(e) => {
@@ -117,7 +117,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
 
           {/* الرسالة */}
           {notification.message && (
-            <div className={`${notification.position === 'center' ? 'mb-12' : 'mb-4'} text-center`}>
+            <div className={`${notification.position === 'center' ? 'mb-8' : 'mb-4'} text-center`}>
               <p className={`text-gray-700 leading-relaxed ${
                 notification.position === 'center' 
                   ? 'text-2xl max-w-4xl mx-auto' 
@@ -128,12 +128,12 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
             </div>
           )}
 
-          {/* منطقة المحتوى الإضافي - تظهر فقط عندما تكون هناك صورة */}
-          {notification.position === 'center' && notification.image_url && (
+          {/* منطقة المحتوى الإضافي - تظهر فقط عندما تكون هناك صورة في وضع المركز */}
+          {notification.position === 'center' && notification.image_url && notification.message && (
             <div className="bg-gray-50/50 rounded-xl p-8 mb-8 border border-gray-200/50">
               <div className="text-center">
                 <p className="text-gray-600 text-lg">
-                  {notification.message || ''}
+                  {notification.message}
                 </p>
               </div>
             </div>
