@@ -142,15 +142,12 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
             </div>
           )}
 
-          {/* منطقة المحتوى الإضافي */}
-          {notification.position === 'center' && (
+          {/* منطقة المحتوى الإضافي - تظهر فقط عندما تكون هناك صورة */}
+          {notification.position === 'center' && notification.image_url && (
             <div className="bg-gray-50/50 rounded-xl p-8 mb-8 border border-gray-200/50">
               <div className="text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-                  <ImageIcon className="h-8 w-8 text-blue-600" />
-                </div>
                 <p className="text-gray-600 text-lg">
-                  يمكنك إضافة محتوى إضافي هنا
+                  {notification.message || ''}
                 </p>
               </div>
             </div>
@@ -163,7 +160,8 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
                 onClick={handleClose} 
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
               >
-                فهمت
+                {/* تم إزالة النص "فهمت" وتركه فارغًا */}
+                <X className="h-5 w-5" />
               </Button>
             </div>
           )}
@@ -172,7 +170,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
           {notification.position !== 'center' && (
             <div className="flex justify-end">
               <Button size="sm" onClick={handleClose} variant="outline">
-                إغلاق
+                <X className="h-4 w-4" />
               </Button>
             </div>
           )}
