@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
@@ -19,7 +19,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await signIn(email, password);
+      await signIn(username, password);
       navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
@@ -38,13 +38,14 @@ const Login = () => {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">البريد الإلكتروني</Label>
+              <Label htmlFor="username">اسم المستخدم</Label>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
+                placeholder="أدخل اسم المستخدم"
                 dir="ltr"
               />
             </div>
@@ -56,6 +57,7 @@ const Login = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                placeholder="أدخل كلمة المرور"
                 dir="ltr"
               />
             </div>
@@ -63,6 +65,12 @@ const Login = () => {
               {loading ? 'جارٍ تسجيل الدخول...' : 'تسجيل الدخول'}
             </Button>
           </form>
+          
+          <div className="mt-6 p-4 bg-gray-50 rounded-md">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">بيانات تسجيل الدخول للمدير العام:</h3>
+            <p className="text-xs text-gray-600">اسم المستخدم: trndsky</p>
+            <p className="text-xs text-gray-600">كلمة المرور: Salem_ss1412</p>
+          </div>
         </CardContent>
       </Card>
     </div>

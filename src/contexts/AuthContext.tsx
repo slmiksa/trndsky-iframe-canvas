@@ -1,16 +1,23 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { authenticateUser, LoginCredentials } from '@/utils/authUtils';
 import { toast } from '@/hooks/use-toast';
+
+interface User {
+  id: string;
+  username?: string;
+  name?: string;
+  email?: string;
+  role: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  session: any;
   loading: boolean;
   userRole: string | null;
   accountId: string | null;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   checkUserRole: () => Promise<void>;
 }
@@ -27,73 +34,59 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
 
   const checkUserRole = async () => {
-    if (!user) {
-      setUserRole(null);
-      setAccountId(null);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role, account_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking user role:', error);
-        return;
-      }
-
-      if (data) {
-        setUserRole(data.role);
-        setAccountId(data.account_id);
-      }
-    } catch (error) {
-      console.error('Error in checkUserRole:', error);
-    }
+    // هذه الدالة ستستخدم لاحقاً إذا احتجنا لتحديث الأدوار
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+    // التحقق من وجود جلسة محفوظة
+    const savedSession = localStorage.getItem('auth_session');
+    if (savedSession) {
+      try {
+        const parsedSession = JSON.parse(savedSession);
+        setUser(parsedSession.user);
+        setSession(parsedSession);
+        setUserRole(parsedSession.role);
+        setAccountId(parsedSession.account_id);
+      } catch (error) {
+        localStorage.removeItem('auth_session');
       }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      checkUserRole();
-    }
-  }, [user]);
-
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      setLoading(true);
+      const authResult = await authenticateUser({ username, password });
+      
+      const userData: User = {
+        id: authResult.user.id,
+        username: authResult.user.username || authResult.user.email,
+        name: authResult.user.name,
+        email: authResult.user.email,
+        role: authResult.role
+      };
 
-      if (error) {
-        throw error;
-      }
+      const sessionData = {
+        user: userData,
+        role: authResult.role,
+        account_id: authResult.account_id,
+        timestamp: Date.now()
+      };
+
+      setUser(userData);
+      setSession(sessionData);
+      setUserRole(authResult.role);
+      setAccountId(authResult.account_id);
+
+      // حفظ الجلسة في localStorage
+      localStorage.setItem('auth_session', JSON.stringify(sessionData));
 
       toast({
         title: "تم تسجيل الدخول بنجاح",
@@ -106,16 +99,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: "destructive",
       });
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      
+      setUser(null);
+      setSession(null);
       setUserRole(null);
       setAccountId(null);
+      
+      localStorage.removeItem('auth_session');
       
       toast({
         title: "تم تسجيل الخروج",
