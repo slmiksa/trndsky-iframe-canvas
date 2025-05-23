@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -133,14 +134,22 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Check for active notifications
+  // Check for active notifications - modify this to not auto-dismiss
   useEffect(() => {
     const checkNotifications = async () => {
       if (!account?.id) return;
 
       try {
         const notifications = await fetchActiveNotifications(account.id);
-        setActiveNotifications(notifications);
+        
+        // Only add notifications that aren't already shown
+        const newNotifications = notifications.filter(
+          notification => !Array.from(shownNotifications).includes(notification.id)
+        );
+        
+        if (newNotifications.length > 0) {
+          setActiveNotifications(prev => [...prev, ...newNotifications]);
+        }
       } catch (error) {
         console.error('❌ Error fetching notifications:', error);
       }
@@ -150,7 +159,7 @@ const ClientPublicPage = () => {
     const notificationInterval = setInterval(checkNotifications, 30000); // Check every 30 seconds
 
     return () => clearInterval(notificationInterval);
-  }, [account?.id, fetchActiveNotifications]);
+  }, [account?.id, fetchActiveNotifications, shownNotifications]);
 
   // Check for active timers
   useEffect(() => {
@@ -183,9 +192,10 @@ const ClientPublicPage = () => {
     return () => clearInterval(interval);
   }, [websites.length]);
 
+  // Modified to only track that we've seen this notification, but don't remove it
   const handleNotificationClose = (notificationId: string) => {
     setShownNotifications(prev => new Set([...prev, notificationId]));
-    setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
+    // We don't remove from activeNotifications anymore - they stay visible
   };
 
   const handleTimerClose = (timerId: string) => {
@@ -241,7 +251,7 @@ const ClientPublicPage = () => {
         ) : null}
       </main>
 
-      {/* Active Notifications */}
+      {/* Active Notifications - modify to show all active */}
       {activeNotifications.map((notification) => (
         <NotificationPopup
           key={notification.id}

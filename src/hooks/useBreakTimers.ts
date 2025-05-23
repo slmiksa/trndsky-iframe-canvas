@@ -83,7 +83,7 @@ export const useBreakTimers = (accountId?: string) => {
       }
 
       console.log('✅ Break timer created successfully:', data);
-      fetchTimers();
+      await fetchTimers();
       return data;
     } catch (error) {
       console.error('❌ Error in createTimer:', error);
@@ -95,18 +95,20 @@ export const useBreakTimers = (accountId?: string) => {
     try {
       console.log('🔄 Updating break timer:', id, updates);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('break_timers')
         .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) {
         console.error('❌ Error updating break timer:', error);
         throw error;
       }
 
-      console.log('✅ Break timer updated successfully');
-      fetchTimers();
+      console.log('✅ Break timer updated successfully:', data);
+      await fetchTimers();
+      return data;
     } catch (error) {
       console.error('❌ Error in updateTimer:', error);
       throw error;
@@ -117,18 +119,20 @@ export const useBreakTimers = (accountId?: string) => {
     try {
       console.log('🗑️ Deleting break timer:', id);
       
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('break_timers')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
 
       if (error) {
         console.error('❌ Error deleting break timer:', error);
         throw error;
       }
 
-      console.log('✅ Break timer deleted successfully');
-      fetchTimers();
+      console.log('✅ Break timer deleted successfully:', data);
+      await fetchTimers();
+      return data;
     } catch (error) {
       console.error('❌ Error in deleteTimer:', error);
       throw error;
