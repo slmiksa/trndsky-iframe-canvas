@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface Website {
@@ -19,7 +18,7 @@ interface Website {
 }
 
 const ClientDashboard = () => {
-  const { signOut, accountId } = useAuth();
+  const { signOut, accountId, user } = useAuth();
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -28,6 +27,30 @@ const ClientDashboard = () => {
     title: '',
   });
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
+  const [accountName, setAccountName] = useState<string>('');
+
+  // Fetch account name for public page link
+  const fetchAccountName = async () => {
+    if (!accountId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('name')
+        .eq('id', accountId)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching account name:', error);
+        return;
+      }
+
+      console.log('✅ Account name fetched:', data.name);
+      setAccountName(data.name);
+    } catch (error) {
+      console.error('❌ Error in fetchAccountName:', error);
+    }
+  };
 
   const fetchWebsites = async () => {
     if (!accountId) {
@@ -63,6 +86,7 @@ const ClientDashboard = () => {
 
   useEffect(() => {
     fetchWebsites();
+    fetchAccountName();
   }, [accountId]);
 
   const addWebsite = async (e: React.FormEvent) => {
@@ -179,6 +203,24 @@ const ClientDashboard = () => {
     }
   };
 
+  const copyPublicLink = () => {
+    if (accountName) {
+      const publicUrl = `${window.location.origin}/client/${accountName}`;
+      navigator.clipboard.writeText(publicUrl);
+      toast({
+        title: "تم نسخ الرابط",
+        description: "تم نسخ رابط الصفحة العامة إلى الحافظة",
+      });
+    }
+  };
+
+  const openPublicPage = () => {
+    if (accountName) {
+      const publicUrl = `/client/${accountName}`;
+      window.open(publicUrl, '_blank');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -188,6 +230,19 @@ const ClientDashboard = () => {
               <h1 className="text-2xl font-bold text-gray-900">لوحة تحكم العميل</h1>
               {accountId && (
                 <p className="text-sm text-gray-600">معرف الحساب: {accountId}</p>
+              )}
+              {accountName && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    الصفحة العامة: /client/{accountName}
+                  </Badge>
+                  <Button size="sm" variant="ghost" onClick={copyPublicLink}>
+                    <Share2 className="h-3 w-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={openPublicPage}>
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                </div>
               )}
             </div>
             <Button onClick={signOut} variant="outline">
@@ -204,146 +259,4 @@ const ClientDashboard = () => {
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle>مواقعي</CardTitle>
-                  <Button onClick={() => setShowAddForm(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    إضافة موقع
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {showAddForm && (
-                  <form onSubmit={addWebsite} className="mb-6 p-4 border rounded-lg bg-gray-50">
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="title">عنوان الموقع</Label>
-                        <Input
-                          id="title"
-                          value={newWebsite.title}
-                          onChange={(e) => setNewWebsite({...newWebsite, title: e.target.value})}
-                          placeholder="اختياري"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="url">رابط الموقع</Label>
-                        <Input
-                          id="url"
-                          type="url"
-                          value={newWebsite.url}
-                          onChange={(e) => setNewWebsite({...newWebsite, url: e.target.value})}
-                          required
-                          dir="ltr"
-                          placeholder="https://example.com"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <Button type="submit" disabled={loading}>
-                        إضافة الموقع
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>
-                        إلغاء
-                      </Button>
-                    </div>
-                  </form>
-                )}
-
-                <div className="space-y-4">
-                  {websites.map((website) => (
-                    <div 
-                      key={website.id} 
-                      className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                        selectedWebsite?.id === website.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-                      }`}
-                      onClick={() => setSelectedWebsite(website)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-semibold">
-                            {website.website_title || 'موقع بدون عنوان'}
-                          </h3>
-                          <p className="text-sm text-gray-600 break-all">{website.website_url}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={website.is_active ? 'default' : 'secondary'}>
-                            {website.is_active ? 'نشط' : 'معطل'}
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleWebsiteStatus(website.id, website.is_active);
-                            }}
-                          >
-                            {website.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {websites.length === 0 && !loading && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>لم تقم بإضافة أي مواقع بعد</p>
-                      <p className="text-sm">انقر على "إضافة موقع" للبدء</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* معاينة الموقع */}
-          <div>
-            <Card className="h-full">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>معاينة الموقع</CardTitle>
-                  {selectedWebsite && (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => deleteWebsite(selectedWebsite.id)}
-                    >
-                      حذف الموقع
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="h-96">
-                {selectedWebsite ? (
-                  selectedWebsite.is_active ? (
-                    <iframe
-                      src={selectedWebsite.website_url}
-                      className="w-full h-full border rounded-lg"
-                      title={selectedWebsite.website_title || 'Website Preview'}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-                      <div className="text-center text-gray-500">
-                        <EyeOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>الموقع معطل</p>
-                        <p className="text-sm">قم بتفعيله لمعاينته</p>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-                    <div className="text-center text-gray-500">
-                      <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>اختر موقعاً لمعاينته</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default ClientDashboard;
+                  <CardTitle>
