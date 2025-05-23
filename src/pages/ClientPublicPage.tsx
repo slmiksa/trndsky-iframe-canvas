@@ -78,7 +78,7 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites
+  // Function to fetch websites - now fetches all websites and filters active ones in state
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log('🔍 Fetching websites for account:', accountData.id);
@@ -87,20 +87,25 @@ const ClientPublicPage = () => {
         .from('account_websites')
         .select('*')
         .eq('account_id', accountData.id)
-        .eq('is_active', true)
         .order('created_at', { ascending: true });
 
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
       } else {
-        console.log('✅ Websites data fetched:', websiteData);
-        setWebsites(websiteData || []);
+        console.log('✅ All websites data fetched:', websiteData);
+        
+        // Filter only active websites
+        const activeWebsites = (websiteData || []).filter(website => website.is_active);
+        console.log('✅ Active websites filtered:', activeWebsites);
+        
+        setWebsites(activeWebsites);
         
         // Reset current website index if needed
-        if (websiteData && websiteData.length > 0) {
-          setCurrentWebsiteIndex(prev => prev >= websiteData.length ? 0 : prev);
+        if (activeWebsites && activeWebsites.length > 0) {
+          setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
         } else {
           setCurrentWebsiteIndex(0);
+          console.log('⚠️ No active websites found');
         }
       }
     } catch (error) {
@@ -189,12 +194,17 @@ const ClientPublicPage = () => {
         },
         (payload) => {
           console.log('🔄 Website change detected:', payload);
+          console.log('🔄 Event type:', payload.eventType);
+          console.log('🔄 New record:', payload.new);
+          console.log('🔄 Old record:', payload.old);
           
           // Re-fetch websites to get the latest data
           fetchWebsites(account);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('🔄 Realtime subscription status:', status);
+      });
 
     return () => {
       console.log('🔄 Cleaning up realtime listener');
@@ -249,7 +259,7 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Website rotation
+  // Website rotation - now only if there are active websites
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
@@ -355,7 +365,7 @@ const ClientPublicPage = () => {
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
                 مرحباً بك في {account.name}
               </h2>
-              <p className="text-gray-600">لا توجد مواقع مُعرّفة حالياً</p>
+              <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
             </div>
           </div>
         ) : currentWebsite ? (
