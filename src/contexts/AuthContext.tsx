@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authenticateUser, LoginCredentials } from '@/utils/authUtils';
 import { toast } from '@/hooks/use-toast';
@@ -39,20 +40,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [accountId, setAccountId] = useState<string | null>(null);
 
   const checkUserRole = async () => {
-    // هذه الدالة ستستخدم لاحقاً إذا احتجنا لتحديث الأدوار
+    // This function will be used later if we need to update roles
   };
 
   useEffect(() => {
-    // التحقق من وجود جلسة محفوظة
+    // Check for saved session
     const savedSession = localStorage.getItem('auth_session');
     if (savedSession) {
       try {
         const parsedSession = JSON.parse(savedSession);
+        console.log('🔐 Found saved session:', parsedSession);
         setUser(parsedSession.user);
         setSession(parsedSession);
         setUserRole(parsedSession.role);
         setAccountId(parsedSession.account_id);
+        console.log('✅ Session restored successfully');
       } catch (error) {
+        console.error('❌ Error parsing saved session:', error);
         localStorage.removeItem('auth_session');
       }
     }
@@ -62,12 +66,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (username: string, password: string) => {
     try {
       setLoading(true);
+      console.log('🔐 Starting authentication for:', username);
+      
       const authResult = await authenticateUser({ username, password });
+      console.log('✅ Authentication successful:', authResult);
       
       let userData: User;
       
       if (authResult.role === 'super_admin') {
-        // التعامل مع السوبر أدمن - نستخدم type casting للوصول للخصائص
         const superAdmin = authResult.user as any;
         userData = {
           id: superAdmin.id,
@@ -75,7 +81,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           role: authResult.role
         };
       } else {
-        // التعامل مع حسابات العملاء - نستخدم type casting للوصول للخصائص
         const account = authResult.user as any;
         userData = {
           id: account.id,
@@ -97,14 +102,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserRole(authResult.role);
       setAccountId(authResult.account_id);
 
-      // حفظ الجلسة في localStorage
       localStorage.setItem('auth_session', JSON.stringify(sessionData));
+      console.log('💾 Session saved to localStorage');
 
       toast({
         title: "تم تسجيل الدخول بنجاح",
         description: "مرحباً بك في النظام",
       });
     } catch (error: any) {
+      console.error('❌ Authentication failed:', error);
       toast({
         title: "خطأ في تسجيل الدخول",
         description: error.message,
@@ -118,18 +124,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      console.log('🚪 Signing out user');
       setUser(null);
       setSession(null);
       setUserRole(null);
       setAccountId(null);
       
       localStorage.removeItem('auth_session');
+      console.log('✅ User signed out successfully');
       
       toast({
         title: "تم تسجيل الخروج",
         description: "شكراً لاستخدام النظام",
       });
     } catch (error: any) {
+      console.error('❌ Sign out error:', error);
       toast({
         title: "خطأ في تسجيل الخروج",
         description: error.message,

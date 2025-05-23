@@ -30,19 +30,28 @@ const ClientDashboard = () => {
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
 
   const fetchWebsites = async () => {
-    if (!accountId) return;
+    if (!accountId) {
+      console.log('⚠️ No account ID available for fetching websites');
+      return;
+    }
 
     try {
+      console.log('🔍 Fetching websites for account:', accountId);
       const { data, error } = await supabase
         .from('account_websites')
         .select('*')
         .eq('account_id', accountId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching websites:', error);
+        throw error;
+      }
+      
+      console.log('✅ Websites fetched successfully:', data);
       setWebsites(data || []);
     } catch (error) {
-      console.error('Error fetching websites:', error);
+      console.error('❌ Error in fetchWebsites:', error);
       toast({
         title: "خطأ في تحميل المواقع",
         variant: "destructive",
@@ -58,11 +67,20 @@ const ClientDashboard = () => {
 
   const addWebsite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!accountId) return;
+    if (!accountId) {
+      toast({
+        title: "خطأ",
+        description: "لم يتم العثور على معرف الحساب",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
 
     try {
+      console.log('➕ Adding new website:', { accountId, url: newWebsite.url, title: newWebsite.title });
+      
       const { error } = await supabase
         .from('account_websites')
         .insert({
@@ -72,8 +90,12 @@ const ClientDashboard = () => {
           is_active: true,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error inserting website:', error);
+        throw error;
+      }
 
+      console.log('✅ Website added successfully');
       toast({
         title: "تم إضافة الموقع بنجاح",
         description: `تم إضافة ${newWebsite.title || newWebsite.url}`,
@@ -83,6 +105,7 @@ const ClientDashboard = () => {
       setShowAddForm(false);
       fetchWebsites();
     } catch (error: any) {
+      console.error('❌ Error in addWebsite:', error);
       toast({
         title: "خطأ في إضافة الموقع",
         description: error.message,
@@ -95,13 +118,19 @@ const ClientDashboard = () => {
 
   const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
     try {
+      console.log('🔄 Toggling website status:', { websiteId, currentStatus });
+      
       const { error } = await supabase
         .from('account_websites')
         .update({ is_active: !currentStatus })
         .eq('id', websiteId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error updating website status:', error);
+        throw error;
+      }
 
+      console.log('✅ Website status updated successfully');
       toast({
         title: "تم تحديث حالة الموقع",
         description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع`,
@@ -109,6 +138,7 @@ const ClientDashboard = () => {
 
       fetchWebsites();
     } catch (error: any) {
+      console.error('❌ Error in toggleWebsiteStatus:', error);
       toast({
         title: "خطأ في تحديث الموقع",
         description: error.message,
@@ -119,13 +149,19 @@ const ClientDashboard = () => {
 
   const deleteWebsite = async (websiteId: string) => {
     try {
+      console.log('🗑️ Deleting website:', websiteId);
+      
       const { error } = await supabase
         .from('account_websites')
         .delete()
         .eq('id', websiteId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error deleting website:', error);
+        throw error;
+      }
 
+      console.log('✅ Website deleted successfully');
       toast({
         title: "تم حذف الموقع",
         description: "تم حذف الموقع بنجاح",
@@ -134,6 +170,7 @@ const ClientDashboard = () => {
       setSelectedWebsite(null);
       fetchWebsites();
     } catch (error: any) {
+      console.error('❌ Error in deleteWebsite:', error);
       toast({
         title: "خطأ في حذف الموقع",
         description: error.message,
@@ -147,7 +184,12 @@ const ClientDashboard = () => {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <h1 className="text-2xl font-bold text-gray-900">لوحة تحكم العميل</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">لوحة تحكم العميل</h1>
+              {accountId && (
+                <p className="text-sm text-gray-600">معرف الحساب: {accountId}</p>
+              )}
+            </div>
             <Button onClick={signOut} variant="outline">
               تسجيل الخروج
             </Button>
