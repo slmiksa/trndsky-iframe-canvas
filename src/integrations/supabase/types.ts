@@ -9,16 +9,131 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      account_websites: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          id: string
+          iframe_content: string | null
+          is_active: boolean | null
+          updated_at: string | null
+          website_title: string | null
+          website_url: string
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          iframe_content?: string | null
+          is_active?: boolean | null
+          updated_at?: string | null
+          website_title?: string | null
+          website_url: string
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          iframe_content?: string | null
+          is_active?: boolean | null
+          updated_at?: string | null
+          website_title?: string | null
+          website_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_websites_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounts: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          database_name: string
+          email: string
+          id: string
+          name: string
+          password_hash: string
+          status: Database["public"]["Enums"]["account_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          database_name: string
+          email: string
+          id?: string
+          name: string
+          password_hash: string
+          status?: Database["public"]["Enums"]["account_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          database_name?: string
+          email?: string
+          id?: string
+          name?: string
+          password_hash?: string
+          status?: Database["public"]["Enums"]["account_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          role: string
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_super_admin: {
+        Args: { user_id: string }
+        Returns: boolean
+      }
+      user_owns_account: {
+        Args: { user_id: string; account_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      account_status: "active" | "suspended" | "pending"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +248,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      account_status: ["active", "suspended", "pending"],
+    },
   },
 } as const
