@@ -118,7 +118,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
           {/* الرسالة */}
           {notification.message && (
             <div className={`text-center`}>
-              <p className={`text-gray-700 leading-relaxed ${
+              <p className={`text-gray-700 leading-relaxed whitespace-pre-wrap ${
                 notification.position === 'center' 
                   ? 'text-2xl max-w-4xl mx-auto' 
                   : 'text-sm'

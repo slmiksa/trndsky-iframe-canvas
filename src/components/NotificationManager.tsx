@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -244,11 +245,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                 
                 <div>
                   <Label htmlFor="message">رسالة الإشعار</Label>
-                  <Input
+                  <Textarea
                     id="message"
                     value={newNotification.message}
                     onChange={(e) => setNewNotification({ ...newNotification, message: e.target.value })}
-                    placeholder="محتوى الرسالة (اختياري)"
+                    placeholder="محتوى الرسالة (اختياري) - يمكنك كتابة عدة أسطر"
+                    className="min-h-[100px] resize-none"
+                    rows={4}
                   />
                 </div>
 
@@ -365,7 +368,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                   </div>
                 </div>
                 {notification.message && (
-                  <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
+                  <p className="text-sm text-gray-600 mb-2 whitespace-pre-wrap">{notification.message}</p>
                 )}
                 {notification.image_url && (
                   <div className="mb-2">
