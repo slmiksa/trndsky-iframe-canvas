@@ -51,61 +51,76 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
       case 'bottom-right':
         return 'bottom-4 right-4';
       case 'top-center':
-        return 'top-4 left-1/2 transform -translate-x-1/2';
+        return 'top-4 left-1/2 -translate-x-1/2';
       case 'bottom-center':
-        return 'bottom-4 left-1/2 transform -translate-x-1/2';
+        return 'bottom-4 left-1/2 -translate-x-1/2';
       case 'center':
-        return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
+        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
       default:
         return 'top-4 right-4';
     }
   };
 
   const getSizeClasses = () => {
-    // إذا كان الموضع في المنتصف، اجعل الإشعار كبيراً جداً
     if (notification.position === 'center') {
-      return 'w-[90vw] max-w-4xl min-h-[60vh]';
+      return 'w-[95vw] max-w-6xl min-h-[85vh]';
     }
-    // للمواضع الأخرى، استخدم الحجم العادي
     return 'max-w-md min-w-80';
+  };
+
+  const getCardStyles = () => {
+    if (notification.position === 'center') {
+      return {
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        border: '3px solid #e2e8f0',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.5)',
+      };
+    }
+    return {};
   };
 
   return (
     <div
-      className={`fixed z-[9999] ${getPositionClasses()} transition-all duration-300 ${
+      className={`fixed z-[9999] ${getPositionClasses()} transition-all duration-500 ease-out ${
         isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
       }`}
-      style={{ 
-        ...(notification.position !== 'center' && { maxWidth: '400px', minWidth: '300px' })
-      }}
     >
-      <Card className={`shadow-2xl border-2 bg-white ${getSizeClasses()}`}>
-        <CardContent className={`${notification.position === 'center' ? 'p-8' : 'p-4'}`}>
-          <div className="flex justify-between items-start mb-4">
-            <h3 className={`font-bold text-gray-900 flex-1 ${
-              notification.position === 'center' ? 'text-3xl' : 'text-lg'
+      <Card 
+        className={`${getSizeClasses()} rounded-2xl overflow-hidden`}
+        style={getCardStyles()}
+      >
+        <CardContent className={`relative ${notification.position === 'center' ? 'p-12' : 'p-4'}`}>
+          {/* زر الإغلاق */}
+          <Button
+            variant="ghost"
+            size={notification.position === 'center' ? 'default' : 'sm'}
+            onClick={handleClose}
+            className={`absolute top-4 right-4 z-10 hover:bg-gray-100/80 rounded-full ${
+              notification.position === 'center' ? 'h-12 w-12' : 'h-8 w-8 p-0'
+            }`}
+          >
+            <X className={notification.position === 'center' ? 'h-7 w-7' : 'h-4 w-4'} />
+          </Button>
+
+          {/* العنوان */}
+          <div className={notification.position === 'center' ? 'mb-8' : 'mb-4'}>
+            <h3 className={`font-bold text-gray-900 ${
+              notification.position === 'center' ? 'text-4xl text-center' : 'text-lg'
             }`}>
               {notification.title}
             </h3>
-            <Button
-              variant="ghost"
-              size={notification.position === 'center' ? 'default' : 'sm'}
-              onClick={handleClose}
-              className={`hover:bg-gray-100 ${
-                notification.position === 'center' ? 'h-10 w-10' : 'h-6 w-6 p-0'
-              }`}
-            >
-              <X className={notification.position === 'center' ? 'h-6 w-6' : 'h-4 w-4'} />
-            </Button>
           </div>
 
+          {/* الصورة */}
           {notification.image_url && (
-            <div className={notification.position === 'center' ? 'mb-6' : 'mb-3'}>
+            <div className={`${notification.position === 'center' ? 'mb-8' : 'mb-4'} flex justify-center`}>
               <img
                 src={notification.image_url}
                 alt={notification.title}
-                className={`w-full object-cover rounded-lg ${
-                  notification.position === 'center' ? 'h-64' : 'h-32'
+                className={`rounded-xl shadow-lg ${
+                  notification.position === 'center' 
+                    ? 'max-w-full max-h-[40vh] w-auto h-auto object-contain' 
+                    : 'w-full h-32 object-cover'
                 }`}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -114,26 +129,53 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
             </div>
           )}
 
+          {/* الرسالة */}
           {notification.message && (
-            <p className={`text-gray-700 leading-relaxed ${
-              notification.position === 'center' 
-                ? 'text-xl mb-6' 
-                : 'text-sm mb-3'
-            }`}>
-              {notification.message}
-            </p>
+            <div className={`${notification.position === 'center' ? 'mb-12' : 'mb-4'} text-center`}>
+              <p className={`text-gray-700 leading-relaxed ${
+                notification.position === 'center' 
+                  ? 'text-2xl max-w-4xl mx-auto' 
+                  : 'text-sm'
+              }`}>
+                {notification.message}
+              </p>
+            </div>
           )}
 
-          <div className="flex justify-end">
-            <Button 
-              size={notification.position === 'center' ? 'default' : 'sm'} 
-              onClick={handleClose} 
-              variant="outline"
-              className={notification.position === 'center' ? 'text-lg px-6 py-3' : ''}
-            >
-              إغلاق
-            </Button>
-          </div>
+          {/* منطقة المحتوى الإضافي */}
+          {notification.position === 'center' && (
+            <div className="bg-gray-50/50 rounded-xl p-8 mb-8 border border-gray-200/50">
+              <div className="text-center">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                  <ImageIcon className="h-8 w-8 text-blue-600" />
+                </div>
+                <p className="text-gray-600 text-lg">
+                  يمكنك إضافة محتوى إضافي هنا
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* أزرار التحكم للإشعارات الكبيرة فقط */}
+          {notification.position === 'center' && (
+            <div className="flex justify-center gap-4">
+              <Button 
+                onClick={handleClose} 
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                فهمت
+              </Button>
+            </div>
+          )}
+
+          {/* زر الإغلاق للإشعارات الصغيرة */}
+          {notification.position !== 'center' && (
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleClose} variant="outline">
+                إغلاق
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
