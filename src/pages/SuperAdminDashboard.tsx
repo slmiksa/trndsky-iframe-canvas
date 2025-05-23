@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -144,9 +143,40 @@ const SuperAdminDashboard = () => {
 
       console.log('✅ تم إنشاء الحساب بنجاح:', createdAccount);
 
+      // إرسال إيميل ترحيب للعميل
+      try {
+        console.log('📧 إرسال إيميل ترحيب...');
+        
+        const { error: emailError } = await supabase.functions.invoke('send-account-welcome', {
+          body: {
+            name: newAccount.name,
+            email: newAccount.email,
+            password: newAccount.password, // إرسال كلمة المرور الأصلية في الإيميل
+            database_name: newAccount.database_name,
+            activation_start_date: newAccount.activation_start_date,
+            activation_end_date: newAccount.activation_end_date,
+            account_id: createdAccount.id
+          }
+        });
+
+        if (emailError) {
+          console.error('❌ خطأ في إرسال الإيميل:', emailError);
+          toast({
+            title: "تم إنشاء الحساب مع تحذير",
+            description: "تم إنشاء الحساب بنجاح ولكن لم يتم إرسال الإيميل",
+            variant: "default",
+          });
+        } else {
+          console.log('✅ تم إرسال الإيميل بنجاح');
+        }
+      } catch (emailError) {
+        console.error('❌ خطأ في إرسال الإيميل:', emailError);
+        // لا نقوم بإيقاف العملية إذا فشل الإيميل
+      }
+
       toast({
         title: "تم إنشاء الحساب بنجاح",
-        description: `تم إنشاء حساب ${newAccount.name}`,
+        description: `تم إنشاء حساب ${newAccount.name} وإرسال التفاصيل عبر الإيميل`,
       });
 
       setNewAccount({ 
