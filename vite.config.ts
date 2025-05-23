@@ -23,5 +23,14 @@ export default defineConfig(({ mode }) => ({
   base: process.env.VITE_BASE_PATH || '/',
   build: {
     outDir: process.env.VITE_BUILD_DIR || 'dist',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-button'],
+        },
+      },
+    },
   },
 }));

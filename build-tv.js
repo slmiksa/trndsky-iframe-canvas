@@ -19,11 +19,11 @@ try {
         fs.rmSync('dist-tv', { recursive: true, force: true });
     }
 
-    // Build the project
+    // Build the project with TV-specific settings
     console.log('⚡ بناء المشروع...');
-    execSync('npm run build', { stdio: 'inherit' });
+    execSync('npx vite build --outDir dist-tv --base /tv/', { stdio: 'inherit' });
 
-    // Copy TV-specific index.html
+    // Copy TV-specific index.html if it exists
     console.log('📄 نسخ ملف HTML المخصص للتليفزيون...');
     const tvIndexPath = path.join('public', 'tv-index.html');
     const distIndexPath = path.join('dist-tv', 'index.html');
@@ -47,6 +47,25 @@ try {
         }
     });
 
+    // Verify critical files exist
+    console.log('🔍 التحقق من الملفات الأساسية...');
+    const criticalFiles = ['index.html', 'assets'];
+    let allFilesExist = true;
+    
+    criticalFiles.forEach(file => {
+        const filePath = path.join('dist-tv', file);
+        if (!fs.existsSync(filePath)) {
+            console.error(`❌ ملف مفقود: ${file}`);
+            allFilesExist = false;
+        } else {
+            console.log(`✅ تم العثور على: ${file}`);
+        }
+    });
+
+    if (!allFilesExist) {
+        throw new Error('بعض الملفات الأساسية مفقودة من البناء');
+    }
+
     console.log('\n🎉 تم بناء التطبيق بنجاح!');
     console.log('📁 الملفات متوفرة في مجلد: dist-tv/');
     console.log('\n📋 خطوات النشر:');
@@ -54,8 +73,21 @@ try {
     console.log('2. تأكد من إعدادات السيرفر (Apache أو Nginx)');
     console.log('3. اختبر الرابط: https://trndsky.com/tv');
     console.log('\n🔄 للتحديثات المباشرة، تأكد من أن HTTPS مفعل!');
+    
+    // List contents of dist-tv for verification
+    console.log('\n📂 محتويات مجلد dist-tv:');
+    const distContents = fs.readdirSync('dist-tv');
+    distContents.forEach(item => {
+        const itemPath = path.join('dist-tv', item);
+        const isDir = fs.statSync(itemPath).isDirectory();
+        console.log(`  ${isDir ? '📁' : '📄'} ${item}`);
+    });
 
 } catch (error) {
     console.error('❌ خطأ في البناء:', error.message);
+    console.error('\n🔧 نصائح لحل المشكلة:');
+    console.error('1. تأكد من تشغيل npm install أولاً');
+    console.error('2. تحقق من عدم وجود أخطاء في الكود');
+    console.error('3. تأكد من أن جميع الملفات المطلوبة موجودة');
     process.exit(1);
 }
