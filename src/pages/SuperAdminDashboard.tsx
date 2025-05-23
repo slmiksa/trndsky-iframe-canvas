@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,25 +43,15 @@ const SuperAdminDashboard = () => {
     try {
       console.log('🔍 جاري تحميل الحسابات...');
       
-      // Use RPC call to bypass RLS for super admin
-      const { data, error } = await supabase.rpc('get_all_accounts_for_super_admin');
+      // Direct query to accounts table instead of RPC
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ خطأ في تحميل الحسابات:', error);
-        
-        // Fallback to direct table access if RPC doesn't exist
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('accounts')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (fallbackError) {
-          throw fallbackError;
-        }
-        
-        console.log('✅ تم تحميل الحسابات بنجاح (fallback):', fallbackData);
-        setAccounts(fallbackData || []);
-        return;
+        throw error;
       }
       
       console.log('✅ تم تحميل الحسابات بنجاح:', data);
@@ -110,40 +99,26 @@ const SuperAdminDashboard = () => {
       const passwordHash = await hashPassword(newAccount.password);
       console.log('✅ تم تشفير كلمة المرور بنجاح');
 
-      // Use RPC call to create account as super admin
+      // Direct insert instead of RPC
       console.log('💾 جاري إدراج الحساب في قاعدة البيانات...');
-      const { data: accountData, error: accountError } = await supabase.rpc('create_account_as_super_admin', {
-        account_name: newAccount.name,
-        account_email: newAccount.email,
-        account_password_hash: passwordHash,
-        account_database_name: newAccount.database_name
-      });
+      const { data: accountData, error: accountError } = await supabase
+        .from('accounts')
+        .insert({
+          name: newAccount.name,
+          email: newAccount.email,
+          password_hash: passwordHash,
+          database_name: newAccount.database_name,
+          status: 'active'
+        })
+        .select()
+        .single();
 
       if (accountError) {
-        console.error('❌ خطأ في إنشاء الحساب (RPC):', accountError);
-        
-        // Fallback to direct insert if RPC doesn't work
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('accounts')
-          .insert({
-            name: newAccount.name,
-            email: newAccount.email,
-            password_hash: passwordHash,
-            database_name: newAccount.database_name,
-            status: 'active',
-          })
-          .select()
-          .single();
-
-        if (fallbackError) {
-          console.error('❌ خطأ في إنشاء الحساب (fallback):', fallbackError);
-          throw fallbackError;
-        }
-
-        console.log('✅ تم إنشاء الحساب بنجاح (fallback):', fallbackData);
-      } else {
-        console.log('✅ تم إنشاء الحساب بنجاح (RPC):', accountData);
+        console.error('❌ خطأ في إنشاء الحساب:', accountError);
+        throw accountError;
       }
+
+      console.log('✅ تم إنشاء الحساب بنجاح:', accountData);
 
       toast({
         title: "تم إنشاء الحساب بنجاح",
@@ -187,25 +162,15 @@ const SuperAdminDashboard = () => {
     try {
       console.log(`🔄 جاري تحديث حالة الحساب ${accountId} إلى ${status}`);
       
-      // Use RPC call for updating as super admin
-      const { error } = await supabase.rpc('update_account_status_as_super_admin', {
-        account_id: accountId,
-        new_status: status
-      });
+      // Direct update instead of RPC
+      const { error } = await supabase
+        .from('accounts')
+        .update({ status })
+        .eq('id', accountId);
 
       if (error) {
-        console.error('❌ خطأ في تحديث حالة الحساب (RPC):', error);
-        
-        // Fallback to direct update
-        const { error: fallbackError } = await supabase
-          .from('accounts')
-          .update({ status })
-          .eq('id', accountId);
-
-        if (fallbackError) {
-          console.error('❌ خطأ في تحديث حالة الحساب (fallback):', fallbackError);
-          throw fallbackError;
-        }
+        console.error('❌ خطأ في تحديث حالة الحساب:', error);
+        throw error;
       }
 
       console.log('✅ تم تحديث حالة الحساب بنجاح');
