@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
+import AccountStatusCard from '@/components/AccountStatusCard';
 
 interface Website {
   id: string;
@@ -19,6 +19,12 @@ interface Website {
   website_title: string | null;
   is_active: boolean;
   created_at: string;
+}
+
+interface AccountInfo {
+  activation_start_date: string | null;
+  activation_end_date: string | null;
+  status: 'active' | 'suspended' | 'pending';
 }
 
 const ClientDashboard = () => {
@@ -32,27 +38,33 @@ const ClientDashboard = () => {
   });
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [accountName, setAccountName] = useState<string>('');
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
 
-  // Fetch account name for public page link
-  const fetchAccountName = async () => {
+  // Fetch account information including subscription details
+  const fetchAccountInfo = async () => {
     if (!accountId) return;
     
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .select('name')
+        .select('name, activation_start_date, activation_end_date, status')
         .eq('id', accountId)
         .single();
 
       if (error) {
-        console.error('❌ Error fetching account name:', error);
+        console.error('❌ Error fetching account info:', error);
         return;
       }
 
-      console.log('✅ Account name fetched:', data.name);
+      console.log('✅ Account info fetched:', data);
       setAccountName(data.name);
+      setAccountInfo({
+        activation_start_date: data.activation_start_date,
+        activation_end_date: data.activation_end_date,
+        status: data.status
+      });
     } catch (error) {
-      console.error('❌ Error in fetchAccountName:', error);
+      console.error('❌ Error in fetchAccountInfo:', error);
     }
   };
 
@@ -90,7 +102,7 @@ const ClientDashboard = () => {
 
   useEffect(() => {
     fetchWebsites();
-    fetchAccountName();
+    fetchAccountInfo();
   }, [accountId]);
 
   const addWebsite = async (e: React.FormEvent) => {
@@ -257,6 +269,18 @@ const ClientDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Account Status Card */}
+        {accountInfo && (
+          <div className="mb-6">
+            <AccountStatusCard
+              activationStartDate={accountInfo.activation_start_date}
+              activationEndDate={accountInfo.activation_end_date}
+              status={accountInfo.status}
+              accountName={accountName}
+            />
+          </div>
+        )}
+
         <Tabs defaultValue="websites" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="websites" className="flex items-center gap-2">
