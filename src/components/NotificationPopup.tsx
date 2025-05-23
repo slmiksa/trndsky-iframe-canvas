@@ -55,7 +55,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
       case 'bottom-center':
         return 'bottom-4 left-1/2 -translate-x-1/2';
       case 'center':
-        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+        return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
       default:
         return 'top-4 right-4';
     }
