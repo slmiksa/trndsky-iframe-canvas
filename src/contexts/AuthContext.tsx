@@ -65,13 +65,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(true);
       const authResult = await authenticateUser({ username, password });
       
-      const userData: User = {
-        id: authResult.user.id,
-        username: authResult.user.username || authResult.user.email,
-        name: authResult.user.name,
-        email: authResult.user.email,
-        role: authResult.role
-      };
+      let userData: User;
+      
+      if (authResult.role === 'super_admin') {
+        // التعامل مع السوبر أدمن
+        userData = {
+          id: authResult.user.id,
+          username: authResult.user.username,
+          role: authResult.role
+        };
+      } else {
+        // التعامل مع حسابات العملاء
+        userData = {
+          id: authResult.user.id,
+          name: authResult.user.name,
+          email: authResult.user.email,
+          role: authResult.role
+        };
+      }
 
       const sessionData = {
         user: userData,
