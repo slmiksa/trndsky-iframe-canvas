@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +26,8 @@ interface NotificationManagerProps {
 }
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) => {
+  console.log('🔍 NotificationManager rendered with accountId:', accountId);
+  
   const {
     notifications,
     loading,
@@ -61,10 +62,30 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('📝 Starting notification creation with data:', {
+      accountId,
+      title: newNotification.title,
+      message: newNotification.message,
+      position: newNotification.position,
+      display_duration: newNotification.display_duration,
+      hasImage: !!selectedImage
+    });
+
     if (!newNotification.title.trim()) {
       toast({
         title: "خطأ",
         description: "يجب إدخال عنوان الإشعار",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!accountId) {
+      console.error('❌ No accountId provided');
+      toast({
+        title: "خطأ",
+        description: "لم يتم العثور على معرف الحساب",
         variant: "destructive",
       });
       return;
@@ -76,13 +97,16 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       let imageUrl = null;
       
       if (selectedImage) {
+        console.log('📸 Uploading image...');
         imageUrl = await uploadImage(selectedImage, accountId);
+        console.log('✅ Image uploaded successfully:', imageUrl);
       }
 
       // Convert minutes to milliseconds for storage
       const durationInMs = newNotification.display_duration * 60 * 1000;
+      console.log('⏱️ Duration converted from', newNotification.display_duration, 'minutes to', durationInMs, 'milliseconds');
 
-      await createNotification({
+      const notificationData = {
         account_id: accountId,
         title: newNotification.title,
         message: newNotification.message || null,
@@ -90,8 +114,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
         is_active: true,
         position: newNotification.position,
         display_duration: durationInMs,
-      });
+      };
 
+      console.log('💾 Creating notification with data:', notificationData);
+
+      await createNotification(notificationData);
+
+      console.log('✅ Notification created successfully');
       toast({
         title: "تم إنشاء الإشعار",
         description: "تم إنشاء الإشعار بنجاح",
@@ -108,10 +137,11 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       setImagePreview(null);
       setShowAddForm(false);
     } catch (error) {
-      console.error('Error creating notification:', error);
+      console.error('❌ Error creating notification:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
       toast({
         title: "خطأ في إنشاء الإشعار",
-        description: "حدث خطأ أثناء إنشاء الإشعار",
+        description: `حدث خطأ أثناء إنشاء الإشعار: ${error.message || 'خطأ غير معروف'}`,
         variant: "destructive",
       });
     } finally {
