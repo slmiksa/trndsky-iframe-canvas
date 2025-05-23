@@ -1,7 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Image as ImageIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface Notification {
@@ -25,7 +23,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
     // Trigger animation after mount
     setTimeout(() => setIsVisible(true), 100);
 
-    // Auto close after display duration
+    // Auto close after display duration only if duration is set
     if (notification.display_duration > 0) {
       const timer = setTimeout(() => {
         handleClose();
@@ -55,7 +53,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
       case 'bottom-center':
         return 'bottom-4 left-1/2 -translate-x-1/2';
       case 'center':
-        return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
+        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
       default:
         return 'top-4 right-4';
     }
@@ -90,18 +88,6 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
         style={getCardStyles()}
       >
         <CardContent className={`relative ${notification.position === 'center' ? 'p-12' : 'p-4'}`}>
-          {/* زر الإغلاق */}
-          <Button
-            variant="ghost"
-            size={notification.position === 'center' ? 'default' : 'sm'}
-            onClick={handleClose}
-            className={`absolute top-4 right-4 z-10 hover:bg-gray-100/80 rounded-full ${
-              notification.position === 'center' ? 'h-12 w-12' : 'h-8 w-8 p-0'
-            }`}
-          >
-            <X className={notification.position === 'center' ? 'h-7 w-7' : 'h-4 w-4'} />
-          </Button>
-
           {/* العنوان */}
           <div className={notification.position === 'center' ? 'mb-8' : 'mb-4'}>
             <h3 className={`font-bold text-gray-900 ${
@@ -150,28 +136,6 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
                   {notification.message || ''}
                 </p>
               </div>
-            </div>
-          )}
-
-          {/* أزرار التحكم للإشعارات الكبيرة فقط */}
-          {notification.position === 'center' && (
-            <div className="flex justify-center gap-4">
-              <Button 
-                onClick={handleClose} 
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {/* تم إزالة النص "فهمت" وتركه فارغًا */}
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          )}
-
-          {/* زر الإغلاق للإشعارات الصغيرة */}
-          {notification.position !== 'center' && (
-            <div className="flex justify-end">
-              <Button size="sm" onClick={handleClose} variant="outline">
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           )}
         </CardContent>
