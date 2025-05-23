@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2 } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import NotificationManager from '@/components/NotificationManager';
 
 interface Website {
   id: string;
@@ -253,165 +255,184 @@ const ClientDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* قائمة المواقع */}
-          <div>
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>
-                    المواقع ({websites.length})
-                  </CardTitle>
-                  <Button onClick={() => setShowAddForm(true)} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    إضافة موقع
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                    <p className="mt-2 text-gray-600">جاري التحميل...</p>
-                  </div>
-                ) : websites.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <p className="text-gray-600">لا توجد مواقع بعد</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {websites.map((website) => (
-                      <div
-                        key={website.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                          selectedWebsite?.id === website.id
-                            ? 'bg-blue-50 border-blue-200'
-                            : 'hover:bg-gray-50'
-                        }`}
-                        onClick={() => setSelectedWebsite(website)}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-semibold">
-                            {website.website_title || 'موقع بدون عنوان'}
-                          </h3>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={website.is_active ? "default" : "secondary"}>
-                              {website.is_active ? 'نشط' : 'متوقف'}
-                            </Badge>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleWebsiteStatus(website.id, website.is_active);
-                              }}
-                            >
-                              {website.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        <Tabs defaultValue="websites" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="websites" className="flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              المواقع
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              الإشعارات
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="websites">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* قائمة المواقع */}
+              <div>
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle>
+                        المواقع ({websites.length})
+                      </CardTitle>
+                      <Button onClick={() => setShowAddForm(true)} size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        إضافة موقع
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                        <p className="mt-2 text-gray-600">جاري التحميل...</p>
+                      </div>
+                    ) : websites.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                        <p className="text-gray-600">لا توجد مواقع بعد</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {websites.map((website) => (
+                          <div
+                            key={website.id}
+                            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                              selectedWebsite?.id === website.id
+                                ? 'bg-blue-50 border-blue-200'
+                                : 'hover:bg-gray-50'
+                            }`}
+                            onClick={() => setSelectedWebsite(website)}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <h3 className="font-semibold">
+                                {website.website_title || 'موقع بدون عنوان'}
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={website.is_active ? "default" : "secondary"}>
+                                  {website.is_active ? 'نشط' : 'متوقف'}
+                                </Badge>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleWebsiteStatus(website.id, website.is_active);
+                                  }}
+                                >
+                                  {website.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteWebsite(website.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 break-all mb-2">
+                              {website.website_url}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(website.created_at).toLocaleDateString('ar-SA')}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* نموذج إضافة موقع */}
+                    {showAddForm && (
+                      <div className="mt-6 border-t pt-6">
+                        <form onSubmit={addWebsite} className="space-y-4">
+                          <div>
+                            <Label htmlFor="url">رابط الموقع</Label>
+                            <Input
+                              id="url"
+                              type="url"
+                              value={newWebsite.url}
+                              onChange={(e) => setNewWebsite({ ...newWebsite, url: e.target.value })}
+                              placeholder="https://example.com"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="title">عنوان الموقع (اختياري)</Label>
+                            <Input
+                              id="title"
+                              type="text"
+                              value={newWebsite.title}
+                              onChange={(e) => setNewWebsite({ ...newWebsite, title: e.target.value })}
+                              placeholder="اسم الموقع"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button type="submit" disabled={loading}>
+                              إضافة
                             </Button>
                             <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteWebsite(website.id);
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setShowAddForm(false);
+                                setNewWebsite({ url: '', title: '' });
                               }}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              إلغاء
                             </Button>
                           </div>
+                        </form>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* معاينة الموقع */}
+              <div>
+                <Card className="h-full">
+                  <CardHeader>
+                    <CardTitle>
+                      {selectedWebsite ? (selectedWebsite.website_title || 'معاينة الموقع') : 'معاينة الموقع'}
+                    </CardTitle>
+                    {selectedWebsite && (
+                      <p className="text-sm text-gray-600 break-all">
+                        {selectedWebsite.website_url}
+                      </p>
+                    )}
+                  </CardHeader>
+                  <CardContent className="h-96 lg:h-[500px]">
+                    {selectedWebsite ? (
+                      <iframe
+                        src={selectedWebsite.website_url}
+                        className="w-full h-full border rounded-lg"
+                        title={selectedWebsite.website_title || 'Website Preview'}
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+                        <div className="text-center text-gray-500">
+                          <Globe className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                          <p>اختر موقعاً لمعاينته</p>
                         </div>
-                        <p className="text-sm text-gray-600 break-all mb-2">
-                          {website.website_url}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(website.created_at).toLocaleDateString('ar-SA')}
-                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
 
-                {/* نموذج إضافة موقع */}
-                {showAddForm && (
-                  <div className="mt-6 border-t pt-6">
-                    <form onSubmit={addWebsite} className="space-y-4">
-                      <div>
-                        <Label htmlFor="url">رابط الموقع</Label>
-                        <Input
-                          id="url"
-                          type="url"
-                          value={newWebsite.url}
-                          onChange={(e) => setNewWebsite({ ...newWebsite, url: e.target.value })}
-                          placeholder="https://example.com"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="title">عنوان الموقع (اختياري)</Label>
-                        <Input
-                          id="title"
-                          type="text"
-                          value={newWebsite.title}
-                          onChange={(e) => setNewWebsite({ ...newWebsite, title: e.target.value })}
-                          placeholder="اسم الموقع"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={loading}>
-                          إضافة
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setShowAddForm(false);
-                            setNewWebsite({ url: '', title: '' });
-                          }}
-                        >
-                          إلغاء
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* معاينة الموقع */}
-          <div>
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>
-                  {selectedWebsite ? (selectedWebsite.website_title || 'معاينة الموقع') : 'معاينة الموقع'}
-                </CardTitle>
-                {selectedWebsite && (
-                  <p className="text-sm text-gray-600 break-all">
-                    {selectedWebsite.website_url}
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent className="h-96 lg:h-[500px]">
-                {selectedWebsite ? (
-                  <iframe
-                    src={selectedWebsite.website_url}
-                    className="w-full h-full border rounded-lg"
-                    title={selectedWebsite.website_title || 'Website Preview'}
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-                    <div className="text-center text-gray-500">
-                      <Globe className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                      <p>اختر موقعاً لمعاينته</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+          <TabsContent value="notifications">
+            {accountId && <NotificationManager accountId={accountId} />}
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

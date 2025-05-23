@@ -4,6 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Globe, ArrowLeft } from 'lucide-react';
+import NotificationPopup from '@/components/NotificationPopup';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface Website {
   id: string;
@@ -19,6 +21,18 @@ interface Account {
   email: string;
 }
 
+interface Notification {
+  id: string;
+  account_id: string;
+  title: string;
+  message: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  position: string;
+  display_duration: number;
+  created_at: string;
+}
+
 const ClientPublicPage = () => {
   const { clientName } = useParams<{ clientName: string }>();
   const navigate = useNavigate();
@@ -26,12 +40,43 @@ const ClientPublicPage = () => {
   const [website, setWebsite] = useState<Website | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
+  const [displayedNotifications, setDisplayedNotifications] = useState<string[]>([]);
+  const { fetchActiveNotifications } = useNotifications();
 
   useEffect(() => {
     if (clientName) {
       fetchClientData();
     }
   }, [clientName]);
+
+  // Set up realtime subscription for notifications
+  useEffect(() => {
+    if (!account?.id) return;
+
+    console.log('🔔 Setting up realtime subscription for notifications');
+    
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `account_id=eq.${account.id}`,
+        },
+        (payload) => {
+          console.log('🔔 Notification change received:', payload);
+          loadActiveNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [account?.id]);
 
   const fetchClientData = async () => {
     try {
@@ -80,12 +125,48 @@ const ClientPublicPage = () => {
         setError('لا توجد مواقع نشطة');
       }
 
+      // Load notifications
+      await loadActiveNotifications(accountData.id);
+
     } catch (error: any) {
       console.error('❌ Error in fetchClientData:', error);
       setError('حدث خطأ في تحميل البيانات');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadActiveNotifications = async (accountId?: string) => {
+    const targetAccountId = accountId || account?.id;
+    if (!targetAccountId) return;
+
+    try {
+      const notifications = await fetchActiveNotifications(targetAccountId);
+      console.log('🔔 Active notifications loaded:', notifications);
+      
+      // Filter notifications that haven't been displayed yet
+      const newNotifications = notifications.filter(
+        (notification) => !displayedNotifications.includes(notification.id)
+      );
+      
+      setActiveNotifications(newNotifications);
+      
+      // Mark new notifications as displayed
+      if (newNotifications.length > 0) {
+        setDisplayedNotifications(prev => [
+          ...prev,
+          ...newNotifications.map(n => n.id)
+        ]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading active notifications:', error);
+    }
+  };
+
+  const handleCloseNotification = (notificationId: string) => {
+    setActiveNotifications(prev => 
+      prev.filter(notification => notification.id !== notificationId)
+    );
   };
 
   if (loading) {
@@ -116,13 +197,22 @@ const ClientPublicPage = () => {
   }
 
   return (
-    <div className="h-screen w-full overflow-hidden">
+    <div className="h-screen w-full overflow-hidden relative">
       <iframe
         src={website.website_url}
         className="w-full h-full border-0"
         title={website.website_title || `موقع ${account.name}`}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"
       />
+      
+      {/* عرض الإشعارات */}
+      {activeNotifications.map((notification) => (
+        <NotificationPopup
+          key={notification.id}
+          notification={notification}
+          onClose={() => handleCloseNotification(notification.id)}
+        />
+      ))}
     </div>
   );
 };

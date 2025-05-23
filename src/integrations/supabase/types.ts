@@ -86,6 +86,53 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          account_id: string
+          created_at: string
+          display_duration: number
+          id: string
+          image_url: string | null
+          is_active: boolean
+          message: string | null
+          position: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          display_duration?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          message?: string | null
+          position?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          display_duration?: number
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          message?: string | null
+          position?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_notifications_account"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           account_id: string | null
