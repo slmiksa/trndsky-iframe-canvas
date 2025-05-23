@@ -73,7 +73,6 @@ export const useNotifications = (accountId?: string) => {
     try {
       console.log('➕ Creating notification:', notificationData);
       
-      // Use the service_role key for admin operations
       const { data, error } = await supabase
         .from('notifications')
         .insert(notificationData)
@@ -139,28 +138,49 @@ export const useNotifications = (accountId?: string) => {
 
   const uploadImage = async (file: File, accountId: string) => {
     try {
+      console.log('📁 Starting image upload for file:', file.name);
+      
+      // First, ensure the bucket exists
+      const { data: buckets, error: bucketsError } = await supabase
+        .storage
+        .listBuckets();
+
+      if (bucketsError) {
+        console.error('❌ Error checking buckets:', bucketsError);
+      }
+
+      const bucketExists = buckets?.some(bucket => bucket.id === 'notification-images');
+      console.log('🪣 Bucket exists:', bucketExists);
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${accountId}/${Date.now()}.${fileExt}`;
 
-      console.log('📁 Uploading image:', fileName);
+      console.log('📁 Uploading to path:', fileName);
 
-      const { error: uploadError } = await supabase.storage
+      const { data, error: uploadError } = await supabase.storage
         .from('notification-images')
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) {
         console.error('❌ Error uploading image:', uploadError);
+        console.error('❌ Upload error details:', JSON.stringify(uploadError, null, 2));
         throw uploadError;
       }
+
+      console.log('✅ File uploaded successfully:', data);
 
       const { data: { publicUrl } } = supabase.storage
         .from('notification-images')
         .getPublicUrl(fileName);
 
-      console.log('✅ Image uploaded successfully:', publicUrl);
+      console.log('✅ Public URL generated:', publicUrl);
       return publicUrl;
     } catch (error) {
       console.error('❌ Error in uploadImage:', error);
+      console.error('❌ Full error details:', JSON.stringify(error, null, 2));
       throw error;
     }
   };
