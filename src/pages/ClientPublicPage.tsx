@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,7 @@ interface Notification {
   image_url: string | null;
   position: string;
   display_duration: number;
+  is_active: boolean;
 }
 
 interface BreakTimer {
@@ -51,7 +53,6 @@ const ClientPublicPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
-  const [shownNotifications, setShownNotifications] = useState<Set<string>>(new Set());
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
   const { fetchActiveNotifications } = useNotifications();
@@ -175,7 +176,7 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes - IMPROVED VERSION
+  // Setup realtime listener for website changes
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
@@ -235,32 +236,79 @@ const ClientPublicPage = () => {
     };
   }, [account?.id, subscriptionExpired]);
 
-  // Check for active notifications - modify this to not auto-dismiss
+  // Initial fetch and realtime listener for notifications - IMPROVED VERSION
   useEffect(() => {
-    const checkNotifications = async () => {
-      if (!account?.id || subscriptionExpired) return;
+    if (!account?.id || subscriptionExpired) return;
 
+    const fetchAndSetNotifications = async () => {
       try {
+        console.log('🔔 Fetching initial notifications for account:', account.id);
         const notifications = await fetchActiveNotifications(account.id);
-        
-        // Only add notifications that aren't already shown
-        const newNotifications = notifications.filter(
-          notification => !Array.from(shownNotifications).includes(notification.id)
-        );
-        
-        if (newNotifications.length > 0) {
-          setActiveNotifications(prev => [...prev, ...newNotifications]);
-        }
+        console.log('✅ Initial notifications loaded:', notifications);
+        setActiveNotifications(notifications);
       } catch (error) {
-        console.error('❌ Error fetching notifications:', error);
+        console.error('❌ Error fetching initial notifications:', error);
       }
     };
 
-    checkNotifications();
-    const notificationInterval = setInterval(checkNotifications, 30000); // Check every 30 seconds
+    // Fetch initial notifications
+    fetchAndSetNotifications();
 
-    return () => clearInterval(notificationInterval);
-  }, [account?.id, fetchActiveNotifications, shownNotifications, subscriptionExpired]);
+    // Setup realtime listener for notifications
+    const notificationChannelName = `notifications-${account.id}`;
+    
+    const notificationChannel = supabase
+      .channel(notificationChannelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `account_id=eq.${account.id}`
+        },
+        async (payload) => {
+          console.log('🔔 Notification change detected:', payload);
+          
+          if (payload.eventType === 'INSERT' && payload.new?.is_active) {
+            // Add new active notification
+            console.log('➕ Adding new notification:', payload.new);
+            setActiveNotifications(prev => [...prev, payload.new as Notification]);
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedNotification = payload.new as Notification;
+            console.log('🔄 Updating notification:', updatedNotification);
+            
+            if (updatedNotification.is_active) {
+              // Update existing or add if not exists
+              setActiveNotifications(prev => {
+                const exists = prev.find(n => n.id === updatedNotification.id);
+                if (exists) {
+                  return prev.map(n => n.id === updatedNotification.id ? updatedNotification : n);
+                } else {
+                  return [...prev, updatedNotification];
+                }
+              });
+            } else {
+              // Remove deactivated notification
+              console.log('❌ Removing deactivated notification:', updatedNotification.id);
+              setActiveNotifications(prev => prev.filter(n => n.id !== updatedNotification.id));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted notification
+            console.log('🗑️ Removing deleted notification:', payload.old?.id);
+            setActiveNotifications(prev => prev.filter(n => n.id !== payload.old?.id));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔔 Notification realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔔 Cleaning up notification realtime listener');
+      supabase.removeChannel(notificationChannel);
+    };
+  }, [account?.id, fetchActiveNotifications, subscriptionExpired]);
 
   // Check for active timers
   useEffect(() => {
@@ -295,8 +343,8 @@ const ClientPublicPage = () => {
 
   // Modified to only track that we've seen this notification, but don't remove it
   const handleNotificationClose = (notificationId: string) => {
-    setShownNotifications(prev => new Set([...prev, notificationId]));
-    // We don't remove from activeNotifications anymore - they stay visible
+    console.log('👋 User closed notification:', notificationId);
+    setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
   };
 
   const handleTimerClose = (timerId: string) => {
@@ -406,7 +454,7 @@ const ClientPublicPage = () => {
         ) : null}
       </main>
 
-      {/* Active Notifications - modify to show all active */}
+      {/* Active Notifications - Now properly managed with realtime updates */}
       {activeNotifications.map((notification) => (
         <NotificationPopup
           key={notification.id}
