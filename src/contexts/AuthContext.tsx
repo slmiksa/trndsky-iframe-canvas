@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authenticateUser, LoginCredentials } from '@/utils/authUtils';
 import { toast } from '@/hooks/use-toast';
@@ -68,18 +67,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       let userData: User;
       
       if (authResult.role === 'super_admin') {
-        // التعامل مع السوبر أدمن
+        // التعامل مع السوبر أدمن - نستخدم type casting للوصول للخصائص
+        const superAdmin = authResult.user as any;
         userData = {
-          id: authResult.user.id,
-          username: authResult.user.username,
+          id: superAdmin.id,
+          username: superAdmin.username,
           role: authResult.role
         };
       } else {
-        // التعامل مع حسابات العملاء
+        // التعامل مع حسابات العملاء - نستخدم type casting للوصول للخصائص
+        const account = authResult.user as any;
         userData = {
-          id: authResult.user.id,
-          name: authResult.user.name,
-          email: authResult.user.email,
+          id: account.id,
+          name: account.name,
+          email: account.email,
           role: authResult.role
         };
       }
