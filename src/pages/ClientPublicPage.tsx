@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -219,33 +218,7 @@ const ClientPublicPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <h1 className="text-2xl font-bold text-gray-900">{account.name}</h1>
-            {websites.length > 1 && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">
-                  الموقع {currentWebsiteIndex + 1} من {websites.length}
-                </span>
-                <div className="flex gap-1">
-                  {websites.map((_, index) => (
-                    <div
-                      key={index}
-                      className={`w-2 h-2 rounded-full ${
-                        index === currentWebsiteIndex ? 'bg-blue-600' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
+      {/* Main Content - Full Screen */}
       <main className="flex-1">
         {websites.length === 0 ? (
           <div className="min-h-screen flex items-center justify-center">
@@ -257,7 +230,7 @@ const ClientPublicPage = () => {
             </div>
           </div>
         ) : currentWebsite ? (
-          <div className="h-[calc(100vh-80px)]">
+          <div className="h-screen">
             <iframe
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
