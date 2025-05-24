@@ -11,12 +11,11 @@ const Index = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-slate-900 p-4">
       <div className="text-center max-w-lg mx-auto">
         <div className="flex justify-center mb-6">
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-4">
-            <div className="w-20 h-20 mx-auto bg-white rounded-xl flex items-center justify-center mb-2">
-              <div className="text-purple-600 text-2xl font-bold">🌐</div>
-            </div>
-            <div className="text-white text-sm font-medium">REMOTEWEB</div>
-          </div>
+          <img 
+            src="/lovable-uploads/e3d01953-fe35-45d7-ac2b-e50bac917958.png" 
+            alt="TRNDSKY Logo" 
+            className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-contain"
+          />
         </div>
         
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white tracking-wider mb-6 animate-pulse">
@@ -48,7 +47,7 @@ const Index = () => {
           </Button>
         </div>
         
-        <div className="mt-8 text-white/70 text-sm">
+        <div className="mt-8 text-white text-base font-medium">
           <p>منصة موثوقة لإدارة مواقعك بسهولة</p>
         </div>
       </div>
