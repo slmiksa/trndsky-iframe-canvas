@@ -41,17 +41,17 @@ export const useVisitorRealtimeUpdates = ({
   const mountedRef = useRef(true);
   const isProcessingUpdate = useRef(false);
 
-  console.log('🌐 إعداد التحديثات الفورية للزائر');
+  console.log('🌐 إعداد التحديثات الفورية المحسنة للزائر');
 
-  // تحديث فوري للزوار مع تأخير قصير جداً
+  // تحديث فوري وسريع للزوار
   const debouncedFetchWebsites = useCallback((accountData: Account, reason = 'visitor-update') => {
     if (!mountedRef.current || !accountData || isProcessingUpdate.current) return;
 
     const now = Date.now();
     
-    // تأخير قصير جداً للزوار - 500ms فقط
-    if (now - lastUpdateTime.current < 500) {
-      console.log('⏭️ منع التحديث السريع للزائر:', reason);
+    // تأخير قصير جداً للزوار - 100ms فقط للاستجابة الفورية
+    if (now - lastUpdateTime.current < 100) {
+      console.log('⏭️ منع التحديث السريع جداً للزائر:', reason);
       return;
     }
 
@@ -61,22 +61,22 @@ export const useVisitorRealtimeUpdates = ({
       debounceTimeoutRef.current = null;
     }
 
-    // تأخير قصير جداً للزوار للحصول على استجابة سريعة
+    // تحديث فوري تقريباً للزوار
     debounceTimeoutRef.current = setTimeout(async () => {
       if (!mountedRef.current || isProcessingUpdate.current) return;
       
       try {
         isProcessingUpdate.current = true;
-        console.log('🔄 تحديث فوري سريع للزائر:', { reason, accountId: accountData.id });
+        console.log('🚀 تحديث فوري سريع للزائر:', { reason, accountId: accountData.id });
         lastUpdateTime.current = Date.now();
         await fetchWebsites(accountData, true);
-        console.log('✅ تم التحديث الفوري السريع للزائر بنجاح');
+        console.log('✅ تم التحديث الفوري للزائر بنجاح');
       } catch (error) {
         console.error('❌ خطأ في التحديث الفوري للزائر:', error);
       } finally {
         isProcessingUpdate.current = false;
       }
-    }, 200); // 200ms فقط للاستجابة السريعة
+    }, 50); // 50ms فقط للاستجابة شبه الفورية
   }, [fetchWebsites]);
 
   // تنظيف القنوات
@@ -101,7 +101,7 @@ export const useVisitorRealtimeUpdates = ({
     isProcessingUpdate.current = false;
   }, []);
 
-  // إعداد مستمعات التحديثات الفورية للزائر مع استجابة سريعة
+  // إعداد مستمعات التحديثات الفورية للزائر مع استجابة فورية
   const setupVisitorRealtimeListeners = useCallback(() => {
     if (!account?.id || !mountedRef.current) {
       console.log('⏭️ تخطي إعداد التحديثات الفورية للزائر:', {
@@ -114,11 +114,11 @@ export const useVisitorRealtimeUpdates = ({
     // تنظيف أولاً
     cleanupChannels();
 
-    console.log('🌐 إعداد مستمعات فورية سريعة للزائر:', account.id);
+    console.log('🌐 إعداد مستمعات فورية للزائر:', account.id);
     
     try {
       // مراقبة تغييرات الحساب (فترة التبديل)
-      const accountChannelName = `visitor-account-${account.id}`;
+      const accountChannelName = `visitor-account-realtime-${account.id}`;
       const accountChannel = supabase
         .channel(accountChannelName)
         .on(
@@ -145,7 +145,7 @@ export const useVisitorRealtimeUpdates = ({
         .subscribe();
 
       // مراقبة تغييرات المواقع - الأهم للزائر مع استجابة فورية
-      const websiteChannelName = `visitor-websites-${account.id}`;
+      const websiteChannelName = `visitor-websites-realtime-${account.id}`;
       const websiteChannel = supabase
         .channel(websiteChannelName)
         .on(
@@ -163,19 +163,19 @@ export const useVisitorRealtimeUpdates = ({
             const websiteId = (payload.new as any)?.id || (payload.old as any)?.id || 'unknown';
             const isActive = (payload.new as any)?.is_active;
             
-            console.log('🚀 تحديث موقع فوري سريع للزائر:', {
+            console.log('🚀 تحديث موقع فوري للزائر:', {
               event: payload.eventType,
               websiteId: websiteId,
               active: isActive,
               timestamp: new Date().toISOString()
             });
             
-            // تحديث فوري وسريع للزائر
-            debouncedFetchWebsites(account, `visitor-${payload.eventType}`);
+            // تحديث فوري للزائر
+            debouncedFetchWebsites(account, `visitor-${payload.eventType}-${websiteId}`);
           }
         )
         .subscribe((status) => {
-          console.log('📡 حالة اشتراك المواقع السريع للزائر:', status);
+          console.log('📡 حالة اشتراك المواقع الفوري للزائر:', status);
         });
 
       // حفظ القنوات
