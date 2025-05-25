@@ -73,7 +73,7 @@ const handler = async (req: Request): Promise<Response> => {
     };
 
     const notificationDetails = getNotificationDetails(notification_type);
-    const dashboardUrl = `${req.headers.get('origin')}/client/${account_id}`;
+    const loginUrl = `${req.headers.get('origin')}/login`;
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -264,7 +264,7 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${dashboardUrl}" class="button">
+              <a href="${loginUrl}" class="button">
                 🔧 دخول لوحة التحكم
               </a>
               <a href="https://trndsky.com" class="button">
