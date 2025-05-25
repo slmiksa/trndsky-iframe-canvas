@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,6 +55,7 @@ const ClientPublicPage = () => {
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [isBrowserSupported, setIsBrowserSupported] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -221,135 +223,78 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener with cross-browser compatibility
+  // Simplified and more reliable realtime listener
   useEffect(() => {
     if (!account?.id || subscriptionExpired || !isBrowserSupported) {
       console.log('⏭️ Skipping realtime setup - no account, subscription expired, or unsupported browser');
       return;
     }
 
-    let channel: any = null;
-    let reconnectTimer: NodeJS.Timeout | null = null;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 5;
+    console.log('🔄 Setting up simple realtime listener for account:', account.id);
     
-    const setupRealtimeListener = () => {
-      // Clear previous reconnect timer
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-      }
+    // Set connection status
+    setConnectionStatus('connecting');
+    
+    const channelName = `websites-${account.id}`;
+    
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'account_websites',
+          filter: `account_id=eq.${account.id}`
+        },
+        async (payload) => {
+          console.log('🔥 REALTIME: Website change detected!', {
+            event: payload.eventType,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Simple delay for consistency
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Refetch websites
+          try {
+            const { data: freshWebsites, error } = await supabase
+              .from('account_websites')
+              .select('*')
+              .eq('account_id', account.id)
+              .order('created_at', { ascending: true });
 
-      // Clean up previous channel
-      if (channel) {
-        console.log('🧹 Cleaning up previous channel');
-        try {
-          supabase.removeChannel(channel);
-        } catch (e) {
-          console.warn('⚠️ Error removing previous channel:', e);
-        }
-      }
-
-      const channelName = `websites-cross-browser-${account.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      console.log('🔄 Setting up cross-browser realtime listener:', channelName);
-      
-      channel = supabase
-        .channel(channelName, {
-          config: {
-            broadcast: { self: false },
-            presence: { key: `user-${Date.now()}` }
-          }
-        })
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'account_websites',
-            filter: `account_id=eq.${account.id}`
-          },
-          async (payload) => {
-            console.log('🔥 REALTIME: Website change detected!', {
-              event: payload.eventType,
-              websiteId: (payload.new as any)?.id || (payload.old as any)?.id,
-              isActive: (payload.new as any)?.is_active,
-              timestamp: new Date().toISOString(),
-              browser: navigator.userAgent
-            });
-            
-            // Add delay for database consistency across all browsers
-            await new Promise(resolve => setTimeout(resolve, 150));
-            
-            try {
-              const { data: freshWebsites, error } = await supabase
-                .from('account_websites')
-                .select('*')
-                .eq('account_id', account.id)
-                .order('created_at', { ascending: true });
-
-              if (error) {
-                console.error('❌ REALTIME: Error refetching websites:', error);
-                return;
-              }
-
-              const activeWebsites = (freshWebsites || []).filter(w => w.is_active);
-              console.log('✅ REALTIME: Fresh active websites:', activeWebsites.length);
+            if (!error && freshWebsites) {
+              const activeWebsites = freshWebsites.filter(w => w.is_active);
+              console.log('✅ REALTIME: Updated websites:', activeWebsites.length);
               
               setWebsites(activeWebsites);
-              
-              setCurrentWebsiteIndex(prev => {
-                const newIndex = activeWebsites.length === 0 ? 0 : (prev >= activeWebsites.length ? 0 : prev);
-                console.log('🔄 REALTIME: Website index updated from', prev, 'to', newIndex);
-                return newIndex;
-              });
-              
-              // Reset reconnect attempts on successful update
-              reconnectAttempts = 0;
-              
-            } catch (refetchError) {
-              console.error('❌ REALTIME: Error in refetch:', refetchError);
+              setCurrentWebsiteIndex(prev => 
+                activeWebsites.length === 0 ? 0 : (prev >= activeWebsites.length ? 0 : prev)
+              );
             }
+          } catch (error) {
+            console.error('❌ REALTIME: Error refetching websites:', error);
           }
-        )
-        .subscribe((status) => {
-          console.log('🔄 REALTIME: Subscription status:', status, 'for channel:', channelName, 'Browser:', navigator.userAgent.split(' ')[0]);
-          
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ REALTIME: Successfully subscribed!');
-            reconnectAttempts = 0;
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-            console.error('❌ REALTIME: Channel error, timeout, or closed');
-            
-            if (reconnectAttempts < maxReconnectAttempts) {
-              reconnectAttempts++;
-              const delay = Math.min(2000 * Math.pow(2, reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
-              console.log(`🔄 REALTIME: Attempting reconnection ${reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms`);
-              
-              reconnectTimer = setTimeout(() => {
-                setupRealtimeListener();
-              }, delay);
-            } else {
-              console.error('❌ REALTIME: Max reconnection attempts reached');
-            }
-          }
-        });
-    };
-
-    setupRealtimeListener();
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔄 REALTIME: Status:', status);
+        
+        if (status === 'SUBSCRIBED') {
+          setConnectionStatus('connected');
+          console.log('✅ REALTIME: Connected successfully');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setConnectionStatus('disconnected');
+          console.error('❌ REALTIME: Connection error');
+        }
+      });
 
     // Cleanup function
     return () => {
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      if (channel) {
-        console.log('🧹 REALTIME: Cleaning up listener');
-        try {
-          supabase.removeChannel(channel);
-        } catch (e) {
-          console.warn('⚠️ Error during cleanup:', e);
-        }
-      }
+      console.log('🧹 REALTIME: Cleaning up listener');
+      supabase.removeChannel(channel);
+      setConnectionStatus('disconnected');
     };
   }, [account?.id, subscriptionExpired, isBrowserSupported]);
 
@@ -385,7 +330,7 @@ const ClientPublicPage = () => {
         async (payload) => {
           console.log('🔔 Notification change detected:', payload);
           
-          if (payload.eventType === 'INSERT' && payload.new?.is_active) {
+          if (payload.eventType === 'INSERT' && (payload.new as any)?.is_active) {
             console.log('➕ Adding new notification:', payload.new);
             setActiveNotifications(prev => [...prev, payload.new as Notification]);
           } else if (payload.eventType === 'UPDATE') {
@@ -406,8 +351,8 @@ const ClientPublicPage = () => {
               setActiveNotifications(prev => prev.filter(n => n.id !== updatedNotification.id));
             }
           } else if (payload.eventType === 'DELETE') {
-            console.log('🗑️ Removing deleted notification:', payload.old?.id);
-            setActiveNotifications(prev => prev.filter(n => n.id !== payload.old?.id));
+            console.log('🗑️ Removing deleted notification:', (payload.old as any)?.id);
+            setActiveNotifications(prev => prev.filter(n => n.id !== (payload.old as any)?.id));
           }
         }
       )
@@ -538,6 +483,13 @@ const ClientPublicPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Connection Status Indicator */}
+      {connectionStatus !== 'connected' && (
+        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-white text-center py-1 text-sm z-50">
+          {connectionStatus === 'connecting' ? '🔄 جاري الاتصال...' : '⚠️ انقطع الاتصال - جاري إعادة المحاولة...'}
+        </div>
+      )}
+
       {/* Main Content - Full Screen */}
       <main className="flex-1">
         {websites.length === 0 ? (
@@ -553,6 +505,12 @@ const ClientPublicPage = () => {
               <p className="text-xs text-gray-400 mt-1">
                 🌐 متوافق مع جميع المتصفحات الحديثة
               </p>
+              <div className="mt-4 flex items-center justify-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+                <span className="text-xs text-gray-500">
+                  {connectionStatus === 'connected' ? 'متصل' : connectionStatus === 'connecting' ? 'جاري الاتصال' : 'غير متصل'}
+                </span>
+              </div>
             </div>
           </div>
         ) : currentWebsite ? (
