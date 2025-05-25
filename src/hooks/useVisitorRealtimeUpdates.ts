@@ -159,10 +159,14 @@ export const useVisitorRealtimeUpdates = ({
           (payload) => {
             if (!mountedRef.current || isProcessingUpdate.current) return;
             
+            // إضافة فحوصات للتأكد من وجود البيانات
+            const websiteId = (payload.new as any)?.id || (payload.old as any)?.id || 'unknown';
+            const isActive = (payload.new as any)?.is_active;
+            
             console.log('🚀 تحديث موقع فوري للزائر:', {
               event: payload.eventType,
-              websiteId: payload.new?.id || payload.old?.id,
-              active: payload.new?.is_active,
+              websiteId: websiteId,
+              active: isActive,
               timestamp: new Date().toISOString()
             });
             
