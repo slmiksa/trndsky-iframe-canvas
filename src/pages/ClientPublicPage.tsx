@@ -178,7 +178,7 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes - IMPROVED VERSION
+  // Setup realtime listener for website changes - FULLY FIXED
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
@@ -198,69 +198,70 @@ const ClientPublicPage = () => {
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        async (payload) => {
+        (payload) => {
           console.log('🔄 Website change detected:', payload);
           console.log('🔄 Event type:', payload.eventType);
           console.log('🔄 New record:', payload.new);
           console.log('🔄 Old record:', payload.old);
           
-          // Handle real-time updates more precisely
+          // Handle all change types immediately
           if (payload.eventType === 'UPDATE' && payload.new) {
             const updatedWebsite = payload.new as Website;
             console.log('🔄 Processing website update:', updatedWebsite);
             
             setWebsites(prevWebsites => {
-              let updatedWebsites = [...prevWebsites];
+              console.log('🔄 Previous websites:', prevWebsites);
               
               if (updatedWebsite.is_active) {
-                // If website is now active, add it if not already present
-                const existingIndex = updatedWebsites.findIndex(w => w.id === updatedWebsite.id);
+                // Website is active - add or update it
+                const existingIndex = prevWebsites.findIndex(w => w.id === updatedWebsite.id);
                 if (existingIndex >= 0) {
-                  updatedWebsites[existingIndex] = updatedWebsite;
+                  // Update existing website
+                  const updated = [...prevWebsites];
+                  updated[existingIndex] = updatedWebsite;
+                  console.log('✅ Website updated in list:', updatedWebsite.id);
+                  return updated;
                 } else {
-                  updatedWebsites.push(updatedWebsite);
+                  // Add new active website
+                  console.log('✅ Website added to list:', updatedWebsite.id);
+                  return [...prevWebsites, updatedWebsite];
                 }
-                console.log('✅ Website activated/updated:', updatedWebsite.id);
               } else {
-                // If website is now inactive, remove it
-                updatedWebsites = updatedWebsites.filter(w => w.id !== updatedWebsite.id);
-                console.log('❌ Website deactivated and removed:', updatedWebsite.id);
-              }
-              
-              console.log('🔄 Updated websites list:', updatedWebsites);
-              
-              // Reset index if current website was removed or if no websites left
-              if (updatedWebsites.length === 0) {
-                setCurrentWebsiteIndex(0);
-              } else if (currentWebsiteIndex >= updatedWebsites.length) {
-                setCurrentWebsiteIndex(0);
-              }
-              
-              return updatedWebsites;
-            });
-          } else {
-            // For INSERT/DELETE events, re-fetch all data to be safe
-            try {
-              const { data: allWebsites, error } = await supabase
-                .from('account_websites')
-                .select('*')
-                .eq('account_id', account.id)
-                .order('created_at', { ascending: true });
-
-              if (!error && allWebsites) {
-                const activeWebsites = allWebsites.filter(website => website.is_active);
-                console.log('🔄 Re-fetched active websites:', activeWebsites);
-                setWebsites(activeWebsites);
+                // Website is inactive - remove it immediately
+                const filtered = prevWebsites.filter(w => w.id !== updatedWebsite.id);
+                console.log('❌ Website removed from list:', updatedWebsite.id);
+                console.log('🔄 Remaining websites:', filtered);
                 
-                if (activeWebsites.length === 0) {
-                  setCurrentWebsiteIndex(0);
-                } else if (currentWebsiteIndex >= activeWebsites.length) {
-                  setCurrentWebsiteIndex(0);
-                }
+                // Reset index if needed
+                setCurrentWebsiteIndex(prev => {
+                  if (filtered.length === 0) {
+                    console.log('🔄 No websites left, resetting index to 0');
+                    return 0;
+                  } else if (prev >= filtered.length) {
+                    console.log('🔄 Index out of bounds, resetting to 0');
+                    return 0;
+                  }
+                  return prev;
+                });
+                
+                return filtered;
               }
-            } catch (error) {
-              console.error('❌ Error re-fetching websites after change:', error);
+            });
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            const newWebsite = payload.new as Website;
+            if (newWebsite.is_active) {
+              console.log('➕ Adding new active website:', newWebsite.id);
+              setWebsites(prev => [...prev, newWebsite]);
             }
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            console.log('🗑️ Removing deleted website:', payload.old.id);
+            setWebsites(prev => {
+              const filtered = prev.filter(w => w.id !== payload.old.id);
+              if (filtered.length === 0) {
+                setCurrentWebsiteIndex(0);
+              }
+              return filtered;
+            });
           }
         }
       )
@@ -278,7 +279,7 @@ const ClientPublicPage = () => {
       console.log('🔄 Cleaning up realtime listener');
       supabase.removeChannel(channel);
     };
-  }, [account?.id, subscriptionExpired, currentWebsiteIndex]);
+  }, [account?.id, subscriptionExpired]);
 
   // Initial fetch and realtime listener for notifications
   useEffect(() => {
