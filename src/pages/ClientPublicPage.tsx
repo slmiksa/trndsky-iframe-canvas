@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useBreakTimers } from '@/hooks/useBreakTimers';
 import { useAccountData } from '@/hooks/useAccountData';
-import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
+import { useVisitorRealtimeUpdates } from '@/hooks/useVisitorRealtimeUpdates';
 import NotificationPopup from '@/components/NotificationPopup';
 import BreakTimerDisplay from '@/components/BreakTimerDisplay';
 import SubscriptionExpiredView from '@/components/SubscriptionExpiredView';
@@ -48,17 +47,16 @@ const ClientPublicPage = () => {
     fetchWebsites
   } = useAccountData(accountId);
 
+  // إعداد التحديثات الفورية للزائر
+  useVisitorRealtimeUpdates({
+    account,
+    fetchWebsites,
+    setRotationInterval,
+    setAccount
+  });
+
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
-
-  // Setup realtime updates
-  useRealtimeUpdates({
-    account,
-    subscriptionExpired,
-    setRotationInterval,
-    setAccount,
-    fetchWebsites
-  });
 
   // Function to check if current time is within timer range
   const isTimerActive = (timer: BreakTimer) => {
