@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,11 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Settings } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Settings, Image } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
+import GalleryManager from '@/components/GalleryManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import Footer from '@/components/Footer';
 import { Slider } from '@/components/ui/slider';
@@ -362,10 +362,14 @@ const ClientDashboard = () => {
         )}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="websites" className="flex items-center gap-2">
               <Globe className="h-4 w-4" />
               المواقع
+            </TabsTrigger>
+            <TabsTrigger value="gallery" className="flex items-center gap-2">
+              <Image className="h-4 w-4" />
+              معرض الصور
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
@@ -541,6 +545,10 @@ const ClientDashboard = () => {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="gallery">
+            {accountId && <GalleryManager accountId={accountId} />}
           </TabsContent>
 
           <TabsContent value="notifications">
