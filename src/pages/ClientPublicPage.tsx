@@ -177,18 +177,18 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Real-time listener only for manual changes (no automatic refresh)
+  // Real-time listener for website changes from dashboard
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up realtime listener for manual website updates');
+    console.log('🔄 Setting up realtime listener for dashboard changes');
     console.log('🔄 Account ID:', account.id);
     
     const websiteChannel = supabase
-      .channel(`websites-${account.id}-${Date.now()}`, {
+      .channel(`websites-dashboard-${account.id}`, {
         config: {
           broadcast: { self: true },
           presence: { key: account.id }
@@ -203,35 +203,19 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         (payload) => {
-          console.log('🔄 Website realtime update detected:', payload);
+          console.log('🔄 Website change detected from dashboard:', payload);
           console.log('🔄 Event type:', payload.eventType);
-          console.log('🔄 New record:', payload.new);
-          console.log('🔄 Old record:', payload.old);
-          console.log('🔄 Timestamp:', new Date().toISOString());
+          console.log('🔄 Payload:', payload);
           
-          // Only update when there's an actual change in is_active status
-          if (payload.eventType === 'UPDATE') {
-            const oldRecord = payload.old as Website;
-            const newRecord = payload.new as Website;
-            
-            if (oldRecord.is_active !== newRecord.is_active) {
-              console.log('🔄 Status change detected, fetching updated websites...');
-              setTimeout(() => {
-                fetchWebsites(account);
-              }, 100);
-            }
-          } else if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-            console.log('🔄 Website added/removed, fetching updated websites...');
-            setTimeout(() => {
-              fetchWebsites(account);
-            }, 100);
-          }
+          // Update websites whenever there's any change
+          console.log('🔄 Refreshing websites due to dashboard change...');
+          fetchWebsites(account);
         }
       )
       .subscribe((status) => {
         console.log('🔄 Website channel status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to website updates!');
+          console.log('✅ Successfully subscribed to website dashboard updates!');
         }
       });
 
@@ -282,7 +266,7 @@ const ClientPublicPage = () => {
       supabase.removeChannel(websiteChannel);
       supabase.removeChannel(notificationChannel);
     };
-  }, [account?.id, subscriptionExpired, processedNotifications]);
+  }, [account?.id, subscriptionExpired]);
 
   // Check for active notifications (only on initial load)
   useEffect(() => {
