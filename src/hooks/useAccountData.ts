@@ -29,17 +29,26 @@ export const useAccountData = (accountId: string | undefined) => {
   const [error, setError] = useState<string | null>(null);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
-  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const isSubscriptionExpired = (account: Account) => {
     if (!account.activation_end_date) return false;
     return new Date(account.activation_end_date) < new Date();
   };
 
-  // Stable fetch websites function with debouncing
+  // Enhanced fetch websites function with better error handling
   const fetchWebsites = useCallback(async (accountData: Account) => {
     try {
-      console.log('🔍 جلب المواقع للحساب:', accountData.id);
+      const now = Date.now();
+      
+      // Prevent rapid successive calls
+      if (now - lastFetchTime < 200) {
+        console.log('⏭️ تخطي الجلب - طلب سريع جداً');
+        return websites;
+      }
+      
+      console.log('🔍 جلب المواقع المحسن للحساب:', accountData.id);
+      console.log('🖥️ نوع الجهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -56,20 +65,24 @@ export const useAccountData = (accountId: string | undefined) => {
       console.log('✅ تم جلب المواقع بنجاح:', websiteData);
       console.log('📊 عدد المواقع النشطة:', (websiteData || []).length);
       
-      // تحديث حالة المواقع بشكل مستقر
       const activeWebsites = websiteData || [];
-      setWebsites(activeWebsites);
+      
+      // Force update state even if data seems the same
+      setWebsites([...activeWebsites]);
+      setLastFetchTime(now);
+      
+      console.log('🔄 تم تحديث حالة المواقع بنجاح');
       
       return activeWebsites;
       
     } catch (error) {
-      console.error('❌ خطأ في fetchWebsites:', error);
+      console.error('❌ خطأ في fetchWebsites المحسن:', error);
       setWebsites([]);
       throw error;
     }
-  }, []);
+  }, [lastFetchTime, websites]);
 
-  // Initial data fetch
+  // Enhanced initial data fetch
   useEffect(() => {
     const fetchAccountData = async () => {
       if (!accountId) {
@@ -79,7 +92,7 @@ export const useAccountData = (accountId: string | undefined) => {
       }
 
       try {
-        console.log('🔍 جلب بيانات الحساب:', accountId);
+        console.log('🔍 جلب بيانات الحساب المحسن:', accountId);
         
         let { data: accountData, error: accountError } = await supabase
           .from('accounts')
@@ -133,8 +146,13 @@ export const useAccountData = (accountId: string | undefined) => {
     fetchAccountData();
   }, [accountId, fetchWebsites]);
 
-  // Remove duplicate realtime subscription - will be handled by useRealtimeUpdates
-  // This prevents multiple listeners from causing rapid updates
+  // Force refresh function for manual updates
+  const forceRefresh = useCallback(async () => {
+    if (account) {
+      console.log('🔄 تحديث يدوي للمواقع');
+      await fetchWebsites(account);
+    }
+  }, [account, fetchWebsites]);
 
   return {
     account,
@@ -145,6 +163,7 @@ export const useAccountData = (accountId: string | undefined) => {
     rotationInterval,
     setRotationInterval,
     setAccount,
-    fetchWebsites
+    fetchWebsites,
+    forceRefresh
   };
 };

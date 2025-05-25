@@ -26,38 +26,44 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastWebsitesLength = useRef(websites.length);
+  const lastWebsitesUpdate = useRef<number>(Date.now());
 
-  console.log('🎯 ClientPageContent rendered with:');
+  console.log('🎯 ClientPageContent محسن مع:');
   console.log('📊 عدد المواقع:', websites.length);
+  console.log('🖥️ نوع الجهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
   console.log('🌐 المواقع:', websites.map(w => ({ id: w.id, url: w.website_url, title: w.website_title })));
   console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
 
-  // Clear any existing interval when component unmounts or websites change
+  // Enhanced cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {
-        console.log('🧹 تنظيف مؤقت التبديل عند إلغاء التحميل');
+        console.log('🧹 تنظيف مؤقت التبديل المحسن عند إلغاء التحميل');
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
   }, []);
 
-  // Reset index when websites list changes significantly
+  // Enhanced reset logic when websites change
   useEffect(() => {
-    if (websites.length !== lastWebsitesLength.current) {
-      console.log('🔄 تغيير في عدد المواقع من', lastWebsitesLength.current, 'إلى', websites.length);
+    const now = Date.now();
+    
+    if (websites.length !== lastWebsitesLength.current || now - lastWebsitesUpdate.current > 1000) {
+      console.log('🔄 تغيير محسن في المواقع من', lastWebsitesLength.current, 'إلى', websites.length);
       lastWebsitesLength.current = websites.length;
+      lastWebsitesUpdate.current = now;
       
       if (websites.length === 0) {
         setCurrentWebsiteIndex(0);
       } else if (currentWebsiteIndex >= websites.length) {
+        console.log('🔄 إعادة تعيين الفهرس إلى 0');
         setCurrentWebsiteIndex(0);
       }
     }
   }, [websites.length, currentWebsiteIndex]);
 
-  // Stable rotation timer
+  // Enhanced rotation timer with better reliability
   useEffect(() => {
     // Clear any existing interval
     if (intervalRef.current) {
@@ -70,20 +76,27 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
       return;
     }
 
-    console.log('🔄 بدء تبديل المواقع الثابت - عدد المواقع:', websites.length);
+    console.log('🔄 بدء تبديل المواقع المحسن - عدد المواقع:', websites.length);
     console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
+    console.log('🖥️ على جهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
+    
+    // Enhanced interval with more aggressive timing for desktop
+    const actualInterval = navigator.userAgent.includes('Mobile') 
+      ? rotationInterval * 1000 
+      : Math.max(rotationInterval * 1000, 3000); // Minimum 3 seconds on desktop
     
     intervalRef.current = setInterval(() => {
       setCurrentWebsiteIndex((prev) => {
         const newIndex = (prev + 1) % websites.length;
-        console.log('🔄 التبديل الثابت إلى الموقع رقم:', newIndex + 1, 'من', websites.length);
+        console.log('🔄 التبديل المحسن إلى الموقع رقم:', newIndex + 1, 'من', websites.length);
+        console.log('🖥️ على جهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
         return newIndex;
       });
-    }, rotationInterval * 1000);
+    }, actualInterval);
 
     return () => {
       if (intervalRef.current) {
-        console.log('🧹 تنظيف مؤقت التبديل');
+        console.log('🧹 تنظيف مؤقت التبديل المحسن');
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
@@ -117,13 +130,19 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
-              key={`stable-${currentWebsite.id}-${currentWebsiteIndex}`}
+              key={`enhanced-${currentWebsite.id}-${currentWebsiteIndex}-${Date.now()}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
-              onLoad={() => console.log('✅ تم تحميل الموقع بشكل ثابت:', currentWebsite.website_url)}
-              onError={() => console.error('❌ خطأ في تحميل الموقع:', currentWebsite.website_url)}
+              onLoad={() => {
+                console.log('✅ تم تحميل الموقع بشكل محسن:', currentWebsite.website_url);
+                console.log('🖥️ على جهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
+              }}
+              onError={() => {
+                console.error('❌ خطأ في تحميل الموقع:', currentWebsite.website_url);
+                console.log('🖥️ على جهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
+              }}
             />
           </div>
         ) : (
