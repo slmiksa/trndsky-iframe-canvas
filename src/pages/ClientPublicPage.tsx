@@ -54,37 +54,9 @@ const ClientPublicPage = () => {
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
-  const [isBrowserSupported, setIsBrowserSupported] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
-
-  // Check browser compatibility
-  useEffect(() => {
-    const checkBrowserSupport = () => {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isModernBrowser = (
-        'fetch' in window &&
-        'Promise' in window &&
-        'WebSocket' in window &&
-        'addEventListener' in window
-      );
-
-      console.log('🌐 Browser detection:', {
-        userAgent: userAgent,
-        isChrome: userAgent.includes('chrome'),
-        isFirefox: userAgent.includes('firefox'),
-        isSafari: userAgent.includes('safari') && !userAgent.includes('chrome'),
-        isEdge: userAgent.includes('edge'),
-        isModernBrowser
-      });
-
-      setIsBrowserSupported(isModernBrowser);
-    };
-
-    checkBrowserSupport();
-  }, []);
 
   // Function to check if subscription is expired
   const isSubscriptionExpired = (account: Account) => {
@@ -106,12 +78,10 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites with retry mechanism
-  const fetchWebsites = async (accountData: Account, retryCount = 0) => {
-    const maxRetries = 3;
-    
+  // Function to fetch websites
+  const fetchWebsites = async (accountData: Account) => {
     try {
-      console.log(`🔍 Fetching websites for account: ${accountData.id} (attempt ${retryCount + 1})`);
+      console.log(`🔍 Fetching websites for account: ${accountData.id}`);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -121,13 +91,6 @@ const ClientPublicPage = () => {
 
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
-        
-        if (retryCount < maxRetries) {
-          console.log(`🔄 Retrying website fetch in 2 seconds...`);
-          setTimeout(() => fetchWebsites(accountData, retryCount + 1), 2000);
-          return;
-        }
-        
         setWebsites([]);
         return;
       }
@@ -149,13 +112,6 @@ const ClientPublicPage = () => {
       }
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
-      
-      if (retryCount < maxRetries) {
-        console.log(`🔄 Retrying website fetch in 2 seconds due to error...`);
-        setTimeout(() => fetchWebsites(accountData, retryCount + 1), 2000);
-        return;
-      }
-      
       setWebsites([]);
     }
   };
@@ -223,22 +179,17 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Simplified and more reliable realtime listener
+  // Realtime listener for websites
   useEffect(() => {
-    if (!account?.id || subscriptionExpired || !isBrowserSupported) {
-      console.log('⏭️ Skipping realtime setup - no account, subscription expired, or unsupported browser');
+    if (!account?.id || subscriptionExpired) {
+      console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up simple realtime listener for account:', account.id);
-    
-    // Set connection status
-    setConnectionStatus('connecting');
-    
-    const channelName = `websites-${account.id}`;
+    console.log('🔄 Setting up realtime listener for account:', account.id);
     
     const channel = supabase
-      .channel(channelName)
+      .channel(`websites-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -248,55 +199,23 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔥 REALTIME: Website change detected!', {
-            event: payload.eventType,
-            timestamp: new Date().toISOString()
-          });
+          console.log('🔥 REALTIME: Website change detected!', payload);
           
-          // Simple delay for consistency
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Refetch websites
-          try {
-            const { data: freshWebsites, error } = await supabase
-              .from('account_websites')
-              .select('*')
-              .eq('account_id', account.id)
-              .order('created_at', { ascending: true });
-
-            if (!error && freshWebsites) {
-              const activeWebsites = freshWebsites.filter(w => w.is_active);
-              console.log('✅ REALTIME: Updated websites:', activeWebsites.length);
-              
-              setWebsites(activeWebsites);
-              setCurrentWebsiteIndex(prev => 
-                activeWebsites.length === 0 ? 0 : (prev >= activeWebsites.length ? 0 : prev)
-              );
-            }
-          } catch (error) {
-            console.error('❌ REALTIME: Error refetching websites:', error);
-          }
+          // Slight delay to ensure consistency
+          setTimeout(async () => {
+            await fetchWebsites(account);
+          }, 100);
         }
       )
       .subscribe((status) => {
         console.log('🔄 REALTIME: Status:', status);
-        
-        if (status === 'SUBSCRIBED') {
-          setConnectionStatus('connected');
-          console.log('✅ REALTIME: Connected successfully');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setConnectionStatus('disconnected');
-          console.error('❌ REALTIME: Connection error');
-        }
       });
 
-    // Cleanup function
     return () => {
       console.log('🧹 REALTIME: Cleaning up listener');
       supabase.removeChannel(channel);
-      setConnectionStatus('disconnected');
     };
-  }, [account?.id, subscriptionExpired, isBrowserSupported]);
+  }, [account?.id, subscriptionExpired]);
 
   // Initial fetch and realtime listener for notifications
   useEffect(() => {
@@ -331,12 +250,9 @@ const ClientPublicPage = () => {
           console.log('🔔 Notification change detected:', payload);
           
           if (payload.eventType === 'INSERT' && (payload.new as any)?.is_active) {
-            console.log('➕ Adding new notification:', payload.new);
             setActiveNotifications(prev => [...prev, payload.new as Notification]);
           } else if (payload.eventType === 'UPDATE') {
             const updatedNotification = payload.new as Notification;
-            console.log('🔄 Updating notification:', updatedNotification);
-            
             if (updatedNotification.is_active) {
               setActiveNotifications(prev => {
                 const exists = prev.find(n => n.id === updatedNotification.id);
@@ -347,11 +263,9 @@ const ClientPublicPage = () => {
                 }
               });
             } else {
-              console.log('❌ Removing deactivated notification:', updatedNotification.id);
               setActiveNotifications(prev => prev.filter(n => n.id !== updatedNotification.id));
             }
           } else if (payload.eventType === 'DELETE') {
-            console.log('🗑️ Removing deleted notification:', (payload.old as any)?.id);
             setActiveNotifications(prev => prev.filter(n => n.id !== (payload.old as any)?.id));
           }
         }
@@ -409,9 +323,6 @@ const ClientPublicPage = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
           <p className="mt-4 text-gray-600">جاري التحميل...</p>
-          <p className="mt-2 text-xs text-gray-400">
-            🌐 متوافق مع جميع المتصفحات الحديثة
-          </p>
         </div>
       </div>
     );
@@ -483,13 +394,6 @@ const ClientPublicPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Connection Status Indicator */}
-      {connectionStatus !== 'connected' && (
-        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-white text-center py-1 text-sm z-50">
-          {connectionStatus === 'connecting' ? '🔄 جاري الاتصال...' : '⚠️ انقطع الاتصال - جاري إعادة المحاولة...'}
-        </div>
-      )}
-
       {/* Main Content - Full Screen */}
       <main className="flex-1">
         {websites.length === 0 ? (
@@ -502,15 +406,6 @@ const ClientPublicPage = () => {
               <p className="text-sm text-gray-400 mt-2">
                 🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
               </p>
-              <p className="text-xs text-gray-400 mt-1">
-                🌐 متوافق مع جميع المتصفحات الحديثة
-              </p>
-              <div className="mt-4 flex items-center justify-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
-                <span className="text-xs text-gray-500">
-                  {connectionStatus === 'connected' ? 'متصل' : connectionStatus === 'connecting' ? 'جاري الاتصال' : 'غير متصل'}
-                </span>
-              </div>
             </div>
           </div>
         ) : currentWebsite ? (
