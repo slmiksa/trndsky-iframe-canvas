@@ -4,6 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface Account {
   id: string;
+  name: string;
+  email: string;
+  database_name: string;
+  status: 'active' | 'suspended' | 'pending';
+  activation_start_date: string | null;
+  activation_end_date: string | null;
+  is_subscription_active: boolean | null;
   rotation_interval: number;
 }
 
@@ -11,7 +18,7 @@ interface UseRealtimeUpdatesProps {
   account: Account | null;
   subscriptionExpired: boolean;
   setRotationInterval: (interval: number) => void;
-  setAccount: (account: Account | null) => void;
+  setAccount: React.Dispatch<React.SetStateAction<Account | null>>;
   fetchWebsites: (account: Account) => Promise<void>;
 }
 
