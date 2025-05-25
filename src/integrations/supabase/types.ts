@@ -62,6 +62,7 @@ export type Database = {
           is_subscription_active: boolean | null
           name: string
           password_hash: string
+          rotation_interval: number
           status: Database["public"]["Enums"]["account_status"] | null
           updated_at: string | null
         }
@@ -76,6 +77,7 @@ export type Database = {
           is_subscription_active?: boolean | null
           name: string
           password_hash: string
+          rotation_interval?: number
           status?: Database["public"]["Enums"]["account_status"] | null
           updated_at?: string | null
         }
@@ -90,6 +92,7 @@ export type Database = {
           is_subscription_active?: boolean | null
           name?: string
           password_hash?: string
+          rotation_interval?: number
           status?: Database["public"]["Enums"]["account_status"] | null
           updated_at?: string | null
         }

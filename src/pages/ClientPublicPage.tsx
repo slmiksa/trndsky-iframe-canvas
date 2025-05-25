@@ -16,6 +16,7 @@ interface Account {
   activation_start_date: string | null;
   activation_end_date: string | null;
   is_subscription_active: boolean | null;
+  rotation_interval: number;
 }
 
 interface Website {
@@ -54,6 +55,7 @@ const ClientPublicPage = () => {
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [rotationInterval, setRotationInterval] = useState(30); // Default 30 seconds
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -154,6 +156,9 @@ const ClientPublicPage = () => {
 
         console.log('✅ Account data fetched:', accountData);
         
+        // Set rotation interval from account data
+        setRotationInterval(accountData.rotation_interval || 30);
+        
         // Check if subscription is expired
         if (isSubscriptionExpired(accountData)) {
           setSubscriptionExpired(true);
@@ -175,6 +180,47 @@ const ClientPublicPage = () => {
 
     fetchAccountData();
   }, [accountId]);
+
+  // Setup realtime listener for account changes (including rotation_interval)
+  useEffect(() => {
+    if (!account?.id || subscriptionExpired) {
+      console.log('⏭️ Skipping account realtime setup - no account or subscription expired');
+      return;
+    }
+
+    console.log('🔄 Setting up realtime listener for account changes');
+    
+    const accountChannelName = `account-changes-${account.id}`;
+    
+    const accountChannel = supabase
+      .channel(accountChannelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'accounts',
+          filter: `id=eq.${account.id}`
+        },
+        (payload) => {
+          console.log('🔄 Account change detected:', payload);
+          
+          if (payload.new?.rotation_interval !== undefined) {
+            console.log('🔄 Rotation interval updated:', payload.new.rotation_interval);
+            setRotationInterval(payload.new.rotation_interval);
+            setAccount(prev => prev ? { ...prev, rotation_interval: payload.new.rotation_interval } : null);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔄 Account realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔄 Cleaning up account realtime listener');
+      supabase.removeChannel(accountChannel);
+    };
+  }, [account?.id, subscriptionExpired]);
 
   // Setup realtime listener for website changes
   useEffect(() => {
@@ -330,16 +376,18 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Website rotation - now only if there are active websites
+  // Website rotation - now uses dynamic rotation interval
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
+    console.log('🔄 Setting up website rotation with interval:', rotationInterval, 'seconds');
+
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
-    }, 30000); // Switch every 30 seconds
+    }, rotationInterval * 1000); // Convert seconds to milliseconds
 
     return () => clearInterval(interval);
-  }, [websites.length, subscriptionExpired]);
+  }, [websites.length, subscriptionExpired, rotationInterval]);
 
   // Modified to only track that we've seen this notification, but don't remove it
   const handleNotificationClose = (notificationId: string) => {
