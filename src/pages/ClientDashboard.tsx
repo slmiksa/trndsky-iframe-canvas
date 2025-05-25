@@ -164,9 +164,9 @@ const ClientDashboard = () => {
     }
   };
 
-  const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
+  const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean, retryCount = 0) => {
     try {
-      console.log('🔄 Toggling website status:', { websiteId, currentStatus });
+      console.log('🔄 Toggling website status:', { websiteId, currentStatus, retryCount });
       
       const { error } = await supabase
         .from('account_websites')
@@ -184,14 +184,36 @@ const ClientDashboard = () => {
         description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع`,
       });
 
-      fetchWebsites();
+      // Immediate local update for better UX
+      setWebsites(prev => prev.map(website => 
+        website.id === websiteId 
+          ? { ...website, is_active: !currentStatus }
+          : website
+      ));
+
+      // Fetch fresh data after a short delay to ensure consistency
+      setTimeout(() => {
+        fetchWebsites();
+      }, 500);
+
     } catch (error: any) {
       console.error('❌ Error in toggleWebsiteStatus:', error);
-      toast({
-        title: "خطأ في تحديث الموقع",
-        description: error.message,
-        variant: "destructive",
-      });
+      
+      // Retry logic for network failures
+      if (retryCount < 2 && (error.message.includes('Failed to fetch') || error.message.includes('network'))) {
+        console.log(`🔄 Retrying... Attempt ${retryCount + 1}`);
+        setTimeout(() => {
+          toggleWebsiteStatus(websiteId, currentStatus, retryCount + 1);
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        toast({
+          title: "خطأ في تحديث الموقع",
+          description: error.message.includes('Failed to fetch') 
+            ? 'مشكلة في الاتصال - يرجى المحاولة مرة أخرى'
+            : error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
