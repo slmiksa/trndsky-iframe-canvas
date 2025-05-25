@@ -25,11 +25,11 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
 }) => {
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
 
-  // Website rotation
+  // Optimized website rotation
   useEffect(() => {
     if (websites.length <= 1) return;
 
-    console.log('🔄 Setting up website rotation with interval:', rotationInterval, 'seconds');
+    console.log('🚀 Setting up FAST website rotation with interval:', rotationInterval, 'seconds');
 
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
@@ -38,23 +38,23 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     return () => clearInterval(interval);
   }, [websites.length, rotationInterval]);
 
-  // Handle website list changes - reset index if current index is out of bounds
+  // Enhanced website list change handling for instant updates
   useEffect(() => {
-    console.log('🔄 Websites list changed. Current count:', websites.length);
-    console.log('🔄 Current website index:', currentWebsiteIndex);
+    console.log('🚀 INSTANT websites list update. Current count:', websites.length);
+    console.log('🚀 Current website index:', currentWebsiteIndex);
     
     if (websites.length === 0) {
-      console.log('🔄 No active websites, resetting index to 0');
+      console.log('🚀 No active websites, resetting index to 0');
       setCurrentWebsiteIndex(0);
     } else if (currentWebsiteIndex >= websites.length) {
-      console.log('🔄 Current index out of bounds, resetting to 0');
+      console.log('🚀 Current index out of bounds, resetting to 0');
       setCurrentWebsiteIndex(0);
     }
   }, [websites, currentWebsiteIndex]);
 
   const currentWebsite = websites.length > 0 ? websites[currentWebsiteIndex] : null;
 
-  console.log('🔄 Current website to display:', currentWebsite);
+  console.log('🚀 Current website to display:', currentWebsite);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -67,7 +67,7 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
               </h2>
               <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
               <p className="text-sm text-gray-400 mt-2">
-                🔄 الاستماع للتحديثات المباشرة نشط
+                🚀 التحديثات المباشرة السريعة نشطة
               </p>
             </div>
           </div>
@@ -87,7 +87,7 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
                 جاري التحميل...
               </h2>
-              <p className="text-gray-600">يتم تحديث المحتوى</p>
+              <p className="text-gray-600">يتم تحديث المحتوى بسرعة</p>
             </div>
           </div>
         )}

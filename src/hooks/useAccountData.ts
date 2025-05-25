@@ -35,9 +35,10 @@ export const useAccountData = (accountId: string | undefined) => {
     return new Date(account.activation_end_date) < new Date();
   };
 
+  // Optimized fetchWebsites function for instant updates
   const fetchWebsites = async (accountData: Account) => {
     try {
-      console.log('🔍 Fetching websites for account:', accountData.id);
+      console.log('🚀 FAST fetching websites for account:', accountData.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -48,15 +49,18 @@ export const useAccountData = (accountId: string | undefined) => {
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
         setWebsites([]);
-      } else {
-        console.log('✅ All websites data fetched:', websiteData);
-        
-        const activeWebsites = (websiteData || []).filter(website => website.is_active);
-        console.log('✅ Active websites filtered:', activeWebsites);
-        
-        // Update websites immediately
-        setWebsites(activeWebsites);
+        return;
       }
+
+      console.log('✅ All websites data fetched:', websiteData);
+      
+      const activeWebsites = (websiteData || []).filter(website => website.is_active);
+      console.log('✅ Active websites filtered:', activeWebsites);
+      
+      // Immediate state update for instant UI response
+      setWebsites(activeWebsites);
+      console.log('🚀 Websites state updated instantly!');
+      
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
       setWebsites([]);

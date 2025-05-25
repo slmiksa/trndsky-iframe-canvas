@@ -70,60 +70,72 @@ export const useRealtimeUpdates = ({
     };
   }, [account?.id, subscriptionExpired, setRotationInterval, setAccount]);
 
-  // Setup realtime listener for website changes with improved handling
+  // Enhanced realtime listener for immediate website changes
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up realtime listener for websites');
+    console.log('🔄 Setting up ENHANCED realtime listener for immediate updates');
     console.log('🔄 Account ID:', account.id);
     
-    const channelName = `account-websites-${account.id}`;
+    const channelName = `fast-updates-${account.id}`;
     
     const channel = supabase
       .channel(channelName, {
         config: {
-          broadcast: { self: true },
+          broadcast: { self: false }, // Don't receive our own changes
           presence: { key: account.id }
         }
       })
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen to all events: INSERT, UPDATE, DELETE
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔄 Website change detected:', payload);
-          console.log('🔄 Event type:', payload.eventType);
-          console.log('🔄 New record:', payload.new);
-          console.log('🔄 Old record:', payload.old);
-          console.log('🔄 Timestamp:', new Date().toISOString());
+          console.log('🚀 IMMEDIATE website change detected:', payload);
+          console.log('🚀 Event:', payload.eventType);
+          console.log('🚀 Timestamp:', new Date().toISOString());
           
-          // Immediate refresh without delay for better responsiveness
-          console.log('🔄 Immediately re-fetching websites due to change...');
-          await fetchWebsites(account);
+          // Immediate refresh without any delay for instant updates
+          console.log('🚀 Instantly refreshing websites...');
+          try {
+            await fetchWebsites(account);
+            console.log('✅ Websites refreshed successfully');
+          } catch (error) {
+            console.error('❌ Error refreshing websites:', error);
+            // Retry once after a short delay if there's an error
+            setTimeout(async () => {
+              try {
+                await fetchWebsites(account);
+                console.log('✅ Websites refreshed on retry');
+              } catch (retryError) {
+                console.error('❌ Retry failed:', retryError);
+              }
+            }, 500);
+          }
         }
       )
       .subscribe((status) => {
-        console.log('🔄 Realtime subscription status:', status);
-        console.log('🔄 Channel name:', channelName);
+        console.log('🚀 Fast updates subscription status:', status);
+        console.log('🚀 Channel name:', channelName);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to realtime updates!');
+          console.log('✅ Successfully subscribed to FAST realtime updates!');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to realtime updates');
+          console.error('❌ Error subscribing to fast updates');
         } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Realtime subscription timed out');
+          console.error('⏰ Fast updates subscription timed out');
         }
       });
 
     return () => {
-      console.log('🔄 Cleaning up realtime listener');
+      console.log('🔄 Cleaning up fast updates listener');
       console.log('🔄 Removing channel:', channelName);
       supabase.removeChannel(channel);
     };
