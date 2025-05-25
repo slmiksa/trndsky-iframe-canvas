@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -401,56 +402,43 @@ const ClientPublicPage = () => {
 
   const currentWebsite = websites[currentWebsiteIndex];
 
-  // Debug logging (only in development)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🖥️ [DEBUG] Browser:', navigator.userAgent);
-    console.log('🖥️ [DEBUG] Websites count:', websites.length);
-    console.log('🖥️ [DEBUG] Current index:', currentWebsiteIndex);
-    console.log('🖥️ [DEBUG] Current website:', currentWebsite);
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100 overflow-hidden">
+    <div className="w-full h-screen overflow-hidden bg-black">
       {/* Main Content - Full Screen */}
-      <main className="w-full h-screen">
-        {websites.length === 0 ? (
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                مرحباً بك في {account.name}
-              </h2>
-              <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
-              <p className="text-sm text-gray-400 mt-2">
-                🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
-              </p>
-            </div>
+      {websites.length === 0 ? (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              مرحباً بك في {account.name}
+            </h2>
+            <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
+            <p className="text-sm text-gray-400 mt-2">
+              🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
+            </p>
           </div>
-        ) : currentWebsite ? (
-          <div className="w-full h-full relative">
-            <iframe
-              key={`${currentWebsite.id}-${Date.now()}`}
-              src={currentWebsite.website_url}
-              title={currentWebsite.website_title || currentWebsite.website_url}
-              className="w-full h-full border-0 block"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation-by-user-activation"
-              loading="eager"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write; camera; microphone; geolocation"
-              style={{
-                border: 'none',
-                outline: 'none',
-                boxShadow: 'none',
-                margin: 0,
-                padding: 0,
-                display: 'block',
-                width: '100%',
-                height: '100%',
-                minHeight: '100vh'
-              }}
-            />
-          </div>
-        ) : null}
-      </main>
+        </div>
+      ) : currentWebsite ? (
+        <iframe
+          key={`${currentWebsite.id}-${Date.now()}`}
+          src={currentWebsite.website_url}
+          title={currentWebsite.website_title || currentWebsite.website_url}
+          className="w-full h-full"
+          style={{
+            border: 'none',
+            margin: 0,
+            padding: 0,
+            width: '100vw',
+            height: '100vh',
+            position: 'absolute',
+            top: 0,
+            left: 0
+          }}
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation-by-user-activation"
+          loading="eager"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write; camera; microphone; geolocation"
+        />
+      ) : null}
 
       {/* Active Notifications */}
       {activeNotifications.map((notification) => (
