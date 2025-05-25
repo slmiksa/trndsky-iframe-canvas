@@ -78,7 +78,7 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites with better error handling
+  // Function to fetch websites
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log('🔍 Fetching websites for account:', accountData.id);
@@ -177,20 +177,16 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener for immediate updates
+  // Real-time listener only for manual changes (no automatic refresh)
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up enhanced realtime listener for websites');
+    console.log('🔄 Setting up realtime listener for manual website updates');
     console.log('🔄 Account ID:', account.id);
     
-    // Create multiple channels for better reliability
-    const channels = [];
-    
-    // Primary channel for website updates
     const websiteChannel = supabase
       .channel(`websites-${account.id}-${Date.now()}`, {
         config: {
@@ -213,11 +209,23 @@ const ClientPublicPage = () => {
           console.log('🔄 Old record:', payload.old);
           console.log('🔄 Timestamp:', new Date().toISOString());
           
-          // Immediate update with a small delay to ensure data consistency
-          setTimeout(() => {
-            console.log('🔄 Fetching updated websites...');
-            fetchWebsites(account);
-          }, 100);
+          // Only update when there's an actual change in is_active status
+          if (payload.eventType === 'UPDATE') {
+            const oldRecord = payload.old as Website;
+            const newRecord = payload.new as Website;
+            
+            if (oldRecord.is_active !== newRecord.is_active) {
+              console.log('🔄 Status change detected, fetching updated websites...');
+              setTimeout(() => {
+                fetchWebsites(account);
+              }, 100);
+            }
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+            console.log('🔄 Website added/removed, fetching updated websites...');
+            setTimeout(() => {
+              fetchWebsites(account);
+            }, 100);
+          }
         }
       )
       .subscribe((status) => {
@@ -226,8 +234,6 @@ const ClientPublicPage = () => {
           console.log('✅ Successfully subscribed to website updates!');
         }
       });
-
-    channels.push(websiteChannel);
 
     // Channel for notification updates
     const notificationChannel = supabase
@@ -271,18 +277,10 @@ const ClientPublicPage = () => {
         console.log('🔄 Notification channel status:', status);
       });
 
-    channels.push(notificationChannel);
-
-    // Secondary polling as fallback
-    const pollInterval = setInterval(() => {
-      console.log('🔄 Polling for updates (fallback)');
-      fetchWebsites(account);
-    }, 5000); // Poll every 5 seconds as backup
-
     return () => {
-      console.log('🔄 Cleaning up realtime listeners and polling');
-      channels.forEach(channel => supabase.removeChannel(channel));
-      clearInterval(pollInterval);
+      console.log('🔄 Cleaning up realtime listeners');
+      supabase.removeChannel(websiteChannel);
+      supabase.removeChannel(notificationChannel);
     };
   }, [account?.id, subscriptionExpired, processedNotifications]);
 
@@ -339,7 +337,7 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Website rotation
+  // Website rotation (only when multiple websites exist)
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
@@ -453,7 +451,7 @@ const ClientPublicPage = () => {
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
-              key={`${currentWebsite.id}-${currentWebsite.is_active}-${Date.now()}`}
+              key={`${currentWebsite.id}-${currentWebsite.is_active}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
