@@ -35,32 +35,32 @@ export const useAccountData = (accountId: string | undefined) => {
     return new Date(account.activation_end_date) < new Date();
   };
 
-  // Enhanced fetchWebsites function for faster updates
+  // Enhanced fetchWebsites function for faster updates - جلب المواقع النشطة فقط
   const fetchWebsites = async (accountData: Account) => {
     try {
-      console.log('🚀 ENHANCED fetching websites for account:', accountData.id);
+      console.log('🚀 جلب المواقع للحساب:', accountData.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
         .eq('account_id', accountData.id)
-        .eq('is_active', true) // Only fetch active websites
+        .eq('is_active', true) // جلب المواقع النشطة فقط
         .order('created_at', { ascending: true });
 
       if (websiteError) {
-        console.error('❌ Error fetching websites:', websiteError);
+        console.error('❌ خطأ في جلب المواقع:', websiteError);
         setWebsites([]);
         return;
       }
 
-      console.log('✅ Active websites fetched:', websiteData);
+      console.log('✅ تم جلب المواقع النشطة:', websiteData);
+      console.log('🔢 عدد المواقع النشطة:', (websiteData || []).length);
       
-      // Immediate state update for instant UI response
+      // تحديث فوري للحالة لاستجابة سريعة في واجهة المستخدم
       setWebsites(websiteData || []);
-      console.log('🚀 Websites state updated instantly with count:', (websiteData || []).length);
       
     } catch (error) {
-      console.error('❌ Error in fetchWebsites:', error);
+      console.error('❌ خطأ في fetchWebsites:', error);
       setWebsites([]);
     }
   };
@@ -75,7 +75,7 @@ export const useAccountData = (accountId: string | undefined) => {
       }
 
       try {
-        console.log('🔍 Fetching account data for:', accountId);
+        console.log('🔍 جلب بيانات الحساب:', accountId);
         
         let { data: accountData, error: accountError } = await supabase
           .from('accounts')
@@ -85,7 +85,7 @@ export const useAccountData = (accountId: string | undefined) => {
           .single();
 
         if (accountError || !accountData) {
-          console.log('🔍 Searching by name:', accountId);
+          console.log('🔍 البحث بالاسم:', accountId);
           const { data: accountByName, error: nameError } = await supabase
             .from('accounts')
             .select('*')
@@ -94,7 +94,7 @@ export const useAccountData = (accountId: string | undefined) => {
             .single();
             
           if (nameError || !accountByName) {
-            console.error('❌ Error fetching account:', nameError);
+            console.error('❌ خطأ في جلب الحساب:', nameError);
             setError('لم يتم العثور على الحساب أو أنه غير نشط');
             setLoading(false);
             return;
@@ -103,7 +103,7 @@ export const useAccountData = (accountId: string | undefined) => {
           accountData = accountByName;
         }
 
-        console.log('✅ Account data fetched:', accountData);
+        console.log('✅ تم جلب بيانات الحساب:', accountData);
         
         setRotationInterval(accountData.rotation_interval || 30);
         
@@ -118,7 +118,7 @@ export const useAccountData = (accountId: string | undefined) => {
         await fetchWebsites(accountData);
 
       } catch (error) {
-        console.error('❌ Error in fetchAccountData:', error);
+        console.error('❌ خطأ في fetchAccountData:', error);
         setError('حدث خطأ في تحميل البيانات');
       } finally {
         setLoading(false);
@@ -128,14 +128,14 @@ export const useAccountData = (accountId: string | undefined) => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime subscription for instant updates
+  // Enhanced realtime subscription للتحديثات الفورية
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ Skipping realtime subscription - no account or subscription expired');
+      console.log('⏭️ تخطي الاشتراك في التحديثات الفورية - لا يوجد حساب أو انتهت صلاحية الاشتراك');
       return;
     }
 
-    console.log('🔄 Setting up ENHANCED realtime subscription for instant website updates');
+    console.log('🔄 إعداد الاشتراك في التحديثات الفورية للمواقع');
     
     const channelName = `instant-website-updates-${account.id}`;
     
@@ -149,39 +149,39 @@ export const useAccountData = (accountId: string | undefined) => {
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events
+          event: '*', // الاستماع لجميع الأحداث
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀 INSTANT website update detected:', payload);
-          console.log('🚀 Event type:', payload.eventType);
-          console.log('🚀 New data:', payload.new);
-          console.log('🚀 Old data:', payload.old);
+          console.log('🚀 تحديث فوري للموقع:', payload);
+          console.log('🚀 نوع الحدث:', payload.eventType);
+          console.log('🚀 البيانات الجديدة:', payload.new);
+          console.log('🚀 البيانات القديمة:', payload.old);
           
-          // Immediate refresh for all events
-          console.log('🚀 Triggering instant website refresh...');
+          // تحديث فوري لجميع الأحداث
+          console.log('🚀 تحديث فوري للمواقع...');
           try {
             await fetchWebsites(account);
-            console.log('✅ Instant website refresh completed');
+            console.log('✅ تم التحديث الفوري للمواقع');
           } catch (error) {
-            console.error('❌ Error in instant refresh:', error);
+            console.error('❌ خطأ في التحديث الفوري:', error);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🚀 Realtime subscription status:', status);
+        console.log('🚀 حالة الاشتراك في التحديثات الفورية:', status);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to instant website updates!');
+          console.log('✅ تم الاشتراك بنجاح في التحديثات الفورية للمواقع!');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error in realtime subscription');
+          console.error('❌ خطأ في الاشتراك في التحديثات الفورية');
         }
       });
 
     return () => {
-      console.log('🔄 Cleaning up realtime subscription');
+      console.log('🔄 تنظيف الاشتراك في التحديثات الفورية');
       supabase.removeChannel(channel);
     };
   }, [account?.id, subscriptionExpired]);

@@ -25,50 +25,50 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
 }) => {
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
 
-  // Enhanced website rotation with immediate response to changes
+  // تحسين تبديل المواقع مع استجابة فورية للتغييرات
   useEffect(() => {
     if (websites.length <= 1) {
-      console.log('🚀 Not enough websites for rotation. Count:', websites.length);
+      console.log('🚀 عدد المواقع غير كافٍ للتبديل. العدد:', websites.length);
       return;
     }
 
-    console.log('🚀 Setting up website rotation. Websites count:', websites.length);
-    console.log('🚀 Rotation interval:', rotationInterval, 'seconds');
+    console.log('🚀 إعداد تبديل المواقع. عدد المواقع:', websites.length);
+    console.log('🚀 فترة التبديل:', rotationInterval, 'ثانية');
 
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => {
         const newIndex = (prev + 1) % websites.length;
-        console.log('🚀 Rotating to website index:', newIndex);
+        console.log('🚀 التبديل إلى فهرس الموقع:', newIndex);
         return newIndex;
       });
     }, rotationInterval * 1000);
 
     return () => {
-      console.log('🚀 Cleaning up rotation interval');
+      console.log('🚀 تنظيف فترة التبديل');
       clearInterval(interval);
     };
   }, [websites.length, rotationInterval]);
 
-  // Enhanced websites list change handling for instant updates
+  // معالجة محسنة لتغيير قائمة المواقع للتحديثات الفورية
   useEffect(() => {
-    console.log('🚀 INSTANT websites list change detected!');
-    console.log('🚀 New websites count:', websites.length);
-    console.log('🚀 Current website index:', currentWebsiteIndex);
-    console.log('🚀 Active websites:', websites.map(w => ({ id: w.id, url: w.website_url })));
+    console.log('🚀 تم اكتشاف تغيير فوري في قائمة المواقع!');
+    console.log('🚀 عدد المواقع الجديد:', websites.length);
+    console.log('🚀 فهرس الموقع الحالي:', currentWebsiteIndex);
+    console.log('🚀 المواقع النشطة:', websites.map(w => ({ id: w.id, url: w.website_url })));
     
     if (websites.length === 0) {
-      console.log('🚀 No active websites, resetting index to 0');
+      console.log('🚀 لا توجد مواقع نشطة، إعادة تعيين الفهرس إلى 0');
       setCurrentWebsiteIndex(0);
     } else if (currentWebsiteIndex >= websites.length) {
-      console.log('🚀 Current index out of bounds, resetting to 0');
+      console.log('🚀 الفهرس الحالي خارج النطاق، إعادة تعيين إلى 0');
       setCurrentWebsiteIndex(0);
     }
   }, [websites, currentWebsiteIndex]);
 
   const currentWebsite = websites.length > 0 ? websites[currentWebsiteIndex] : null;
 
-  console.log('🚀 Current website to display:', currentWebsite);
-  console.log('🚀 Is there a current website?', !!currentWebsite);
+  console.log('🚀 الموقع الحالي للعرض:', currentWebsite);
+  console.log('🚀 هل يوجد موقع حالي؟', !!currentWebsite);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -91,7 +91,7 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
-              key={`${currentWebsite.id}-${Date.now()}`} // Force re-render on changes
+              key={`${currentWebsite.id}-${Date.now()}`} // إجبار إعادة التحميل عند التغييرات
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
