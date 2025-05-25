@@ -54,10 +54,10 @@ const ClientPublicPage = () => {
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
-  const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeLoading, setIframeLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [lastWebsiteId, setLastWebsiteId] = useState<string>('');
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -106,13 +106,13 @@ const ClientPublicPage = () => {
     }
   };
 
-  // INSTANT websites fetch - no delays
+  // Optimized websites fetch - prevent unnecessary re-renders
   const fetchWebsites = async (accountData?: Account) => {
     const targetAccount = accountData || account;
     if (!targetAccount?.id) return;
 
     try {
-      console.log('⚡ [INSTANT FETCH] Getting websites for:', targetAccount.id);
+      console.log('⚡ Fetching websites for:', targetAccount.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -122,35 +122,35 @@ const ClientPublicPage = () => {
         .order('created_at', { ascending: true });
 
       if (websiteError) {
-        console.error('❌ [INSTANT FETCH] Error:', websiteError);
-        setWebsites([]);
+        console.error('❌ Error fetching websites:', websiteError);
         return;
       }
 
-      console.log('📊 [INSTANT FETCH] Raw data:', websiteData?.length || 0, 'websites');
+      console.log('📊 Raw website data:', websiteData?.length || 0, 'websites');
       
       // Filter valid URLs only
       const activeWebsites = (websiteData || []).filter(website => {
         const isValid = isValidUrl(website.website_url);
         if (!isValid) {
-          console.warn('⚠️ [INSTANT FETCH] Invalid URL:', website.website_url);
+          console.warn('⚠️ Invalid URL:', website.website_url);
         }
         return isValid;
       });
       
-      console.log('✅ [INSTANT FETCH] Active websites:', activeWebsites.length);
+      console.log('✅ Active websites:', activeWebsites.length);
       
-      // IMMEDIATE state update
-      setWebsites(activeWebsites);
-      setCurrentWebsiteIndex(0);
-      setIframeLoading(activeWebsites.length > 0);
-      setIframeError(false);
-      setRefreshKey(prev => prev + 1);
+      // Only update if websites actually changed
+      const websiteIds = activeWebsites.map(w => w.id).join(',');
+      const currentIds = websites.map(w => w.id).join(',');
       
-      console.log('🚀 [INSTANT FETCH] State updated immediately with', activeWebsites.length, 'websites');
+      if (websiteIds !== currentIds) {
+        setWebsites(activeWebsites);
+        setCurrentWebsiteIndex(0);
+        console.log('🔄 Websites updated:', activeWebsites.length);
+      }
+      
     } catch (error) {
-      console.error('❌ [INSTANT FETCH] Exception:', error);
-      setWebsites([]);
+      console.error('❌ Exception fetching websites:', error);
     }
   };
 
@@ -163,7 +163,7 @@ const ClientPublicPage = () => {
       }
 
       try {
-        console.log('🔍 [ACCOUNT] Fetching account data for:', accountId);
+        console.log('🔍 Fetching account data for:', accountId);
         
         // First try to search by ID
         let { data: accountData, error: accountError } = await supabase
@@ -175,7 +175,7 @@ const ClientPublicPage = () => {
 
         // If not found, search by name
         if (accountError || !accountData) {
-          console.log('🔍 [ACCOUNT] Searching by name:', accountId);
+          console.log('🔍 Searching by name:', accountId);
           const { data: accountByName, error: nameError } = await supabase
             .from('accounts')
             .select('*')
@@ -184,7 +184,7 @@ const ClientPublicPage = () => {
             .single();
             
           if (nameError || !accountByName) {
-            console.error('❌ [ACCOUNT] Error:', nameError);
+            console.error('❌ Account not found:', nameError);
             setError('لم يتم العثور على الحساب أو أنه غير نشط');
             setLoading(false);
             return;
@@ -193,7 +193,7 @@ const ClientPublicPage = () => {
           accountData = accountByName;
         }
 
-        console.log('✅ [ACCOUNT] Data fetched successfully:', accountData.name);
+        console.log('✅ Account data fetched:', accountData.name);
         
         // Check if subscription is expired
         if (isSubscriptionExpired(accountData)) {
@@ -207,7 +207,7 @@ const ClientPublicPage = () => {
         await fetchWebsites(accountData);
 
       } catch (error) {
-        console.error('❌ [ACCOUNT] Exception:', error);
+        console.error('❌ Account fetch exception:', error);
         setError('حدث خطأ في تحميل البيانات');
       } finally {
         setLoading(false);
@@ -217,16 +217,18 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // INSTANT realtime listener - no delays, immediate response
+  // Realtime listener with debounce
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('⚡ [INSTANT REALTIME] Setting up immediate listener for:', account.id);
+    console.log('📡 Setting up realtime listener for:', account.id);
+    
+    let timeoutId: NodeJS.Timeout;
     
     const websiteChannel = supabase
-      .channel(`instant_websites_${account.id}_${Date.now()}`)
+      .channel(`websites_${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -236,64 +238,33 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('⚡ [INSTANT REALTIME] Change detected immediately!', {
-            event: payload.eventType,
-            timestamp: new Date().toISOString()
-          });
+          console.log('📡 Website change detected:', payload.eventType);
           
-          // INSTANT response - no waiting
-          fetchWebsites();
+          // Debounce rapid changes
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            fetchWebsites();
+          }, 500);
         }
       )
       .subscribe((status) => {
-        console.log('📡 [INSTANT REALTIME] Status:', status);
+        console.log('📡 Realtime status:', status);
       });
 
-    // Super fast polling for mobile - every 1 second
-    const fastInterval = setInterval(() => {
-      console.log('🔄 [INSTANT POLLING] Checking for updates');
-      fetchWebsites();
-    }, 1000);
-
-    // Mobile specific events for immediate updates
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('👁️ [INSTANT] Page visible - immediate fetch');
+    // Mobile-specific polling (reduced frequency)
+    const mobileInterval = setInterval(() => {
+      if (isMobile) {
         fetchWebsites();
       }
-    };
-
-    const handleFocus = () => {
-      console.log('🎯 [INSTANT] Window focused - immediate fetch');
-      fetchWebsites();
-    };
-
-    const handleTouchStart = () => {
-      console.log('👆 [INSTANT] Touch detected - immediate fetch');
-      fetchWebsites();
-    };
-
-    const handlePageShow = () => {
-      console.log('📱 [INSTANT] Page shown - immediate fetch');
-      fetchWebsites();
-    };
-
-    // Add all event listeners for immediate response
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('pageshow', handlePageShow);
-    document.addEventListener('touchstart', handleTouchStart);
+    }, 5000); // Every 5 seconds for mobile
 
     return () => {
-      console.log('🧹 [INSTANT CLEANUP] Removing all instant listeners');
+      console.log('🧹 Cleaning up listeners');
+      clearTimeout(timeoutId);
+      clearInterval(mobileInterval);
       supabase.removeChannel(websiteChannel);
-      clearInterval(fastInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('pageshow', handlePageShow);
-      document.removeEventListener('touchstart', handleTouchStart);
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, isMobile]);
 
   // Enhanced realtime listener for notifications
   useEffect(() => {
@@ -301,12 +272,11 @@ const ClientPublicPage = () => {
 
     const fetchAndSetNotifications = async () => {
       try {
-        console.log('🔔 Fetching initial notifications for account:', account.id);
+        console.log('🔔 Fetching notifications for:', account.id);
         const notifications = await fetchActiveNotifications(account.id);
-        console.log('✅ Initial notifications loaded:', notifications);
         setActiveNotifications(notifications);
       } catch (error) {
-        console.error('❌ Error fetching initial notifications:', error);
+        console.error('❌ Error fetching notifications:', error);
       }
     };
 
@@ -323,9 +293,8 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔔 Notification change detected:', payload.eventType, payload);
+          console.log('🔔 Notification change:', payload.eventType);
           
-          // Immediate response based on event type
           if (payload.eventType === 'INSERT' && (payload.new as any)?.is_active) {
             setActiveNotifications(prev => [...prev, payload.new as Notification]);
           } else if (payload.eventType === 'UPDATE') {
@@ -371,7 +340,6 @@ const ClientPublicPage = () => {
     checkTimers();
     const timerInterval = setInterval(checkTimers, 10000);
 
-    // Add realtime listener for break timers
     if (account?.id && !subscriptionExpired) {
       const timerChannel = supabase
         .channel(`break_timers-${account.id}`)
@@ -384,8 +352,7 @@ const ClientPublicPage = () => {
             filter: `account_id=eq.${account.id}`
           },
           async (payload) => {
-            console.log('⏰ Timer change detected:', payload.eventType, payload);
-            // Immediate check for active timers
+            console.log('⏰ Timer change:', payload.eventType);
             await checkTimers();
           }
         )
@@ -400,26 +367,32 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // INSTANT website rotation - NO DELAY
+  // Optimized website rotation - only when website actually changes
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
-    // النقل الفوري - بدون تأخير على الإطلاق
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => {
         const nextIndex = (prev + 1) % websites.length;
-        console.log('⚡ [INSTANT SWITCH] Switching NOW to website:', nextIndex, websites[nextIndex]?.website_url);
-        setIframeLoading(true);
-        setIframeError(false);
+        const nextWebsite = websites[nextIndex];
+        
+        // Only trigger loading state if website actually changed
+        if (nextWebsite && nextWebsite.id !== lastWebsiteId) {
+          console.log('🔄 Switching to website:', nextWebsite.website_url);
+          setLastWebsiteId(nextWebsite.id);
+          setIframeLoading(true);
+          setIframeError(false);
+        }
+        
         return nextIndex;
       });
-    }, 1000); // ثانية واحدة فقط للنقل
+    }, 3000); // 3 seconds rotation
 
     return () => clearInterval(interval);
-  }, [websites.length, subscriptionExpired]);
+  }, [websites.length, subscriptionExpired, lastWebsiteId]);
 
   const handleNotificationClose = (notificationId: string) => {
-    console.log('👋 User closed notification:', notificationId);
+    console.log('👋 Closing notification:', notificationId);
     setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
   };
 
@@ -428,13 +401,15 @@ const ClientPublicPage = () => {
   };
 
   const handleIframeLoad = () => {
-    console.log('✅ [IFRAME] Website loaded successfully:', websites[currentWebsiteIndex]?.website_url);
+    const currentWebsite = websites[currentWebsiteIndex];
+    console.log('✅ Website loaded:', currentWebsite?.website_url);
     setIframeLoading(false);
     setIframeError(false);
   };
 
   const handleIframeError = () => {
-    console.error('❌ [IFRAME] Failed to load website:', websites[currentWebsiteIndex]?.website_url);
+    const currentWebsite = websites[currentWebsiteIndex];
+    console.error('❌ Website failed to load:', currentWebsite?.website_url);
     setIframeLoading(false);
     setIframeError(true);
   };
@@ -516,8 +491,8 @@ const ClientPublicPage = () => {
   const hasActiveWebsites = websites.length > 0;
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black relative" key={`page-${refreshKey}`}>
-      {/* Loading indicator */}
+    <div className="w-full h-screen overflow-hidden bg-black relative">
+      {/* Loading indicator - only show when actually loading */}
       {(iframeLoading && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
           <div className="text-center text-white">
@@ -544,7 +519,7 @@ const ClientPublicPage = () => {
         </div>
       )}
 
-      {/* Main Content - Full Screen */}
+      {/* Main Content */}
       {!hasActiveWebsites ? (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center text-white">
@@ -553,13 +528,13 @@ const ClientPublicPage = () => {
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
-              ⚡ التحديث الفوري مُفعّل
+              ⚡ التحديث التلقائي مُفعّل
             </p>
           </div>
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}-${refreshKey}`}
+          key={`website-${currentWebsite.id}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -600,17 +575,16 @@ const ClientPublicPage = () => {
         />
       ))}
 
-      {/* Enhanced debug info in development */}
+      {/* Debug info in development */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
-          <div>⚡ النقل الفوري: مُفعّل (1 ثانية)</div>
+          <div>🔄 النقل: كل 3 ثوان</div>
           <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
           <div>✅ المواقع النشطة: {websites.length}</div>
           <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>🔄 Refresh Key: {refreshKey}</div>
-          <div>🚀 Realtime: فوري (1 ثانية)</div>
+          <div>🆔 آخر موقع: {lastWebsiteId}</div>
         </div>
       )}
     </div>
