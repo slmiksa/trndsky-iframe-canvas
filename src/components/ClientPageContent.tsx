@@ -25,23 +25,36 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
 }) => {
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
 
-  // Optimized website rotation
+  // Enhanced website rotation with immediate response to changes
   useEffect(() => {
-    if (websites.length <= 1) return;
+    if (websites.length <= 1) {
+      console.log('🚀 Not enough websites for rotation. Count:', websites.length);
+      return;
+    }
 
-    console.log('🚀 Setting up FAST website rotation with interval:', rotationInterval, 'seconds');
+    console.log('🚀 Setting up website rotation. Websites count:', websites.length);
+    console.log('🚀 Rotation interval:', rotationInterval, 'seconds');
 
     const interval = setInterval(() => {
-      setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
+      setCurrentWebsiteIndex((prev) => {
+        const newIndex = (prev + 1) % websites.length;
+        console.log('🚀 Rotating to website index:', newIndex);
+        return newIndex;
+      });
     }, rotationInterval * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log('🚀 Cleaning up rotation interval');
+      clearInterval(interval);
+    };
   }, [websites.length, rotationInterval]);
 
-  // Enhanced website list change handling for instant updates
+  // Enhanced websites list change handling for instant updates
   useEffect(() => {
-    console.log('🚀 INSTANT websites list update. Current count:', websites.length);
+    console.log('🚀 INSTANT websites list change detected!');
+    console.log('🚀 New websites count:', websites.length);
     console.log('🚀 Current website index:', currentWebsiteIndex);
+    console.log('🚀 Active websites:', websites.map(w => ({ id: w.id, url: w.website_url })));
     
     if (websites.length === 0) {
       console.log('🚀 No active websites, resetting index to 0');
@@ -55,6 +68,7 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
   const currentWebsite = websites.length > 0 ? websites[currentWebsiteIndex] : null;
 
   console.log('🚀 Current website to display:', currentWebsite);
+  console.log('🚀 Is there a current website?', !!currentWebsite);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -69,12 +83,15 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
               <p className="text-sm text-gray-400 mt-2">
                 🚀 التحديثات المباشرة السريعة نشطة
               </p>
+              <p className="text-xs text-gray-300 mt-1">
+                عدد المواقع: {websites.length}
+              </p>
             </div>
           </div>
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
-              key={currentWebsite.id}
+              key={`${currentWebsite.id}-${Date.now()}`} // Force re-render on changes
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
@@ -88,6 +105,9 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
                 جاري التحميل...
               </h2>
               <p className="text-gray-600">يتم تحديث المحتوى بسرعة</p>
+              <p className="text-xs text-gray-400 mt-2">
+                عدد المواقع: {websites.length} | الموقع الحالي: {currentWebsiteIndex}
+              </p>
             </div>
           </div>
         )}

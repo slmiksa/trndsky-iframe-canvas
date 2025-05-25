@@ -35,15 +35,16 @@ export const useAccountData = (accountId: string | undefined) => {
     return new Date(account.activation_end_date) < new Date();
   };
 
-  // Optimized fetchWebsites function for instant updates
+  // Enhanced fetchWebsites function for faster updates
   const fetchWebsites = async (accountData: Account) => {
     try {
-      console.log('🚀 FAST fetching websites for account:', accountData.id);
+      console.log('🚀 ENHANCED fetching websites for account:', accountData.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
         .eq('account_id', accountData.id)
+        .eq('is_active', true) // Only fetch active websites
         .order('created_at', { ascending: true });
 
       if (websiteError) {
@@ -52,14 +53,11 @@ export const useAccountData = (accountId: string | undefined) => {
         return;
       }
 
-      console.log('✅ All websites data fetched:', websiteData);
-      
-      const activeWebsites = (websiteData || []).filter(website => website.is_active);
-      console.log('✅ Active websites filtered:', activeWebsites);
+      console.log('✅ Active websites fetched:', websiteData);
       
       // Immediate state update for instant UI response
-      setWebsites(activeWebsites);
-      console.log('🚀 Websites state updated instantly!');
+      setWebsites(websiteData || []);
+      console.log('🚀 Websites state updated instantly with count:', (websiteData || []).length);
       
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
@@ -67,6 +65,7 @@ export const useAccountData = (accountId: string | undefined) => {
     }
   };
 
+  // Initial data fetch
   useEffect(() => {
     const fetchAccountData = async () => {
       if (!accountId) {
@@ -128,6 +127,64 @@ export const useAccountData = (accountId: string | undefined) => {
 
     fetchAccountData();
   }, [accountId]);
+
+  // Enhanced realtime subscription for instant updates
+  useEffect(() => {
+    if (!account?.id || subscriptionExpired) {
+      console.log('⏭️ Skipping realtime subscription - no account or subscription expired');
+      return;
+    }
+
+    console.log('🔄 Setting up ENHANCED realtime subscription for instant website updates');
+    
+    const channelName = `instant-website-updates-${account.id}`;
+    
+    const channel = supabase
+      .channel(channelName, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: account.id }
+        }
+      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events
+          schema: 'public',
+          table: 'account_websites',
+          filter: `account_id=eq.${account.id}`
+        },
+        async (payload) => {
+          console.log('🚀 INSTANT website update detected:', payload);
+          console.log('🚀 Event type:', payload.eventType);
+          console.log('🚀 New data:', payload.new);
+          console.log('🚀 Old data:', payload.old);
+          
+          // Immediate refresh for all events
+          console.log('🚀 Triggering instant website refresh...');
+          try {
+            await fetchWebsites(account);
+            console.log('✅ Instant website refresh completed');
+          } catch (error) {
+            console.error('❌ Error in instant refresh:', error);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🚀 Realtime subscription status:', status);
+        
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to instant website updates!');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Error in realtime subscription');
+        }
+      });
+
+    return () => {
+      console.log('🔄 Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [account?.id, subscriptionExpired]);
 
   return {
     account,
