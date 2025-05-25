@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,7 +56,7 @@ const ClientPublicPage = () => {
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [forceUpdate, setForceUpdate] = useState(0);
+  const [lastWebsiteUpdate, setLastWebsiteUpdate] = useState(Date.now());
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -93,25 +92,27 @@ const ClientPublicPage = () => {
   };
 
   // Enhanced function to fetch websites with instant updates
-  const fetchWebsites = async (accountData: Account) => {
+  const fetchWebsites = async (accountData?: Account) => {
+    const targetAccount = accountData || account;
+    if (!targetAccount?.id) return;
+
     try {
-      console.log(`🔍 [WEBSITES] Fetching websites for account: ${accountData.id}`);
+      console.log('🔍 [WEBSITES] Fetching websites for account:', targetAccount.id, 'at', new Date().toISOString());
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
-        .eq('account_id', accountData.id)
+        .eq('account_id', targetAccount.id)
         .eq('is_active', true)
         .order('created_at', { ascending: true });
 
       if (websiteError) {
         console.error('❌ [WEBSITES] Error fetching websites:', websiteError);
         setWebsites([]);
-        setForceUpdate(prev => prev + 1);
         return;
       }
 
-      console.log('✅ [WEBSITES] Active websites fetched:', websiteData?.length || 0);
+      console.log('✅ [WEBSITES] Raw data fetched:', websiteData);
       
       // Filter valid URLs only
       const activeWebsites = (websiteData || []).filter(website => {
@@ -122,19 +123,20 @@ const ClientPublicPage = () => {
         return isValid;
       });
       
-      // Force complete UI refresh for instant changes
+      console.log('✅ [WEBSITES] Active valid websites:', activeWebsites.length, activeWebsites);
+      
+      // Always update state even if same data to trigger re-render
       setWebsites(activeWebsites);
       setCurrentWebsiteIndex(0);
       setIframeLoading(activeWebsites.length > 0);
       setIframeError(false);
       setRefreshKey(prev => prev + 1);
-      setForceUpdate(prev => prev + 1);
+      setLastWebsiteUpdate(Date.now());
       
-      console.log('✅ [WEBSITES] Websites updated instantly:', activeWebsites.length);
+      console.log('🔄 [WEBSITES] State updated with', activeWebsites.length, 'websites');
     } catch (error) {
       console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
       setWebsites([]);
-      setForceUpdate(prev => prev + 1);
     }
   };
 
@@ -215,49 +217,69 @@ const ClientPublicPage = () => {
       return;
     }
 
-    console.log('🔄 [REALTIME] Setting up enhanced website listener for account:', account.id);
+    console.log('🔄 [REALTIME] Setting up ENHANCED website listener for account:', account.id);
     
-    const channelName = `websites_${account.id}_${Date.now()}`;
+    // Create unique channel name with timestamp to ensure fresh connection
+    const channelName = `websites_realtime_${account.id}_${Date.now()}`;
     
     const websiteChannel = supabase
       .channel(channelName)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen to ALL events
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔥 [REALTIME] Website change detected instantly:', payload.eventType, payload);
+          console.log('🚀 [REALTIME] INSTANT website change detected:', {
+            event: payload.eventType,
+            timestamp: new Date().toISOString(),
+            payload: payload
+          });
           
-          // Immediate response to any change
-          try {
-            await fetchWebsites(account);
-            console.log('✅ [REALTIME] Websites updated instantly after change');
-          } catch (error) {
-            console.error('❌ [REALTIME] Error updating websites:', error);
-          }
+          // Immediate fetch with small delay to ensure DB consistency
+          setTimeout(async () => {
+            try {
+              await fetchWebsites();
+              console.log('✅ [REALTIME] Websites refreshed INSTANTLY after change');
+            } catch (error) {
+              console.error('❌ [REALTIME] Error refreshing websites:', error);
+            }
+          }, 100); // 100ms delay for DB consistency
         }
       )
       .subscribe((status) => {
-        console.log('🔄 [REALTIME] Website channel status:', status);
+        console.log('🔄 [REALTIME] Website channel status:', status, 'for channel:', channelName);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ [REALTIME] Successfully connected to website updates');
+          console.log('✅ [REALTIME] Successfully connected to INSTANT website updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ [REALTIME] Channel error, will retry connection');
         }
       });
 
-    // Set up periodic refresh as backup
+    // More frequent backup refresh for mobile reliability
     const backupRefresh = setInterval(() => {
-      console.log('🔄 [BACKUP_REFRESH] Running backup refresh');
-      forceRefresh();
-    }, 30000); // Every 30 seconds
+      console.log('🔄 [BACKUP] Running backup website refresh');
+      fetchWebsites();
+    }, 15000); // Every 15 seconds instead of 30
+
+    // Additional visibility change listener for when user returns to tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('👁️ [VISIBILITY] Page became visible, refreshing websites');
+        fetchWebsites();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      console.log('🧹 [REALTIME] Cleaning up website listener and backup refresh');
+      console.log('🧹 [REALTIME] Cleaning up enhanced website listener');
       supabase.removeChannel(websiteChannel);
       clearInterval(backupRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [account?.id, subscriptionExpired]);
 
@@ -383,17 +405,6 @@ const ClientPublicPage = () => {
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
 
-  // Add window focus event to refresh when user returns to tab
-  useEffect(() => {
-    const handleFocus = () => {
-      console.log('🔄 [FOCUS] Window focused, refreshing data');
-      forceRefresh();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [account]);
-
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 User closed notification:', notificationId);
     setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -492,7 +503,7 @@ const ClientPublicPage = () => {
   const hasActiveWebsites = websites.length > 0;
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black relative" key={`page-${refreshKey}-${forceUpdate}`}>
+    <div className="w-full h-screen overflow-hidden bg-black relative" key={`page-${refreshKey}-${lastWebsiteUpdate}`}>
       {/* Loading indicator */}
       {(iframeLoading && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
@@ -539,13 +550,16 @@ const ClientPublicPage = () => {
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
-              🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
+              🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً فوراً
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              آخر تحديث: {new Date(lastWebsiteUpdate).toLocaleTimeString('ar-SA')}
             </p>
           </div>
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}-${refreshKey}-${forceUpdate}`}
+          key={`website-${currentWebsite.id}-${refreshKey}-${lastWebsiteUpdate}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -594,7 +608,7 @@ const ClientPublicPage = () => {
           <div>حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>خطأ: {iframeError ? 'نعم' : 'لا'}</div>
           <div>Refresh Key: {refreshKey}</div>
-          <div>Force Update: {forceUpdate}</div>
+          <div>Last Update: {new Date(lastWebsiteUpdate).toLocaleTimeString()}</div>
         </div>
       )}
     </div>
