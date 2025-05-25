@@ -31,29 +31,32 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
   const lastRotationTime = useRef<number>(0);
   const iframeKeyRef = useRef<string>('');
 
-  console.log('🎯 ClientPageContent مستقر بدون وميض:');
+  console.log('🎯 ClientPageContent استجابة سريعة للتغييرات:');
   console.log('📊 عدد المواقع:', websites.length);
   console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
 
-  // Enhanced website stability - only update when really necessary
+  // تحديث فوري للمواقع عند التغيير
   useEffect(() => {
     if (!mountedRef.current) return;
 
     const websitesChanged = JSON.stringify(websites) !== JSON.stringify(stableWebsitesRef.current);
     
-    if (websitesChanged && websites.length > 0) {
-      console.log('🔄 تحديث مستقر للمواقع - تغيير حقيقي مكتشف');
+    if (websitesChanged) {
+      console.log('🔄 تحديث فوري للمواقع - تغيير مكتشف');
       stableWebsitesRef.current = [...websites];
       
-      // Reset index only if current is out of bounds
-      if (currentWebsiteIndex >= websites.length) {
+      // إعادة تعيين الفهرس إذا كان خارج النطاق
+      if (currentWebsiteIndex >= websites.length && websites.length > 0) {
         console.log('🔄 إعادة تعيين الفهرس إلى 0');
+        setCurrentWebsiteIndex(0);
+      } else if (websites.length === 0) {
+        console.log('📭 لا توجد مواقع نشطة');
         setCurrentWebsiteIndex(0);
       }
     }
   }, [websites, currentWebsiteIndex]);
 
-  // Cleanup on unmount
+  // تنظيف عند الإلغاء
   useEffect(() => {
     mountedRef.current = true;
     
@@ -67,11 +70,11 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     };
   }, []);
 
-  // Super stable rotation with anti-flicker measures
+  // تبديل محسن مع استجابة للتغييرات
   useEffect(() => {
     if (!mountedRef.current) return;
 
-    // Clear existing interval
+    // مسح المؤقت السابق
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -84,22 +87,22 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
       return;
     }
 
-    console.log('🔄 بدء التبديل المستقر بدون وميض:', {
+    console.log('🔄 بدء التبديل المحسن:', {
       websitesCount: activeWebsites.length,
       interval: rotationInterval
     });
     
-    // Much safer interval with anti-flicker protection
-    const safeInterval = Math.max(rotationInterval * 1000, 8000); // Minimum 8 seconds
+    // فترة تبديل محسنة مع حد أدنى 5 ثوان
+    const safeInterval = Math.max(rotationInterval * 1000, 5000);
     
     intervalRef.current = setInterval(() => {
       if (!mountedRef.current) return;
       
       const now = Date.now();
       
-      // Strong protection against rapid rotation
-      if (now - lastRotationTime.current < 7000) {
-        console.log('⏭️ منع التبديل السريع لتجنب الوميض');
+      // حماية من التبديل السريع
+      if (now - lastRotationTime.current < 4000) {
+        console.log('⏭️ منع التبديل السريع');
         return;
       }
       
@@ -107,7 +110,7 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
         const newIndex = (prev + 1) % activeWebsites.length;
         lastRotationTime.current = now;
         
-        console.log('🔄 التبديل المستقر بدون وميض:', {
+        console.log('🔄 التبديل المحسن:', {
           newIndex: newIndex + 1,
           total: activeWebsites.length,
           websiteId: activeWebsites[newIndex]?.id
@@ -126,14 +129,14 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     };
   }, [rotationInterval, stableWebsitesRef.current.length]);
 
-  // Ultra stable current website management
+  // إدارة الموقع الحالي مع تحديث المفتاح
   const currentWebsite = stableWebsitesRef.current.length > 0 ? stableWebsitesRef.current[currentWebsiteIndex] : null;
   
-  // Only update iframe key when website actually changes to prevent flicker
+  // تحديث مفتاح iframe عند تغيير الموقع فقط
   if (currentWebsite && currentWebsite.id !== currentWebsiteRef.current?.id) {
     currentWebsiteRef.current = currentWebsite;
-    iframeKeyRef.current = `stable-${currentWebsite.id}`;
-    console.log('🎯 الموقع الجديد مستقر:', {
+    iframeKeyRef.current = `website-${currentWebsite.id}-${Date.now()}`;
+    console.log('🎯 الموقع الجديد:', {
       index: currentWebsiteIndex,
       id: currentWebsite.id,
       url: currentWebsite.website_url,
@@ -141,10 +144,10 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     });
   }
 
-  // Enhanced iframe handlers
+  // معالجات iframe محسنة
   const handleIframeLoad = useCallback(() => {
     if (currentWebsiteRef.current) {
-      console.log('✅ تم تحميل الموقع بنجاح بدون وميض:', currentWebsiteRef.current.website_url);
+      console.log('✅ تم تحميل الموقع بنجاح:', currentWebsiteRef.current.website_url);
     }
   }, []);
 
@@ -159,20 +162,26 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
       <main className="flex-1">
         {stableWebsitesRef.current.length === 0 ? (
           <div className="min-h-screen flex items-center justify-center">
-            <div className="text-center">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            <div className="text-center p-8">
+              <div className="text-6xl mb-6">📺</div>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">
                 مرحباً بك في {account.name}
               </h2>
-              <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
-              <p className="text-sm text-gray-400 mt-2">
-                سيتم عرض المواقع هنا عند إضافتها وتفعيلها
+              <p className="text-lg text-gray-600 mb-2">لا توجد مواقع نشطة حالياً</p>
+              <p className="text-sm text-gray-400">
+                سيتم عرض المواقع هنا فور تفعيلها من لوحة التحكم
               </p>
+              <div className="mt-6 animate-pulse">
+                <div className="inline-block w-3 h-3 bg-blue-500 rounded-full mx-1"></div>
+                <div className="inline-block w-3 h-3 bg-blue-500 rounded-full mx-1" style={{animationDelay: '0.2s'}}></div>
+                <div className="inline-block w-3 h-3 bg-blue-500 rounded-full mx-1" style={{animationDelay: '0.4s'}}></div>
+              </div>
             </div>
           </div>
         ) : currentWebsiteRef.current ? (
           <div className="h-screen">
             <iframe
-              key={iframeKeyRef.current} // Stable key prevents unnecessary re-renders
+              key={iframeKeyRef.current}
               src={currentWebsiteRef.current.website_url}
               title={currentWebsiteRef.current.website_title || currentWebsiteRef.current.website_url}
               className="w-full h-full border-0"
@@ -181,14 +190,14 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
               onError={handleIframeError}
               style={{
                 backgroundColor: '#f5f5f5',
-                transition: 'opacity 0.5s ease-in-out'
+                transition: 'opacity 0.3s ease-in-out'
               }}
             />
           </div>
         ) : (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
                 جاري التحميل...
               </h2>

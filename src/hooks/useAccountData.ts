@@ -63,8 +63,8 @@ export const useAccountData = (accountId: string | undefined) => {
 
     const now = Date.now();
     
-    // Prevent rapid calls - minimum 3 seconds between fetches
-    if (!forceRefresh && (now - lastFetchTime.current < 3000 || isCurrentlyFetching.current)) {
+    // Prevent rapid calls for visitors - shorter delay
+    if (!forceRefresh && (now - lastFetchTime.current < 1000 || isCurrentlyFetching.current)) {
       console.log('⏭️ منع الجلب السريع للاستقرار');
       return stableWebsitesRef.current;
     }
@@ -72,7 +72,7 @@ export const useAccountData = (accountId: string | undefined) => {
     isCurrentlyFetching.current = true;
     
     try {
-      console.log('🔍 جلب المواقع المستقر:', { accountId: accountData.id, forceRefresh });
+      console.log('🔍 جلب المواقع:', { accountId: accountData.id, forceRefresh });
 
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -89,9 +89,9 @@ export const useAccountData = (accountId: string | undefined) => {
       const activeWebsites = websiteData || [];
       const newHash = createWebsitesHash(activeWebsites);
       
-      // Only update if there's a real change or forced refresh
+      // Update immediately for visitors to see changes faster
       if (forceRefresh || newHash !== lastWebsitesHash.current) {
-        console.log('✅ تحديث المواقع المستقر:', {
+        console.log('✅ تحديث المواقع:', {
           count: activeWebsites.length,
           forced: forceRefresh,
           changed: newHash !== lastWebsitesHash.current
@@ -104,7 +104,7 @@ export const useAccountData = (accountId: string | undefined) => {
           setError(null);
         }
       } else {
-        console.log('ℹ️ لا توجد تغييرات في المواقع - الحفاظ على الاستقرار');
+        console.log('ℹ️ لا توجد تغييرات في المواقع');
       }
       
       lastFetchTime.current = now;
@@ -123,21 +123,22 @@ export const useAccountData = (accountId: string | undefined) => {
     }
   }, [createWebsitesHash]);
 
-  // Enhanced initial data fetch
+  // Enhanced initial data fetch with better error handling
   useEffect(() => {
     const fetchAccountData = async () => {
       if (!accountId || !mountedRef.current) {
-        setError('معرف الحساب غير صحيح');
+        console.log('⚠️ لا يوجد معرف حساب أو تم إلغاء التحميل');
+        setError('معرف الحساب مطلوب');
         setLoading(false);
         return;
       }
 
       try {
-        console.log('🔍 جلب بيانات الحساب المحسن:', accountId);
+        console.log('🔍 جلب بيانات الحساب:', accountId);
         
         let accountData = null;
 
-        // Check if accountId is UUID format first
+        // البحث بالمعرف UUID أولاً
         if (isUUID(accountId)) {
           console.log('🔍 البحث بالمعرف UUID:', accountId);
           const { data, error } = await supabase
@@ -147,7 +148,7 @@ export const useAccountData = (accountId: string | undefined) => {
             .eq('status', 'active')
             .maybeSingle();
 
-          if (error) {
+          if (error && !error.message.includes('PGRST116')) {
             console.error('❌ خطأ في البحث بالمعرف:', error);
             throw error;
           }
@@ -155,7 +156,7 @@ export const useAccountData = (accountId: string | undefined) => {
           accountData = data;
         }
 
-        // If not found by ID or not UUID format, try by name
+        // البحث بالاسم إذا لم يتم العثور على الحساب بالمعرف
         if (!accountData) {
           console.log('🔍 البحث بالاسم:', accountId);
           const { data, error } = await supabase
@@ -165,7 +166,7 @@ export const useAccountData = (accountId: string | undefined) => {
             .eq('status', 'active')
             .maybeSingle();
             
-          if (error) {
+          if (error && !error.message.includes('PGRST116')) {
             console.error('❌ خطأ في البحث بالاسم:', error);
             throw error;
           }
@@ -174,6 +175,7 @@ export const useAccountData = (accountId: string | undefined) => {
         }
 
         if (!accountData) {
+          console.log('❌ لم يتم العثور على الحساب:', accountId);
           setError('لم يتم العثور على الحساب أو أنه غير نشط');
           setLoading(false);
           return;
@@ -195,7 +197,7 @@ export const useAccountData = (accountId: string | undefined) => {
             return;
           }
 
-          // Fetch websites with initial stable fetch
+          // جلب المواقع
           await fetchWebsites(accountData, true);
         }
 
@@ -208,7 +210,7 @@ export const useAccountData = (accountId: string | undefined) => {
           if (error.message?.includes('Failed to fetch')) {
             errorMessage = 'مشكلة في الاتصال - يرجى التحقق من الإنترنت';
           } else if (error.message?.includes('invalid input syntax for type uuid')) {
-            errorMessage = 'معرف الحساب غير صحيح';
+            errorMessage = 'تنسيق معرف الحساب غير صحيح';
           } else if (error.message) {
             errorMessage = error.message;
           }
@@ -225,10 +227,10 @@ export const useAccountData = (accountId: string | undefined) => {
     fetchAccountData();
   }, [accountId, fetchWebsites, isSubscriptionExpired]);
 
-  // Force refresh function with stability
+  // Force refresh function
   const forceRefresh = useCallback(async () => {
     if (account && mountedRef.current && !isCurrentlyFetching.current) {
-      console.log('🔄 تحديث يدوي مستقر للمواقع');
+      console.log('🔄 تحديث يدوي للمواقع');
       setError(null);
       await fetchWebsites(account, true);
     }
@@ -246,7 +248,7 @@ export const useAccountData = (accountId: string | undefined) => {
 
   return {
     account,
-    websites: stableWebsitesRef.current, // Return stable reference
+    websites: stableWebsitesRef.current,
     loading,
     error,
     subscriptionExpired,
