@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -178,83 +179,111 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes - COMPLETE REWRITE
+  // Realtime listener with improved error handling and recovery
   useEffect(() => {
-    if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ Skipping realtime setup - no account or subscription expired');
-      return;
-    }
+    let channel: any = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 3;
 
-    console.log('🔄 Setting up NEW realtime listener for websites');
-    console.log('🔄 Account ID:', account.id);
-    
-    const channelName = `websites-live-${account.id}-${Date.now()}`;
-    
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'account_websites',
-          filter: `account_id=eq.${account.id}`
-        },
-        async (payload) => {
-          console.log('🔥 REALTIME: Website change detected!', {
-            event: payload.eventType,
-            websiteId: (payload.new as any)?.id || (payload.old as any)?.id,
-            isActive: (payload.new as any)?.is_active,
-            timestamp: new Date().toISOString()
-          });
-          
-          // Immediately refetch all websites to ensure consistency
-          console.log('🔄 REALTIME: Refetching all websites...');
-          
-          try {
-            const { data: freshWebsites, error } = await supabase
-              .from('account_websites')
-              .select('*')
-              .eq('account_id', account.id)
-              .order('created_at', { ascending: true });
+    const setupRealtimeListener = () => {
+      if (!account?.id || subscriptionExpired) {
+        console.log('⏭️ Skipping realtime setup - no account or subscription expired');
+        return;
+      }
 
-            if (error) {
-              console.error('❌ REALTIME: Error refetching websites:', error);
-              return;
-            }
+      // Clean up previous channel
+      if (channel) {
+        console.log('🧹 Cleaning up previous channel');
+        supabase.removeChannel(channel);
+      }
 
-            const activeWebsites = (freshWebsites || []).filter(w => w.is_active);
-            console.log('✅ REALTIME: Fresh active websites:', activeWebsites.length, activeWebsites.map(w => ({ id: w.id, url: w.website_url, active: w.is_active })));
-            
-            setWebsites(activeWebsites);
-            
-            // Reset index if current one is invalid
-            setCurrentWebsiteIndex(prev => {
-              const newIndex = activeWebsites.length === 0 ? 0 : (prev >= activeWebsites.length ? 0 : prev);
-              console.log('🔄 REALTIME: Website index updated from', prev, 'to', newIndex);
-              return newIndex;
+      const channelName = `websites-stable-${account.id}-${Date.now()}`;
+      console.log('🔄 Setting up realtime listener:', channelName);
+      
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'account_websites',
+            filter: `account_id=eq.${account.id}`
+          },
+          async (payload) => {
+            console.log('🔥 REALTIME: Website change detected!', {
+              event: payload.eventType,
+              websiteId: (payload.new as any)?.id || (payload.old as any)?.id,
+              isActive: (payload.new as any)?.is_active,
+              timestamp: new Date().toISOString()
             });
             
-          } catch (refetchError) {
-            console.error('❌ REALTIME: Error in refetch:', refetchError);
+            // Small delay to ensure database consistency
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            try {
+              const { data: freshWebsites, error } = await supabase
+                .from('account_websites')
+                .select('*')
+                .eq('account_id', account.id)
+                .order('created_at', { ascending: true });
+
+              if (error) {
+                console.error('❌ REALTIME: Error refetching websites:', error);
+                return;
+              }
+
+              const activeWebsites = (freshWebsites || []).filter(w => w.is_active);
+              console.log('✅ REALTIME: Fresh active websites:', activeWebsites.length);
+              
+              setWebsites(activeWebsites);
+              
+              setCurrentWebsiteIndex(prev => {
+                const newIndex = activeWebsites.length === 0 ? 0 : (prev >= activeWebsites.length ? 0 : prev);
+                console.log('🔄 REALTIME: Website index updated from', prev, 'to', newIndex);
+                return newIndex;
+              });
+              
+              // Reset reconnect attempts on successful update
+              reconnectAttempts = 0;
+              
+            } catch (refetchError) {
+              console.error('❌ REALTIME: Error in refetch:', refetchError);
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log('🔄 REALTIME: Subscription status:', status, 'for channel:', channelName);
-        
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ REALTIME: Successfully subscribed to website updates!');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ REALTIME: Error subscribing to website updates');
-        } else if (status === 'CLOSED') {
-          console.log('🔒 REALTIME: Channel closed');
-        }
-      });
+        )
+        .subscribe((status) => {
+          console.log('🔄 REALTIME: Subscription status:', status, 'for channel:', channelName);
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ REALTIME: Successfully subscribed!');
+            reconnectAttempts = 0;
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error('❌ REALTIME: Channel error or timeout');
+            
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              console.log(`🔄 REALTIME: Attempting reconnection ${reconnectAttempts}/${maxReconnectAttempts}`);
+              
+              setTimeout(() => {
+                setupRealtimeListener();
+              }, 2000 * reconnectAttempts); // Exponential backoff
+            } else {
+              console.error('❌ REALTIME: Max reconnection attempts reached');
+            }
+          } else if (status === 'CLOSED') {
+            console.log('🔒 REALTIME: Channel closed');
+          }
+        });
+    };
+
+    setupRealtimeListener();
 
     return () => {
-      console.log('🧹 REALTIME: Cleaning up listener for channel:', channelName);
-      supabase.removeChannel(channel);
+      if (channel) {
+        console.log('🧹 REALTIME: Cleaning up listener');
+        supabase.removeChannel(channel);
+      }
     };
   }, [account?.id, subscriptionExpired]);
 
