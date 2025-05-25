@@ -70,7 +70,7 @@ export const useRealtimeUpdates = ({
     };
   }, [account?.id, subscriptionExpired, setRotationInterval, setAccount]);
 
-  // Setup realtime listener for website changes
+  // Setup realtime listener for website changes with improved handling
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
@@ -97,15 +97,18 @@ export const useRealtimeUpdates = ({
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        (payload) => {
+        async (payload) => {
           console.log('🔄 Website change detected:', payload);
           console.log('🔄 Event type:', payload.eventType);
           console.log('🔄 New record:', payload.new);
           console.log('🔄 Old record:', payload.old);
           console.log('🔄 Timestamp:', new Date().toISOString());
           
-          console.log('🔄 Re-fetching websites due to change...');
-          fetchWebsites(account);
+          // Add a small delay to ensure database consistency
+          setTimeout(async () => {
+            console.log('🔄 Re-fetching websites due to change...');
+            await fetchWebsites(account);
+          }, 100);
         }
       )
       .subscribe((status) => {
