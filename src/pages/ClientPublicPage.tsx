@@ -410,9 +410,9 @@ const ClientPublicPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 overflow-hidden">
       {/* Main Content - Full Screen */}
-      <main className="flex-1">
+      <main className="w-full h-screen">
         {websites.length === 0 ? (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
@@ -426,20 +426,26 @@ const ClientPublicPage = () => {
             </div>
           </div>
         ) : currentWebsite ? (
-          <div className="h-screen">
+          <div className="w-full h-full relative">
             <iframe
               key={`${currentWebsite.id}-${Date.now()}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
-              className="w-full h-full border-0"
+              className="w-full h-full border-0 block"
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation-by-user-activation"
               loading="eager"
               referrerPolicy="strict-origin-when-cross-origin"
-              allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write"
+              allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write; camera; microphone; geolocation"
               style={{
                 border: 'none',
                 outline: 'none',
-                boxShadow: 'none'
+                boxShadow: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                minHeight: '100vh'
               }}
             />
           </div>
