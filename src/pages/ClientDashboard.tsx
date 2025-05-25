@@ -108,9 +108,113 @@ const ClientDashboard = () => {
     }
   };
 
+  // إعداد التحديثات الفورية للوحة التحكم
   useEffect(() => {
+    if (!accountId) return;
+
+    // جلب البيانات الأولية
     fetchWebsites();
     fetchAccountInfo();
+
+    console.log('🎯 إعداد التحديثات الفورية للوحة التحكم');
+
+    // إعداد مستمع التحديثات الفورية للمواقع
+    const websiteChannelName = `admin-websites-${accountId}`;
+    const websiteChannel = supabase
+      .channel(websiteChannelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // جميع الأحداث: INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'account_websites',
+          filter: `account_id=eq.${accountId}`
+        },
+        (payload) => {
+          console.log('🔄 تحديث فوري في لوحة التحكم:', payload);
+          
+          if (payload.eventType === 'INSERT' && payload.new) {
+            const newWebsite = payload.new as Website;
+            console.log('➕ إضافة موقع جديد:', newWebsite);
+            setWebsites(prev => [newWebsite, ...prev]);
+            
+            toast({
+              title: "تم إضافة موقع جديد",
+              description: `تم إضافة ${newWebsite.website_title || newWebsite.website_url} بنجاح`,
+            });
+          } 
+          else if (payload.eventType === 'UPDATE' && payload.new) {
+            const updatedWebsite = payload.new as Website;
+            console.log('🔄 تحديث موقع:', updatedWebsite);
+            
+            setWebsites(prev => prev.map(website => 
+              website.id === updatedWebsite.id ? updatedWebsite : website
+            ));
+            
+            // تحديث الموقع المحدد إذا كان هو المعروض
+            setSelectedWebsite(prev => 
+              prev?.id === updatedWebsite.id ? updatedWebsite : prev
+            );
+            
+            const statusText = updatedWebsite.is_active ? 'تم تفعيل' : 'تم إيقاف';
+            toast({
+              title: "تم تحديث حالة الموقع",
+              description: `${statusText} ${updatedWebsite.website_title || updatedWebsite.website_url}`,
+            });
+          }
+          else if (payload.eventType === 'DELETE' && payload.old) {
+            const deletedWebsite = payload.old as Website;
+            console.log('🗑️ حذف موقع:', deletedWebsite);
+            
+            setWebsites(prev => prev.filter(website => website.id !== deletedWebsite.id));
+            
+            // إزالة التحديد إذا كان الموقع المحذوف هو المعروض
+            setSelectedWebsite(prev => 
+              prev?.id === deletedWebsite.id ? null : prev
+            );
+            
+            toast({
+              title: "تم حذف الموقع",
+              description: `تم حذف ${deletedWebsite.website_title || deletedWebsite.website_url}`,
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 حالة اشتراك التحديثات الفورية للوحة التحكم:', status);
+      });
+
+    // إعداد مستمع لتحديثات فترة التبديل
+    const accountChannelName = `admin-account-${accountId}`;
+    const accountChannel = supabase
+      .channel(accountChannelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'accounts',
+          filter: `id=eq.${accountId}`
+        },
+        (payload) => {
+          console.log('🔄 تحديث بيانات الحساب في لوحة التحكم:', payload.new);
+          
+          const newData = payload.new as any;
+          if (newData?.rotation_interval !== undefined) {
+            console.log('⏱️ تحديث فترة التبديل:', newData.rotation_interval);
+            setRotationInterval(newData.rotation_interval);
+            setAccountInfo(prev => prev ? { ...prev, rotation_interval: newData.rotation_interval } : null);
+          }
+        }
+      )
+      .subscribe();
+
+    // تنظيف المستمعات عند الإلغاء
+    return () => {
+      console.log('🧹 تنظيف مستمعات التحديثات الفورية للوحة التحكم');
+      supabase.removeChannel(websiteChannel);
+      supabase.removeChannel(accountChannel);
+    };
   }, [accountId]);
 
   const addWebsite = async (e: React.FormEvent) => {
@@ -144,14 +248,11 @@ const ClientDashboard = () => {
       }
 
       console.log('✅ Website added successfully');
-      toast({
-        title: "تم إضافة الموقع بنجاح",
-        description: `تم إضافة ${newWebsite.title || newWebsite.url}`,
-      });
-
+      
       setNewWebsite({ url: '', title: '' });
       setShowAddForm(false);
-      fetchWebsites();
+      
+      // لا حاجة لجلب البيانات يدوياً - ستأتي عبر realtime
     } catch (error: any) {
       console.error('❌ Error in addWebsite:', error);
       toast({
@@ -167,13 +268,6 @@ const ClientDashboard = () => {
   const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
     try {
       console.log('🔄 Toggling website status:', { websiteId, currentStatus });
-      
-      // التحديث المحلي الفوري لتحسين تجربة المستخدم
-      setWebsites(prev => prev.map(website => 
-        website.id === websiteId 
-          ? { ...website, is_active: !currentStatus }
-          : website
-      ));
 
       const { error } = await supabase
         .from('account_websites')
@@ -181,27 +275,13 @@ const ClientDashboard = () => {
         .eq('id', websiteId);
 
       if (error) {
-        // إعادة التحديث المحلي في حالة الخطأ
-        setWebsites(prev => prev.map(website => 
-          website.id === websiteId 
-            ? { ...website, is_active: currentStatus }
-            : website
-        ));
-        
         console.error('❌ Error updating website status:', error);
         throw error;
       }
 
       console.log('✅ Website status updated successfully');
-      toast({
-        title: "تم تحديث حالة الموقع",
-        description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع بنجاح`,
-      });
-
-      // تحديث البيانات من الخادم بعد التأكد من نجاح العملية
-      setTimeout(() => {
-        fetchWebsites();
-      }, 500);
+      
+      // لا حاجة لتحديث البيانات يدوياً - ستأتي عبر realtime
 
     } catch (error: any) {
       console.error('❌ Error in toggleWebsiteStatus:', error);
@@ -239,13 +319,9 @@ const ClientDashboard = () => {
       }
 
       console.log('✅ Website deleted successfully');
-      toast({
-        title: "تم حذف الموقع",
-        description: "تم حذف الموقع بنجاح",
-      });
+      
+      // لا حاجة لتحديث البيانات يدوياً - ستأتي عبر realtime
 
-      setSelectedWebsite(null);
-      fetchWebsites();
     } catch (error: any) {
       console.error('❌ Error in deleteWebsite:', error);
       
