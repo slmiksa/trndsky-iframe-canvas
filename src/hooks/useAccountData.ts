@@ -56,6 +56,12 @@ export const useAccountData = (accountId: string | undefined) => {
     return new Date(account.activation_end_date) < new Date();
   }, []);
 
+  // Helper function to check if string is UUID format
+  const isUUID = (str: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  };
+
   // Enhanced fetch with retry logic and better error handling
   const fetchWebsites = useCallback(async (accountData: Account, forceRefresh = false) => {
     if (!mountedRef.current || !accountData?.id) return [];
@@ -148,33 +154,42 @@ export const useAccountData = (accountId: string | undefined) => {
       try {
         console.log('🔍 جلب بيانات الحساب المحسن:', accountId);
         
-        // Try by ID first
-        let { data: accountData, error: accountError } = await supabase
-          .from('accounts')
-          .select('*')
-          .eq('id', accountId)
-          .eq('status', 'active')
-          .maybeSingle();
+        let accountData = null;
 
-        // If not found by ID, try by name
-        if (!accountData && !accountError) {
+        // Check if accountId is UUID format first
+        if (isUUID(accountId)) {
+          console.log('🔍 البحث بالمعرف UUID:', accountId);
+          const { data, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq('id', accountId)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (error) {
+            console.error('❌ خطأ في البحث بالمعرف:', error);
+            throw error;
+          }
+          
+          accountData = data;
+        }
+
+        // If not found by ID or not UUID format, try by name
+        if (!accountData) {
           console.log('🔍 البحث بالاسم:', accountId);
-          const { data: accountByName, error: nameError } = await supabase
+          const { data, error } = await supabase
             .from('accounts')
             .select('*')
             .eq('name', accountId)
             .eq('status', 'active')
             .maybeSingle();
             
-          if (nameError) {
-            throw nameError;
+          if (error) {
+            console.error('❌ خطأ في البحث بالاسم:', error);
+            throw error;
           }
           
-          accountData = accountByName;
-        }
-
-        if (accountError) {
-          throw accountError;
+          accountData = data;
         }
 
         if (!accountData) {
@@ -211,6 +226,8 @@ export const useAccountData = (accountId: string | undefined) => {
           
           if (error.message?.includes('Failed to fetch')) {
             errorMessage = 'مشكلة في الاتصال - يرجى التحقق من الإنترنت';
+          } else if (error.message?.includes('invalid input syntax for type uuid')) {
+            errorMessage = 'معرف الحساب غير صحيح';
           } else if (error.message) {
             errorMessage = error.message;
           }
