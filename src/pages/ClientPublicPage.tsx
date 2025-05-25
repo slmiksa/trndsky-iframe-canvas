@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,7 +56,7 @@ const ClientPublicPage = () => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
-  const [forceRefresh, setForceRefresh] = useState(0); // Add force refresh state
+  const [refreshKey, setRefreshKey] = useState(0); // Enhanced refresh mechanism
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -90,7 +91,7 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Function to fetch websites with enhanced cross-browser compatibility
+  // Function to fetch websites with enhanced instant updates
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log(`🔍 [WEBSITES] Fetching websites for account: ${accountData.id}`);
@@ -119,24 +120,32 @@ const ClientPublicPage = () => {
         return isValid;
       });
       
-      setWebsites(activeWebsites);
-      
-      // Reset current website index and states
-      if (activeWebsites.length > 0) {
+      // If no active websites, clear everything immediately
+      if (activeWebsites.length === 0) {
+        console.log('🚫 [WEBSITES] No active websites found, clearing display');
+        setWebsites([]);
         setCurrentWebsiteIndex(0);
-        setIframeLoading(true);
+        setIframeLoading(false);
         setIframeError(false);
-      } else {
-        setCurrentWebsiteIndex(0);
+        setRefreshKey(prev => prev + 1);
+        return;
       }
       
-      // Force refresh to ensure immediate UI update
-      setForceRefresh(prev => prev + 1);
+      setWebsites(activeWebsites);
+      
+      // Reset current website index and states for active websites
+      setCurrentWebsiteIndex(0);
+      setIframeLoading(true);
+      setIframeError(false);
+      
+      // Force complete refresh for immediate UI update
+      setRefreshKey(prev => prev + 1);
       
       console.log('✅ [WEBSITES] Valid websites set:', activeWebsites.length);
     } catch (error) {
       console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
       setWebsites([]);
+      setRefreshKey(prev => prev + 1);
     }
   };
 
@@ -203,15 +212,15 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener for websites with immediate response
+  // Enhanced realtime listener for websites with instant response
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('🔄 [REALTIME] Setting up website listener for account:', account.id);
+    console.log('🔄 [REALTIME] Setting up enhanced website listener for account:', account.id);
     
-    const channelName = `websites_${account.id}`;
+    const channelName = `websites_${account.id}_instant`;
     
     const websiteChannel = supabase
       .channel(channelName)
@@ -226,7 +235,29 @@ const ClientPublicPage = () => {
         async (payload) => {
           console.log('🔥 [REALTIME] Website change detected:', payload.eventType, payload);
           
-          // Immediate response without delay
+          // Immediate response based on specific event types
+          if (payload.eventType === 'UPDATE') {
+            const updatedWebsite = payload.new as Website;
+            console.log('🔄 [REALTIME] Website updated:', updatedWebsite.website_url, 'Active:', updatedWebsite.is_active);
+            
+            // If website was deactivated, remove it immediately
+            if (!updatedWebsite.is_active) {
+              setWebsites(prev => {
+                const filtered = prev.filter(w => w.id !== updatedWebsite.id);
+                console.log('🚫 [REALTIME] Website deactivated, remaining websites:', filtered.length);
+                if (filtered.length === 0) {
+                  setCurrentWebsiteIndex(0);
+                  setIframeLoading(false);
+                  setIframeError(false);
+                }
+                return filtered;
+              });
+              setRefreshKey(prev => prev + 1);
+              return;
+            }
+          }
+          
+          // For all other cases, refresh the websites list
           try {
             await fetchWebsites(account);
           } catch (error) {
@@ -235,11 +266,11 @@ const ClientPublicPage = () => {
         }
       )
       .subscribe((status) => {
-        console.log('🔄 [REALTIME] Website channel status:', status);
+        console.log('🔄 [REALTIME] Enhanced website channel status:', status);
       });
 
     return () => {
-      console.log('🧹 [REALTIME] Cleaning up website listener');
+      console.log('🧹 [REALTIME] Cleaning up enhanced website listener');
       supabase.removeChannel(websiteChannel);
     };
   }, [account?.id, subscriptionExpired]);
@@ -464,7 +495,7 @@ const ClientPublicPage = () => {
   const hasActiveWebsites = websites.length > 0;
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black relative">
+    <div className="w-full h-screen overflow-hidden bg-black relative" key={refreshKey}>
       {/* Loading indicator */}
       {(iframeLoading && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
@@ -507,7 +538,7 @@ const ClientPublicPage = () => {
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}-${forceRefresh}`}
+          key={`website-${currentWebsite.id}-${refreshKey}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -555,7 +586,7 @@ const ClientPublicPage = () => {
           <div>الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>Force Refresh: {forceRefresh}</div>
+          <div>Refresh Key: {refreshKey}</div>
         </div>
       )}
     </div>
