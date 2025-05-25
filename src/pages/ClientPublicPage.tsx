@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -178,18 +179,20 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes - FULLY FIXED
+  // Setup realtime listener for website changes - COMPLETE REWRITE
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up realtime listener for websites');
+    console.log('🔄 Setting up NEW realtime listener for websites');
     console.log('🔄 Account ID:', account.id);
     
+    const channelName = `websites-live-${account.id}-${Date.now()}`;
+    
     const channel = supabase
-      .channel(`websites-changes-${account.id}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -198,85 +201,60 @@ const ClientPublicPage = () => {
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        (payload) => {
-          console.log('🔄 Website change detected:', payload);
-          console.log('🔄 Event type:', payload.eventType);
-          console.log('🔄 New record:', payload.new);
-          console.log('🔄 Old record:', payload.old);
+        async (payload) => {
+          console.log('🔥 REALTIME: Website change detected!', {
+            event: payload.eventType,
+            websiteId: payload.new?.id || payload.old?.id,
+            isActive: payload.new?.is_active,
+            timestamp: new Date().toISOString()
+          });
           
-          // Handle all change types immediately
-          if (payload.eventType === 'UPDATE' && payload.new) {
-            const updatedWebsite = payload.new as Website;
-            console.log('🔄 Processing website update:', updatedWebsite);
-            
-            setWebsites(prevWebsites => {
-              console.log('🔄 Previous websites:', prevWebsites);
-              
-              if (updatedWebsite.is_active) {
-                // Website is active - add or update it
-                const existingIndex = prevWebsites.findIndex(w => w.id === updatedWebsite.id);
-                if (existingIndex >= 0) {
-                  // Update existing website
-                  const updated = [...prevWebsites];
-                  updated[existingIndex] = updatedWebsite;
-                  console.log('✅ Website updated in list:', updatedWebsite.id);
-                  return updated;
-                } else {
-                  // Add new active website
-                  console.log('✅ Website added to list:', updatedWebsite.id);
-                  return [...prevWebsites, updatedWebsite];
-                }
-              } else {
-                // Website is inactive - remove it immediately
-                const filtered = prevWebsites.filter(w => w.id !== updatedWebsite.id);
-                console.log('❌ Website removed from list:', updatedWebsite.id);
-                console.log('🔄 Remaining websites:', filtered);
-                
-                // Reset index if needed
-                setCurrentWebsiteIndex(prev => {
-                  if (filtered.length === 0) {
-                    console.log('🔄 No websites left, resetting index to 0');
-                    return 0;
-                  } else if (prev >= filtered.length) {
-                    console.log('🔄 Index out of bounds, resetting to 0');
-                    return 0;
-                  }
-                  return prev;
-                });
-                
-                return filtered;
-              }
-            });
-          } else if (payload.eventType === 'INSERT' && payload.new) {
-            const newWebsite = payload.new as Website;
-            if (newWebsite.is_active) {
-              console.log('➕ Adding new active website:', newWebsite.id);
-              setWebsites(prev => [...prev, newWebsite]);
+          // Immediately refetch all websites to ensure consistency
+          console.log('🔄 REALTIME: Refetching all websites...');
+          
+          try {
+            const { data: freshWebsites, error } = await supabase
+              .from('account_websites')
+              .select('*')
+              .eq('account_id', account.id)
+              .order('created_at', { ascending: true });
+
+            if (error) {
+              console.error('❌ REALTIME: Error refetching websites:', error);
+              return;
             }
-          } else if (payload.eventType === 'DELETE' && payload.old) {
-            console.log('🗑️ Removing deleted website:', payload.old.id);
-            setWebsites(prev => {
-              const filtered = prev.filter(w => w.id !== payload.old.id);
-              if (filtered.length === 0) {
-                setCurrentWebsiteIndex(0);
-              }
-              return filtered;
+
+            const activeWebsites = (freshWebsites || []).filter(w => w.is_active);
+            console.log('✅ REALTIME: Fresh active websites:', activeWebsites.length, activeWebsites.map(w => ({ id: w.id, url: w.website_url, active: w.is_active })));
+            
+            setWebsites(activeWebsites);
+            
+            // Reset index if current one is invalid
+            setCurrentWebsiteIndex(prev => {
+              const newIndex = activeWebsites.length === 0 ? 0 : (prev >= activeWebsites.length ? 0 : prev);
+              console.log('🔄 REALTIME: Website index updated from', prev, 'to', newIndex);
+              return newIndex;
             });
+            
+          } catch (refetchError) {
+            console.error('❌ REALTIME: Error in refetch:', refetchError);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🔄 Realtime subscription status:', status);
+        console.log('🔄 REALTIME: Subscription status:', status, 'for channel:', channelName);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to website updates!');
+          console.log('✅ REALTIME: Successfully subscribed to website updates!');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to website updates');
+          console.error('❌ REALTIME: Error subscribing to website updates');
+        } else if (status === 'CLOSED') {
+          console.log('🔒 REALTIME: Channel closed');
         }
       });
 
     return () => {
-      console.log('🔄 Cleaning up realtime listener');
+      console.log('🧹 REALTIME: Cleaning up listener for channel:', channelName);
       supabase.removeChannel(channel);
     };
   }, [account?.id, subscriptionExpired]);
