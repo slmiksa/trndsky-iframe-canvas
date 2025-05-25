@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -107,7 +108,7 @@ const ClientPublicPage = () => {
         setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
       } else {
         setCurrentWebsiteIndex(0);
-        console.log('⚠️ No active websites found');
+        console.log('⚠️ No active websites found - clearing display');
       }
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
@@ -202,14 +203,14 @@ const ClientPublicPage = () => {
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        (payload) => {
+        async (payload) => {
           console.log('🔄 Website change detected from dashboard:', payload);
           console.log('🔄 Event type:', payload.eventType);
           console.log('🔄 Payload:', payload);
           
-          // Update websites whenever there's any change
+          // Update websites immediately when dashboard makes changes
           console.log('🔄 Refreshing websites due to dashboard change...');
-          fetchWebsites(account);
+          await fetchWebsites(account);
         }
       )
       .subscribe((status) => {
