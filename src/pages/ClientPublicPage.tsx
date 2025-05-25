@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -78,7 +77,7 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites
+  // Function to fetch websites with better error handling
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log(`🔍 Fetching websites for account: ${accountData.id}`);
@@ -95,11 +94,11 @@ const ClientPublicPage = () => {
         return;
       }
 
-      console.log('✅ All websites data fetched:', websiteData);
+      console.log('✅ Raw websites data:', websiteData);
       
       // Filter only active websites
-      const activeWebsites = (websiteData || []).filter(website => website.is_active);
-      console.log('✅ Active websites filtered:', activeWebsites);
+      const activeWebsites = (websiteData || []).filter(website => website.is_active === true);
+      console.log('✅ Active websites after filtering:', activeWebsites);
       
       setWebsites(activeWebsites);
       
@@ -179,17 +178,17 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Realtime listener for websites
+  // Enhanced realtime listener for websites with immediate updates
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up realtime listener for account:', account.id);
+    console.log('🔄 Setting up enhanced realtime listener for account:', account.id);
     
     const channel = supabase
-      .channel(`websites-${account.id}`)
+      .channel(`websites-changes-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -200,19 +199,52 @@ const ClientPublicPage = () => {
         },
         async (payload) => {
           console.log('🔥 REALTIME: Website change detected!', payload);
+          console.log('🔥 Event type:', payload.eventType);
+          console.log('🔥 New data:', payload.new);
+          console.log('🔥 Old data:', payload.old);
           
-          // Slight delay to ensure consistency
-          setTimeout(async () => {
-            await fetchWebsites(account);
-          }, 100);
+          // Handle different types of changes
+          if (payload.eventType === 'UPDATE') {
+            const updatedWebsite = payload.new as Website;
+            console.log('🔄 Website updated:', updatedWebsite);
+            
+            setWebsites(prevWebsites => {
+              const updatedWebsites = prevWebsites.map(website => 
+                website.id === updatedWebsite.id ? updatedWebsite : website
+              );
+              
+              // Filter only active websites
+              const activeWebsites = updatedWebsites.filter(website => website.is_active === true);
+              console.log('✅ Updated active websites:', activeWebsites);
+              return activeWebsites;
+            });
+          } else if (payload.eventType === 'INSERT') {
+            const newWebsite = payload.new as Website;
+            if (newWebsite.is_active) {
+              setWebsites(prevWebsites => [...prevWebsites, newWebsite]);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedWebsite = payload.old as Website;
+            setWebsites(prevWebsites => 
+              prevWebsites.filter(website => website.id !== deletedWebsite.id)
+            );
+          }
         }
       )
       .subscribe((status) => {
-        console.log('🔄 REALTIME: Status:', status);
+        console.log('🔄 REALTIME: Channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ REALTIME: Successfully subscribed to website changes');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ REALTIME: Channel error, attempting to reconnect...');
+          setTimeout(() => {
+            fetchWebsites(account);
+          }, 1000);
+        }
       });
 
     return () => {
-      console.log('🧹 REALTIME: Cleaning up listener');
+      console.log('🧹 REALTIME: Cleaning up website listener');
       supabase.removeChannel(channel);
     };
   }, [account?.id, subscriptionExpired]);
