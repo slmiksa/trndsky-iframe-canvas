@@ -48,7 +48,7 @@ const handler = async (req: Request): Promise<Response> => {
       });
     };
 
-    const dashboardUrl = `${req.headers.get('origin')}/client/${account_id}`;
+    const loginUrl = `${req.headers.get('origin')}/login`;
     const publicPageUrl = `${req.headers.get('origin')}/client/${account_id}`;
 
     const emailHtml = `
@@ -227,7 +227,7 @@ const handler = async (req: Request): Promise<Response> => {
             <div class="links-section">
               <h3>روابط مهمة:</h3>
               <div>
-                <a href="${dashboardUrl}" class="button">
+                <a href="${loginUrl}" class="button">
                   🔧 دخول لوحة التحكم
                 </a>
                 <a href="${publicPageUrl}" class="button">
