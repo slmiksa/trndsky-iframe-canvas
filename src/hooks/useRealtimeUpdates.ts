@@ -19,7 +19,7 @@ interface UseRealtimeUpdatesProps {
   subscriptionExpired: boolean;
   setRotationInterval: (interval: number) => void;
   setAccount: React.Dispatch<React.SetStateAction<Account | null>>;
-  fetchWebsites: (account: Account) => Promise<void>;
+  fetchWebsites: (account: Account) => Promise<any>;
 }
 
 export const useRealtimeUpdates = ({
@@ -29,14 +29,14 @@ export const useRealtimeUpdates = ({
   setAccount,
   fetchWebsites
 }: UseRealtimeUpdatesProps) => {
-  // Setup realtime listener for account changes (including rotation_interval)
+  // Setup realtime listener for account changes
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ Skipping account realtime setup - no account or subscription expired');
+      console.log('⏭️ تخطي إعداد التحديثات الفورية للحساب');
       return;
     }
 
-    console.log('🔄 Setting up realtime listener for account changes');
+    console.log('🔄 إعداد مستمع التحديثات الفورية للحساب');
     
     const accountChannelName = `account-changes-${account.id}`;
     
@@ -51,92 +51,88 @@ export const useRealtimeUpdates = ({
           filter: `id=eq.${account.id}`
         },
         (payload) => {
-          console.log('🔄 Account change detected:', payload);
+          console.log('🔄 تغيير في بيانات الحساب:', payload);
           
           if (payload.new?.rotation_interval !== undefined) {
-            console.log('🔄 Rotation interval updated:', payload.new.rotation_interval);
+            console.log('⏱️ تحديث فترة التبديل:', payload.new.rotation_interval);
             setRotationInterval(payload.new.rotation_interval);
             setAccount(prev => prev ? { ...prev, rotation_interval: payload.new.rotation_interval } : null);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🔄 Account realtime subscription status:', status);
+        console.log('📡 حالة اشتراك التحديثات للحساب:', status);
       });
 
     return () => {
-      console.log('🔄 Cleaning up account realtime listener');
+      console.log('🧹 تنظيف مستمع التحديثات للحساب');
       supabase.removeChannel(accountChannel);
     };
   }, [account?.id, subscriptionExpired, setRotationInterval, setAccount]);
 
-  // Enhanced realtime listener for immediate website changes
+  // Enhanced realtime listener for website changes
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ Skipping realtime setup - no account or subscription expired');
+      console.log('⏭️ تخطي إعداد التحديثات الفورية للمواقع');
       return;
     }
 
-    console.log('🔄 Setting up ENHANCED realtime listener for immediate updates');
-    console.log('🔄 Account ID:', account.id);
+    console.log('🌐 إعداد مستمع التحديثات الفورية للمواقع');
+    console.log('🆔 معرف الحساب:', account.id);
     
-    const channelName = `fast-updates-${account.id}`;
+    const channelName = `website-realtime-${account.id}`;
     
     const channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: false }, // Don't receive our own changes
-          presence: { key: account.id }
-        }
-      })
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to all events: INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀 IMMEDIATE website change detected:', payload);
-          console.log('🚀 Event:', payload.eventType);
-          console.log('🚀 Timestamp:', new Date().toISOString());
+          console.log('🚀 تحديث فوري للموقع:', payload);
+          console.log('📅 الوقت:', new Date().toISOString());
+          console.log('🎯 نوع الحدث:', payload.eventType);
           
-          // Immediate refresh without any delay for instant updates
-          console.log('🚀 Instantly refreshing websites...');
           try {
+            console.log('🔄 إعادة جلب المواقع...');
             await fetchWebsites(account);
-            console.log('✅ Websites refreshed successfully');
+            console.log('✅ تم تحديث المواقع بنجاح');
           } catch (error) {
-            console.error('❌ Error refreshing websites:', error);
-            // Retry once after a short delay if there's an error
+            console.error('❌ خطأ في تحديث المواقع:', error);
+            
+            // إعادة المحاولة مرة واحدة بعد تأخير قصير
             setTimeout(async () => {
               try {
+                console.log('🔄 إعادة المحاولة...');
                 await fetchWebsites(account);
-                console.log('✅ Websites refreshed on retry');
+                console.log('✅ نجحت إعادة المحاولة');
               } catch (retryError) {
-                console.error('❌ Retry failed:', retryError);
+                console.error('❌ فشلت إعادة المحاولة:', retryError);
               }
-            }, 500);
+            }, 1000);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🚀 Fast updates subscription status:', status);
-        console.log('🚀 Channel name:', channelName);
+        console.log('📡 حالة اشتراك التحديثات للمواقع:', status);
+        console.log('📺 اسم القناة:', channelName);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to FAST realtime updates!');
+          console.log('✅ تم الاشتراك بنجاح في التحديثات الفورية للمواقع!');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to fast updates');
+          console.error('❌ خطأ في الاشتراك');
         } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Fast updates subscription timed out');
+          console.error('⏰ انتهت مهلة الاشتراك');
         }
       });
 
     return () => {
-      console.log('🔄 Cleaning up fast updates listener');
-      console.log('🔄 Removing channel:', channelName);
+      console.log('🧹 تنظيف مستمع التحديثات للمواقع');
+      console.log('📺 إزالة القناة:', channelName);
       supabase.removeChannel(channel);
     };
   }, [account?.id, subscriptionExpired, fetchWebsites]);

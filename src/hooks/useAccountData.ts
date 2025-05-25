@@ -35,33 +35,36 @@ export const useAccountData = (accountId: string | undefined) => {
     return new Date(account.activation_end_date) < new Date();
   };
 
-  // Enhanced fetchWebsites function for faster updates - جلب المواقع النشطة فقط
+  // Fetch websites function - جلب جميع المواقع النشطة
   const fetchWebsites = async (accountData: Account) => {
     try {
-      console.log('🚀 جلب المواقع للحساب:', accountData.id);
+      console.log('🔍 جلب المواقع للحساب:', accountData.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
         .eq('account_id', accountData.id)
-        .eq('is_active', true) // جلب المواقع النشطة فقط
+        .eq('is_active', true)
         .order('created_at', { ascending: true });
 
       if (websiteError) {
         console.error('❌ خطأ في جلب المواقع:', websiteError);
-        setWebsites([]);
-        return;
+        throw websiteError;
       }
 
-      console.log('✅ تم جلب المواقع النشطة:', websiteData);
-      console.log('🔢 عدد المواقع النشطة:', (websiteData || []).length);
+      console.log('✅ تم جلب المواقع بنجاح:', websiteData);
+      console.log('📊 عدد المواقع النشطة:', (websiteData || []).length);
       
-      // تحديث فوري للحالة لاستجابة سريعة في واجهة المستخدم
-      setWebsites(websiteData || []);
+      // تحديث حالة المواقع
+      const activeWebsites = websiteData || [];
+      setWebsites(activeWebsites);
+      
+      return activeWebsites;
       
     } catch (error) {
       console.error('❌ خطأ في fetchWebsites:', error);
       setWebsites([]);
+      throw error;
     }
   };
 
@@ -105,17 +108,18 @@ export const useAccountData = (accountId: string | undefined) => {
 
         console.log('✅ تم جلب بيانات الحساب:', accountData);
         
+        setAccount(accountData);
         setRotationInterval(accountData.rotation_interval || 30);
         
         if (isSubscriptionExpired(accountData)) {
           setSubscriptionExpired(true);
-          setAccount(accountData);
           setLoading(false);
           return;
         }
 
-        setAccount(accountData);
-        await fetchWebsites(accountData);
+        // جلب المواقع النشطة
+        const activeWebsites = await fetchWebsites(accountData);
+        console.log('🌐 المواقع النشطة المحملة:', activeWebsites.length);
 
       } catch (error) {
         console.error('❌ خطأ في fetchAccountData:', error);
@@ -128,56 +132,40 @@ export const useAccountData = (accountId: string | undefined) => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime subscription للتحديثات الفورية
+  // Realtime subscription للتحديثات الفورية
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ تخطي الاشتراك في التحديثات الفورية - لا يوجد حساب أو انتهت صلاحية الاشتراك');
+      console.log('⏭️ تخطي الاشتراك في التحديثات الفورية');
       return;
     }
 
     console.log('🔄 إعداد الاشتراك في التحديثات الفورية للمواقع');
     
-    const channelName = `instant-website-updates-${account.id}`;
+    const channelName = `website-updates-${account.id}`;
     
     const channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: false },
-          presence: { key: account.id }
-        }
-      })
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
-          event: '*', // الاستماع لجميع الأحداث
+          event: '*',
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀 تحديث فوري للموقع:', payload);
-          console.log('🚀 نوع الحدث:', payload.eventType);
-          console.log('🚀 البيانات الجديدة:', payload.new);
-          console.log('🚀 البيانات القديمة:', payload.old);
+          console.log('🚀 تحديث موقع فوري:', payload);
           
-          // تحديث فوري لجميع الأحداث
-          console.log('🚀 تحديث فوري للمواقع...');
           try {
             await fetchWebsites(account);
-            console.log('✅ تم التحديث الفوري للمواقع');
+            console.log('✅ تم تحديث المواقع فورياً');
           } catch (error) {
             console.error('❌ خطأ في التحديث الفوري:', error);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🚀 حالة الاشتراك في التحديثات الفورية:', status);
-        
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ تم الاشتراك بنجاح في التحديثات الفورية للمواقع!');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ خطأ في الاشتراك في التحديثات الفورية');
-        }
+        console.log('📡 حالة الاشتراك:', status);
       });
 
     return () => {
