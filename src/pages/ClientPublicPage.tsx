@@ -78,7 +78,7 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites - now fetches all websites and filters active ones in state
+  // Function to fetch websites
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log('🔍 Fetching websites for account:', accountData.id);
@@ -91,25 +91,28 @@ const ClientPublicPage = () => {
 
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
+        setWebsites([]);
+        return;
+      }
+
+      console.log('✅ All websites data fetched:', websiteData);
+      
+      // Filter only active websites
+      const activeWebsites = (websiteData || []).filter(website => website.is_active);
+      console.log('✅ Active websites filtered:', activeWebsites);
+      
+      setWebsites(activeWebsites);
+      
+      // Reset current website index if needed
+      if (activeWebsites && activeWebsites.length > 0) {
+        setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
       } else {
-        console.log('✅ All websites data fetched:', websiteData);
-        
-        // Filter only active websites
-        const activeWebsites = (websiteData || []).filter(website => website.is_active);
-        console.log('✅ Active websites filtered:', activeWebsites);
-        
-        setWebsites(activeWebsites);
-        
-        // Reset current website index if needed
-        if (activeWebsites && activeWebsites.length > 0) {
-          setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
-        } else {
-          setCurrentWebsiteIndex(0);
-          console.log('⚠️ No active websites found');
-        }
+        setCurrentWebsiteIndex(0);
+        console.log('⚠️ No active websites found');
       }
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
+      setWebsites([]);
     }
   };
 
@@ -176,7 +179,7 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes
+  // Setup realtime listener for website changes - FIXED VERSION
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
@@ -186,16 +189,8 @@ const ClientPublicPage = () => {
     console.log('🔄 Setting up realtime listener for websites');
     console.log('🔄 Account ID:', account.id);
     
-    // Create a unique channel name
-    const channelName = `account-websites-${account.id}`;
-    
     const channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: true },
-          presence: { key: account.id }
-        }
-      })
+      .channel(`websites-changes-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -204,39 +199,54 @@ const ClientPublicPage = () => {
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        (payload) => {
+        async (payload) => {
           console.log('🔄 Website change detected:', payload);
           console.log('🔄 Event type:', payload.eventType);
           console.log('🔄 New record:', payload.new);
           console.log('🔄 Old record:', payload.old);
-          console.log('🔄 Timestamp:', new Date().toISOString());
           
-          // Force re-fetch websites to get the latest data
-          console.log('🔄 Re-fetching websites due to change...');
-          fetchWebsites(account);
+          // Re-fetch and filter websites immediately
+          try {
+            const { data: allWebsites, error } = await supabase
+              .from('account_websites')
+              .select('*')
+              .eq('account_id', account.id)
+              .order('created_at', { ascending: true });
+
+            if (!error && allWebsites) {
+              const activeWebsites = allWebsites.filter(website => website.is_active);
+              console.log('🔄 Updated active websites:', activeWebsites);
+              setWebsites(activeWebsites);
+              
+              // Reset index if no active websites
+              if (activeWebsites.length === 0) {
+                setCurrentWebsiteIndex(0);
+              } else if (currentWebsiteIndex >= activeWebsites.length) {
+                setCurrentWebsiteIndex(0);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error updating websites after change:', error);
+          }
         }
       )
       .subscribe((status) => {
         console.log('🔄 Realtime subscription status:', status);
-        console.log('🔄 Channel name:', channelName);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to realtime updates!');
+          console.log('✅ Successfully subscribed to website updates!');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to realtime updates');
-        } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Realtime subscription timed out');
+          console.error('❌ Error subscribing to website updates');
         }
       });
 
     return () => {
       console.log('🔄 Cleaning up realtime listener');
-      console.log('🔄 Removing channel:', channelName);
       supabase.removeChannel(channel);
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, currentWebsiteIndex]);
 
-  // Initial fetch and realtime listener for notifications - IMPROVED VERSION
+  // Initial fetch and realtime listener for notifications
   useEffect(() => {
     if (!account?.id || subscriptionExpired) return;
 
@@ -255,10 +265,8 @@ const ClientPublicPage = () => {
     fetchAndSetNotifications();
 
     // Setup realtime listener for notifications
-    const notificationChannelName = `notifications-${account.id}`;
-    
     const notificationChannel = supabase
-      .channel(notificationChannelName)
+      .channel(`notifications-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -271,7 +279,6 @@ const ClientPublicPage = () => {
           console.log('🔔 Notification change detected:', payload);
           
           if (payload.eventType === 'INSERT' && payload.new?.is_active) {
-            // Add new active notification
             console.log('➕ Adding new notification:', payload.new);
             setActiveNotifications(prev => [...prev, payload.new as Notification]);
           } else if (payload.eventType === 'UPDATE') {
@@ -279,7 +286,6 @@ const ClientPublicPage = () => {
             console.log('🔄 Updating notification:', updatedNotification);
             
             if (updatedNotification.is_active) {
-              // Update existing or add if not exists
               setActiveNotifications(prev => {
                 const exists = prev.find(n => n.id === updatedNotification.id);
                 if (exists) {
@@ -289,23 +295,18 @@ const ClientPublicPage = () => {
                 }
               });
             } else {
-              // Remove deactivated notification
               console.log('❌ Removing deactivated notification:', updatedNotification.id);
               setActiveNotifications(prev => prev.filter(n => n.id !== updatedNotification.id));
             }
           } else if (payload.eventType === 'DELETE') {
-            // Remove deleted notification
             console.log('🗑️ Removing deleted notification:', payload.old?.id);
             setActiveNotifications(prev => prev.filter(n => n.id !== payload.old?.id));
           }
         }
       )
-      .subscribe((status) => {
-        console.log('🔔 Notification realtime subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('🔔 Cleaning up notification realtime listener');
       supabase.removeChannel(notificationChannel);
     };
   }, [account?.id, fetchActiveNotifications, subscriptionExpired]);
@@ -330,7 +331,7 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Website rotation - now only if there are active websites
+  // Website rotation - only if there are active websites
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
@@ -341,7 +342,6 @@ const ClientPublicPage = () => {
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
 
-  // Modified to only track that we've seen this notification, but don't remove it
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 User closed notification:', notificationId);
     setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -438,7 +438,7 @@ const ClientPublicPage = () => {
               </h2>
               <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
               <p className="text-sm text-gray-400 mt-2">
-                🔄 الاستماع للتحديثات المباشرة نشط
+                🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
               </p>
             </div>
           </div>
@@ -454,7 +454,7 @@ const ClientPublicPage = () => {
         ) : null}
       </main>
 
-      {/* Active Notifications - Now properly managed with realtime updates */}
+      {/* Active Notifications */}
       {activeNotifications.map((notification) => (
         <NotificationPopup
           key={notification.id}
