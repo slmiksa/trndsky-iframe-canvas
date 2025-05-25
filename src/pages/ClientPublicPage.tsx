@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,6 +54,8 @@ const ClientPublicPage = () => {
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [iframeLoading, setIframeLoading] = useState(true);
+  const [iframeError, setIframeError] = useState(false);
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -77,6 +80,16 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
+  // Function to validate URL
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   // Function to fetch websites with enhanced cross-browser compatibility
   const fetchWebsites = async (accountData: Account) => {
     try {
@@ -97,15 +110,27 @@ const ClientPublicPage = () => {
 
       console.log('✅ [WEBSITES] Active websites fetched:', websiteData?.length || 0);
       
-      const activeWebsites = websiteData || [];
+      // Filter valid URLs only
+      const activeWebsites = (websiteData || []).filter(website => {
+        const isValid = isValidUrl(website.website_url);
+        if (!isValid) {
+          console.warn('⚠️ [WEBSITES] Invalid URL found:', website.website_url);
+        }
+        return isValid;
+      });
+      
       setWebsites(activeWebsites);
       
-      // Reset current website index if needed
+      // Reset current website index and states
       if (activeWebsites.length > 0) {
-        setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
+        setCurrentWebsiteIndex(0);
+        setIframeLoading(true);
+        setIframeError(false);
       } else {
         setCurrentWebsiteIndex(0);
       }
+      
+      console.log('✅ [WEBSITES] Valid websites set:', activeWebsites.length);
     } catch (error) {
       console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
       setWebsites([]);
@@ -181,17 +206,12 @@ const ClientPublicPage = () => {
       return;
     }
 
-    console.log('🔄 [REALTIME] Setting up immediate website listener for account:', account.id);
+    console.log('🔄 [REALTIME] Setting up website listener for account:', account.id);
     
     const channelName = `websites_${account.id}`;
     
     const websiteChannel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: false },
-          presence: { key: account.id }
-        }
-      })
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -331,7 +351,13 @@ const ClientPublicPage = () => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
     const interval = setInterval(() => {
-      setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
+      setCurrentWebsiteIndex((prev) => {
+        const nextIndex = (prev + 1) % websites.length;
+        console.log('🔄 [ROTATION] Switching to website index:', nextIndex, websites[nextIndex]?.website_url);
+        setIframeLoading(true);
+        setIframeError(false);
+        return nextIndex;
+      });
     }, 30000);
 
     return () => clearInterval(interval);
@@ -344,6 +370,18 @@ const ClientPublicPage = () => {
 
   const handleTimerClose = (timerId: string) => {
     setActiveTimers(prev => prev.filter(t => t.id !== timerId));
+  };
+
+  const handleIframeLoad = () => {
+    console.log('✅ [IFRAME] Website loaded successfully:', websites[currentWebsiteIndex]?.website_url);
+    setIframeLoading(false);
+    setIframeError(false);
+  };
+
+  const handleIframeError = () => {
+    console.error('❌ [IFRAME] Failed to load website:', websites[currentWebsiteIndex]?.website_url);
+    setIframeLoading(false);
+    setIframeError(true);
   };
 
   if (loading) {
@@ -422,15 +460,42 @@ const ClientPublicPage = () => {
   const currentWebsite = websites[currentWebsiteIndex];
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black">
+    <div className="w-full h-screen overflow-hidden bg-black relative">
+      {/* Loading indicator */}
+      {(iframeLoading && currentWebsite) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+            <p className="text-lg">جاري تحميل الموقع...</p>
+            <p className="text-sm text-gray-300 mt-2">{currentWebsite.website_url}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error indicator */}
+      {(iframeError && currentWebsite) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-red-900 z-10">
+          <div className="text-center text-white">
+            <div className="w-16 h-16 bg-red-800 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <p className="text-lg">فشل في تحميل الموقع</p>
+            <p className="text-sm text-gray-300 mt-2">{currentWebsite.website_url}</p>
+            <p className="text-xs text-gray-400 mt-2">قد يكون الموقع لا يدعم العرض في iframe</p>
+          </div>
+        </div>
+      )}
+
       {/* Main Content - Full Screen */}
       {websites.length === 0 ? (
         <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <div className="text-center text-white">
+            <h2 className="text-xl font-semibold mb-2">
               مرحباً بك في {account.name}
             </h2>
-            <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
+            <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
               🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
             </p>
@@ -438,24 +503,26 @@ const ClientPublicPage = () => {
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={currentWebsite.id}
+          key={`website-${currentWebsite.id}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
-          className="w-full h-full"
+          className="w-full h-full border-0"
           style={{
-            border: 'none',
             margin: 0,
             padding: 0,
             width: '100vw',
             height: '100vh',
             position: 'absolute',
             top: 0,
-            left: 0
+            left: 0,
+            border: 'none'
           }}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation-by-user-activation"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation allow-downloads"
           loading="eager"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write; camera; microphone; geolocation"
+          referrerPolicy="no-referrer-when-downgrade"
+          allow="fullscreen; picture-in-picture; autoplay; encrypted-media; accelerometer; gyroscope; camera; microphone; geolocation; payment"
+          onLoad={handleIframeLoad}
+          onError={handleIframeError}
         />
       ) : null}
 
@@ -476,6 +543,16 @@ const ClientPublicPage = () => {
           onClose={() => handleTimerClose(timer.id)}
         />
       ))}
+
+      {/* Debug info in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
+          <div>المواقع النشطة: {websites.length}</div>
+          <div>الموقع الحالي: {currentWebsiteIndex + 1}</div>
+          <div>حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
+          <div>خطأ: {iframeError ? 'نعم' : 'لا'}</div>
+        </div>
+      )}
     </div>
   );
 };
