@@ -56,7 +56,8 @@ const ClientPublicPage = () => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0); // Enhanced refresh mechanism
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0);
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -91,7 +92,7 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Function to fetch websites with enhanced instant updates
+  // Enhanced function to fetch websites with instant updates
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log(`🔍 [WEBSITES] Fetching websites for account: ${accountData.id}`);
@@ -106,6 +107,7 @@ const ClientPublicPage = () => {
       if (websiteError) {
         console.error('❌ [WEBSITES] Error fetching websites:', websiteError);
         setWebsites([]);
+        setForceUpdate(prev => prev + 1);
         return;
       }
 
@@ -120,32 +122,27 @@ const ClientPublicPage = () => {
         return isValid;
       });
       
-      // If no active websites, clear everything immediately
-      if (activeWebsites.length === 0) {
-        console.log('🚫 [WEBSITES] No active websites found, clearing display');
-        setWebsites([]);
-        setCurrentWebsiteIndex(0);
-        setIframeLoading(false);
-        setIframeError(false);
-        setRefreshKey(prev => prev + 1);
-        return;
-      }
-      
+      // Force complete UI refresh for instant changes
       setWebsites(activeWebsites);
-      
-      // Reset current website index and states for active websites
       setCurrentWebsiteIndex(0);
-      setIframeLoading(true);
+      setIframeLoading(activeWebsites.length > 0);
       setIframeError(false);
-      
-      // Force complete refresh for immediate UI update
       setRefreshKey(prev => prev + 1);
+      setForceUpdate(prev => prev + 1);
       
-      console.log('✅ [WEBSITES] Valid websites set:', activeWebsites.length);
+      console.log('✅ [WEBSITES] Websites updated instantly:', activeWebsites.length);
     } catch (error) {
       console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
       setWebsites([]);
-      setRefreshKey(prev => prev + 1);
+      setForceUpdate(prev => prev + 1);
+    }
+  };
+
+  // Force refresh function for manual updates
+  const forceRefresh = async () => {
+    if (account) {
+      console.log('🔄 [FORCE_REFRESH] Manual refresh triggered');
+      await fetchWebsites(account);
     }
   };
 
@@ -160,7 +157,7 @@ const ClientPublicPage = () => {
       try {
         console.log('🔍 Fetching account data for:', accountId);
         
-        // أولاً نحاول البحث بالـ ID
+        // First try to search by ID
         let { data: accountData, error: accountError } = await supabase
           .from('accounts')
           .select('*')
@@ -168,7 +165,7 @@ const ClientPublicPage = () => {
           .eq('status', 'active')
           .single();
 
-        // إذا لم نجد شيئاً، نبحث بالاسم
+        // If not found, search by name
         if (accountError || !accountData) {
           console.log('🔍 Searching by name:', accountId);
           const { data: accountByName, error: nameError } = await supabase
@@ -212,7 +209,7 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener for websites with instant response
+  // Enhanced realtime listener for instant website updates
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
@@ -220,7 +217,7 @@ const ClientPublicPage = () => {
 
     console.log('🔄 [REALTIME] Setting up enhanced website listener for account:', account.id);
     
-    const channelName = `websites_${account.id}_instant`;
+    const channelName = `websites_${account.id}_${Date.now()}`;
     
     const websiteChannel = supabase
       .channel(channelName)
@@ -233,49 +230,38 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔥 [REALTIME] Website change detected:', payload.eventType, payload);
+          console.log('🔥 [REALTIME] Website change detected instantly:', payload.eventType, payload);
           
-          // Immediate response based on specific event types
-          if (payload.eventType === 'UPDATE') {
-            const updatedWebsite = payload.new as Website;
-            console.log('🔄 [REALTIME] Website updated:', updatedWebsite.website_url, 'Active:', updatedWebsite.is_active);
-            
-            // If website was deactivated, remove it immediately
-            if (!updatedWebsite.is_active) {
-              setWebsites(prev => {
-                const filtered = prev.filter(w => w.id !== updatedWebsite.id);
-                console.log('🚫 [REALTIME] Website deactivated, remaining websites:', filtered.length);
-                if (filtered.length === 0) {
-                  setCurrentWebsiteIndex(0);
-                  setIframeLoading(false);
-                  setIframeError(false);
-                }
-                return filtered;
-              });
-              setRefreshKey(prev => prev + 1);
-              return;
-            }
-          }
-          
-          // For all other cases, refresh the websites list
+          // Immediate response to any change
           try {
             await fetchWebsites(account);
+            console.log('✅ [REALTIME] Websites updated instantly after change');
           } catch (error) {
-            console.error('❌ [REALTIME] Error refreshing websites:', error);
+            console.error('❌ [REALTIME] Error updating websites:', error);
           }
         }
       )
       .subscribe((status) => {
-        console.log('🔄 [REALTIME] Enhanced website channel status:', status);
+        console.log('🔄 [REALTIME] Website channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ [REALTIME] Successfully connected to website updates');
+        }
       });
 
+    // Set up periodic refresh as backup
+    const backupRefresh = setInterval(() => {
+      console.log('🔄 [BACKUP_REFRESH] Running backup refresh');
+      forceRefresh();
+    }, 30000); // Every 30 seconds
+
     return () => {
-      console.log('🧹 [REALTIME] Cleaning up enhanced website listener');
+      console.log('🧹 [REALTIME] Cleaning up website listener and backup refresh');
       supabase.removeChannel(websiteChannel);
+      clearInterval(backupRefresh);
     };
   }, [account?.id, subscriptionExpired]);
 
-  // Enhanced realtime listener for notifications with immediate response
+  // Enhanced realtime listener for notifications
   useEffect(() => {
     if (!account?.id || subscriptionExpired) return;
 
@@ -334,7 +320,7 @@ const ClientPublicPage = () => {
     };
   }, [account?.id, fetchActiveNotifications, subscriptionExpired]);
 
-  // Enhanced realtime listener for break timers with immediate response
+  // Enhanced realtime listener for break timers
   useEffect(() => {
     const checkTimers = async () => {
       if (!account?.id || subscriptionExpired) return;
@@ -396,6 +382,17 @@ const ClientPublicPage = () => {
 
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
+
+  // Add window focus event to refresh when user returns to tab
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔄 [FOCUS] Window focused, refreshing data');
+      forceRefresh();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [account]);
 
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 User closed notification:', notificationId);
@@ -495,7 +492,7 @@ const ClientPublicPage = () => {
   const hasActiveWebsites = websites.length > 0;
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black relative" key={refreshKey}>
+    <div className="w-full h-screen overflow-hidden bg-black relative" key={`page-${refreshKey}-${forceUpdate}`}>
       {/* Loading indicator */}
       {(iframeLoading && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
@@ -523,6 +520,16 @@ const ClientPublicPage = () => {
         </div>
       )}
 
+      {/* Manual refresh button for testing */}
+      {process.env.NODE_ENV === 'development' && (
+        <button
+          onClick={forceRefresh}
+          className="absolute top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded z-50 text-sm"
+        >
+          تحديث يدوي
+        </button>
+      )}
+
       {/* Main Content - Full Screen */}
       {!hasActiveWebsites ? (
         <div className="min-h-screen flex items-center justify-center">
@@ -538,7 +545,7 @@ const ClientPublicPage = () => {
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}-${refreshKey}`}
+          key={`website-${currentWebsite.id}-${refreshKey}-${forceUpdate}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -587,6 +594,7 @@ const ClientPublicPage = () => {
           <div>حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>خطأ: {iframeError ? 'نعم' : 'لا'}</div>
           <div>Refresh Key: {refreshKey}</div>
+          <div>Force Update: {forceUpdate}</div>
         </div>
       )}
     </div>
