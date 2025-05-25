@@ -106,13 +106,13 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Enhanced function to fetch websites with immediate updates
+  // INSTANT websites fetch - no delays
   const fetchWebsites = async (accountData?: Account) => {
     const targetAccount = accountData || account;
     if (!targetAccount?.id) return;
 
     try {
-      console.log('🚀 [WEBSITES FETCH] Fetching for account:', targetAccount.id);
+      console.log('⚡ [INSTANT FETCH] Getting websites for:', targetAccount.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -122,34 +122,34 @@ const ClientPublicPage = () => {
         .order('created_at', { ascending: true });
 
       if (websiteError) {
-        console.error('❌ [WEBSITES FETCH] Error:', websiteError);
+        console.error('❌ [INSTANT FETCH] Error:', websiteError);
         setWebsites([]);
         return;
       }
 
-      console.log('📊 [WEBSITES FETCH] Raw data:', websiteData?.length || 0, 'items');
+      console.log('📊 [INSTANT FETCH] Raw data:', websiteData?.length || 0, 'websites');
       
       // Filter valid URLs only
       const activeWebsites = (websiteData || []).filter(website => {
         const isValid = isValidUrl(website.website_url);
         if (!isValid) {
-          console.warn('⚠️ [WEBSITES FETCH] Invalid URL:', website.website_url);
+          console.warn('⚠️ [INSTANT FETCH] Invalid URL:', website.website_url);
         }
         return isValid;
       });
       
-      console.log('✅ [WEBSITES FETCH] ACTIVE websites found:', activeWebsites.length);
+      console.log('✅ [INSTANT FETCH] Active websites:', activeWebsites.length);
       
-      // Force update state to trigger re-render
+      // IMMEDIATE state update
       setWebsites(activeWebsites);
       setCurrentWebsiteIndex(0);
       setIframeLoading(activeWebsites.length > 0);
       setIframeError(false);
       setRefreshKey(prev => prev + 1);
       
-      console.log('🔄 [WEBSITES FETCH] State updated with', activeWebsites.length, 'active websites');
+      console.log('🚀 [INSTANT FETCH] State updated immediately with', activeWebsites.length, 'websites');
     } catch (error) {
-      console.error('❌ [WEBSITES FETCH] Exception:', error);
+      console.error('❌ [INSTANT FETCH] Exception:', error);
       setWebsites([]);
     }
   };
@@ -217,18 +217,16 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener for immediate website updates
+  // INSTANT realtime listener - no delays, immediate response
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('🚀 [REALTIME SETUP] Starting instant website listener for account:', account.id);
-    
-    const channelName = `instant_websites_${account.id}`;
+    console.log('⚡ [INSTANT REALTIME] Setting up immediate listener for:', account.id);
     
     const websiteChannel = supabase
-      .channel(channelName)
+      .channel(`instant_websites_${account.id}_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -238,47 +236,62 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀⚡ [INSTANT REALTIME] Website change detected!', {
+          console.log('⚡ [INSTANT REALTIME] Change detected immediately!', {
             event: payload.eventType,
             timestamp: new Date().toISOString()
           });
           
-          // Immediate update
-          await fetchWebsites();
+          // INSTANT response - no waiting
+          fetchWebsites();
         }
       )
       .subscribe((status) => {
-        console.log('📡⚡ [INSTANT REALTIME] Channel status:', status);
+        console.log('📡 [INSTANT REALTIME] Status:', status);
       });
 
-    // Fast refresh for mobile - 2 seconds only
-    const refreshInterval = setInterval(() => {
-      console.log('🔄⚡ [FAST REFRESH] Checking for updates');
+    // Super fast polling for mobile - every 1 second
+    const fastInterval = setInterval(() => {
+      console.log('🔄 [INSTANT POLLING] Checking for updates');
       fetchWebsites();
-    }, 2000);
+    }, 1000);
 
-    // Event listeners for immediate updates
+    // Mobile specific events for immediate updates
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('👁️⚡ [INSTANT VISIBILITY] Page visible - immediate refresh');
+        console.log('👁️ [INSTANT] Page visible - immediate fetch');
         fetchWebsites();
       }
     };
 
     const handleFocus = () => {
-      console.log('🎯⚡ [INSTANT FOCUS] Window focused - immediate refresh');
+      console.log('🎯 [INSTANT] Window focused - immediate fetch');
       fetchWebsites();
     };
 
+    const handleTouchStart = () => {
+      console.log('👆 [INSTANT] Touch detected - immediate fetch');
+      fetchWebsites();
+    };
+
+    const handlePageShow = () => {
+      console.log('📱 [INSTANT] Page shown - immediate fetch');
+      fetchWebsites();
+    };
+
+    // Add all event listeners for immediate response
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
+    document.addEventListener('touchstart', handleTouchStart);
 
     return () => {
-      console.log('🧹⚡ [INSTANT CLEANUP] Removing all listeners');
+      console.log('🧹 [INSTANT CLEANUP] Removing all instant listeners');
       supabase.removeChannel(websiteChannel);
-      clearInterval(refreshInterval);
+      clearInterval(fastInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('touchstart', handleTouchStart);
     };
   }, [account?.id, subscriptionExpired]);
 
@@ -387,20 +400,20 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // INSTANT website rotation - immediate switching
+  // INSTANT website rotation - NO DELAY
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
-    // النقل الفوري - 3 ثواني بدلاً من 30
+    // النقل الفوري - بدون تأخير على الإطلاق
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => {
         const nextIndex = (prev + 1) % websites.length;
-        console.log('🔄⚡ [INSTANT ROTATION] Switching immediately to website index:', nextIndex, websites[nextIndex]?.website_url);
+        console.log('⚡ [INSTANT SWITCH] Switching NOW to website:', nextIndex, websites[nextIndex]?.website_url);
         setIframeLoading(true);
         setIframeError(false);
         return nextIndex;
       });
-    }, 3000); // 3 ثواني فقط للنقل
+    }, 1000); // ثانية واحدة فقط للنقل
 
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
@@ -590,14 +603,14 @@ const ClientPublicPage = () => {
       {/* Enhanced debug info in development */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
-          <div>⚡ النقل الفوري: مُفعّل</div>
+          <div>⚡ النقل الفوري: مُفعّل (1 ثانية)</div>
           <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
           <div>✅ المواقع النشطة: {websites.length}</div>
           <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
           <div>🔄 Refresh Key: {refreshKey}</div>
-          <div>🚀 Realtime: نشط فوري</div>
+          <div>🚀 Realtime: فوري (1 ثانية)</div>
         </div>
       )}
     </div>
