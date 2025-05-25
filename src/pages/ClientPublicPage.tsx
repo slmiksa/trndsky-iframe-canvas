@@ -78,15 +78,17 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites
+  // Function to fetch websites with enhanced cross-browser compatibility
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log(`🔍 [WEBSITES] Fetching websites for account: ${accountData.id}`);
       
+      // Use a more compatible query approach
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
         .eq('account_id', accountData.id)
+        .eq('is_active', true)
         .order('created_at', { ascending: true });
 
       if (websiteError) {
@@ -95,20 +97,16 @@ const ClientPublicPage = () => {
         return;
       }
 
-      console.log('✅ [WEBSITES] Raw data fetched:', websiteData);
+      console.log('✅ [WEBSITES] Active websites fetched:', websiteData?.length || 0);
       
-      // Filter only active websites
-      const activeWebsites = (websiteData || []).filter(website => website.is_active === true);
-      console.log('✅ [WEBSITES] Active websites after filtering:', activeWebsites);
-      
+      const activeWebsites = websiteData || [];
       setWebsites(activeWebsites);
       
       // Reset current website index if needed
-      if (activeWebsites && activeWebsites.length > 0) {
+      if (activeWebsites.length > 0) {
         setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
       } else {
         setCurrentWebsiteIndex(0);
-        console.log('⚠️ [WEBSITES] No active websites found');
       }
     } catch (error) {
       console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
@@ -179,17 +177,24 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Realtime listener for websites - Enhanced with proper state management
+  // Enhanced cross-browser realtime listener for websites
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ [REALTIME] Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 [REALTIME] Setting up website changes listener for account:', account.id);
+    console.log('🔄 [REALTIME] Setting up cross-browser website listener for account:', account.id);
+    
+    // Use a simpler channel name for better compatibility
+    const channelName = `websites_${account.id}`;
     
     const websiteChannel = supabase
-      .channel(`websites-realtime-${account.id}`)
+      .channel(channelName, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: account.id }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -198,75 +203,22 @@ const ClientPublicPage = () => {
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        (payload) => {
-          console.log('🔥 [REALTIME] Website change detected!', {
-            event: payload.eventType,
-            new: payload.new,
-            old: payload.old
-          });
+        async (payload) => {
+          console.log('🔥 [REALTIME] Website change detected:', payload.eventType);
           
-          if (payload.eventType === 'UPDATE') {
-            const updatedWebsite = payload.new as Website;
-            console.log('🔄 [REALTIME] Processing UPDATE for website:', updatedWebsite.id, 'active:', updatedWebsite.is_active);
-            
-            setWebsites(prevWebsites => {
-              console.log('📊 [REALTIME] Current websites before update:', prevWebsites.map(w => ({ id: w.id, active: w.is_active })));
-              
-              let updatedWebsites;
-              
-              // Check if website exists in current list
-              const existingIndex = prevWebsites.findIndex(w => w.id === updatedWebsite.id);
-              
-              if (existingIndex >= 0) {
-                // Website exists - update it
-                updatedWebsites = prevWebsites.map(website => 
-                  website.id === updatedWebsite.id ? updatedWebsite : website
-                );
-              } else {
-                // Website doesn't exist - add it if active
-                updatedWebsites = updatedWebsite.is_active 
-                  ? [...prevWebsites, updatedWebsite]
-                  : prevWebsites;
-              }
-              
-              // Filter only active websites
-              const activeWebsites = updatedWebsites.filter(website => website.is_active === true);
-              console.log('✅ [REALTIME] Final active websites after UPDATE:', activeWebsites.map(w => ({ id: w.id, url: w.website_url })));
-              
-              return activeWebsites;
-            });
-            
-          } else if (payload.eventType === 'INSERT') {
-            const newWebsite = payload.new as Website;
-            console.log('➕ [REALTIME] Processing INSERT for website:', newWebsite.id, 'active:', newWebsite.is_active);
-            
-            if (newWebsite.is_active) {
-              setWebsites(prevWebsites => {
-                const updatedWebsites = [...prevWebsites, newWebsite];
-                console.log('✅ [REALTIME] Added new website to list:', updatedWebsites.map(w => ({ id: w.id, url: w.website_url })));
-                return updatedWebsites;
-              });
+          // Add a small delay to ensure database consistency across browsers
+          setTimeout(async () => {
+            try {
+              // Re-fetch all websites to ensure consistency
+              await fetchWebsites(account);
+            } catch (error) {
+              console.error('❌ [REALTIME] Error refreshing websites:', error);
             }
-            
-          } else if (payload.eventType === 'DELETE') {
-            const deletedWebsite = payload.old as Website;
-            console.log('🗑️ [REALTIME] Processing DELETE for website:', deletedWebsite.id);
-            
-            setWebsites(prevWebsites => {
-              const filteredWebsites = prevWebsites.filter(website => website.id !== deletedWebsite.id);
-              console.log('✅ [REALTIME] Removed website from list:', filteredWebsites.map(w => ({ id: w.id, url: w.website_url })));
-              return filteredWebsites;
-            });
-          }
+          }, 100);
         }
       )
       .subscribe((status) => {
         console.log('🔄 [REALTIME] Website channel status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ [REALTIME] Successfully subscribed to website changes');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ [REALTIME] Website channel error');
-        }
       });
 
     return () => {
@@ -452,6 +404,16 @@ const ClientPublicPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Debug info - visible in console */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ display: 'none' }}>
+          {console.log('🖥️ [DEBUG] Browser:', navigator.userAgent)}
+          {console.log('🖥️ [DEBUG] Websites count:', websites.length)}
+          {console.log('🖥️ [DEBUG] Current index:', currentWebsiteIndex)}
+          {console.log('🖥️ [DEBUG] Current website:', currentWebsite)}
+        </div>
+      )}
+
       {/* Main Content - Full Screen */}
       <main className="flex-1">
         {websites.length === 0 ? (
@@ -469,13 +431,19 @@ const ClientPublicPage = () => {
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
+              key={`${currentWebsite.id}-${Date.now()}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation-by-user-activation"
-              loading="lazy"
+              loading="eager"
               referrerPolicy="strict-origin-when-cross-origin"
               allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write"
+              style={{
+                border: 'none',
+                outline: 'none',
+                boxShadow: 'none'
+              }}
             />
           </div>
         ) : null}
