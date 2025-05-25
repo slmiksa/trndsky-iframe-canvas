@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -204,8 +203,8 @@ const ClientPublicPage = () => {
         async (payload) => {
           console.log('🔥 REALTIME: Website change detected!', {
             event: payload.eventType,
-            websiteId: payload.new?.id || payload.old?.id,
-            isActive: payload.new?.is_active,
+            websiteId: (payload.new as any)?.id || (payload.old as any)?.id,
+            isActive: (payload.new as any)?.is_active,
             timestamp: new Date().toISOString()
           });
           
