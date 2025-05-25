@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +32,7 @@ interface Notification {
   image_url: string | null;
   position: string;
   display_duration: number;
+  is_active: boolean;
 }
 
 interface BreakTimer {
@@ -50,9 +50,9 @@ const ClientPublicPage = () => {
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
+  const [visibleNotifications, setVisibleNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
-  const [shownNotifications, setShownNotifications] = useState<Set<string>>(new Set());
+  const [processedNotifications, setProcessedNotifications] = useState<Set<string>>(new Set());
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
 
   const { fetchActiveNotifications } = useNotifications();
@@ -229,6 +229,50 @@ const ClientPublicPage = () => {
 
     channels.push(websiteChannel);
 
+    // Channel for notification updates
+    const notificationChannel = supabase
+      .channel(`notifications-${account.id}-${Date.now()}`, {
+        config: {
+          broadcast: { self: true },
+          presence: { key: account.id }
+        }
+      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `account_id=eq.${account.id}`
+        },
+        (payload) => {
+          console.log('🔄 Notification realtime update detected:', payload);
+          
+          if (payload.eventType === 'UPDATE') {
+            const updatedNotification = payload.new as Notification;
+            
+            // إذا تم إيقاف الإشعار، أزله من القائمة المعروضة
+            if (!updatedNotification.is_active) {
+              console.log('🔄 Removing notification from display:', updatedNotification.id);
+              setVisibleNotifications(prev => 
+                prev.filter(n => n.id !== updatedNotification.id)
+              );
+            }
+            // إذا تم تفعيل الإشعار ولم يتم عرضه مسبقاً
+            else if (updatedNotification.is_active && !processedNotifications.has(updatedNotification.id)) {
+              console.log('🔄 Adding new notification to display:', updatedNotification.id);
+              setVisibleNotifications(prev => [...prev, updatedNotification]);
+              setProcessedNotifications(prev => new Set([...prev, updatedNotification.id]));
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🔄 Notification channel status:', status);
+      });
+
+    channels.push(notificationChannel);
+
     // Secondary polling as fallback
     const pollInterval = setInterval(() => {
       console.log('🔄 Polling for updates (fallback)');
@@ -240,34 +284,40 @@ const ClientPublicPage = () => {
       channels.forEach(channel => supabase.removeChannel(channel));
       clearInterval(pollInterval);
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, processedNotifications]);
 
-  // Check for active notifications
+  // Check for active notifications (only on initial load)
   useEffect(() => {
     const checkNotifications = async () => {
       if (!account?.id || subscriptionExpired) return;
 
       try {
+        console.log('🔍 Checking for active notifications...');
         const notifications = await fetchActiveNotifications(account.id);
         
-        // Only add notifications that aren't already shown
+        // فقط عرض الإشعارات النشطة التي لم يتم عرضها مسبقاً
         const newNotifications = notifications.filter(
-          notification => !Array.from(shownNotifications).includes(notification.id)
+          notification => notification.is_active && !processedNotifications.has(notification.id)
         );
         
         if (newNotifications.length > 0) {
-          setActiveNotifications(prev => [...prev, ...newNotifications]);
+          console.log('✅ Found new active notifications:', newNotifications.length);
+          setVisibleNotifications(newNotifications);
+          
+          // إضافة معرفات الإشعارات الجديدة للمعالجة
+          const newProcessedIds = new Set([...processedNotifications, ...newNotifications.map(n => n.id)]);
+          setProcessedNotifications(newProcessedIds);
         }
       } catch (error) {
         console.error('❌ Error fetching notifications:', error);
       }
     };
 
-    checkNotifications();
-    const notificationInterval = setInterval(checkNotifications, 30000);
-
-    return () => clearInterval(notificationInterval);
-  }, [account?.id, fetchActiveNotifications, shownNotifications, subscriptionExpired]);
+    // فقط في التحميل الأولي
+    if (account?.id && !subscriptionExpired && processedNotifications.size === 0) {
+      checkNotifications();
+    }
+  }, [account?.id, subscriptionExpired]);
 
   // Check for active timers
   useEffect(() => {
@@ -301,7 +351,8 @@ const ClientPublicPage = () => {
   }, [websites.length, subscriptionExpired]);
 
   const handleNotificationClose = (notificationId: string) => {
-    setShownNotifications(prev => new Set([...prev, notificationId]));
+    console.log('🔄 User closed notification:', notificationId);
+    setVisibleNotifications(prev => prev.filter(n => n.id !== notificationId));
   };
 
   const handleTimerClose = (timerId: string) => {
@@ -391,7 +442,7 @@ const ClientPublicPage = () => {
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                مرحباً بك في {account.name}
+                مرحباً بك في {account?.name}
               </h2>
               <p className="text-gray-600">لا توجد مواقع نشطة حالياً</p>
               <p className="text-sm text-gray-400 mt-2">
@@ -402,7 +453,7 @@ const ClientPublicPage = () => {
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
-              key={`${currentWebsite.id}-${currentWebsite.is_active}`}
+              key={`${currentWebsite.id}-${currentWebsite.is_active}-${Date.now()}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
@@ -413,7 +464,7 @@ const ClientPublicPage = () => {
       </main>
 
       {/* Active Notifications */}
-      {activeNotifications.map((notification) => (
+      {visibleNotifications.map((notification) => (
         <NotificationPopup
           key={notification.id}
           notification={notification}
