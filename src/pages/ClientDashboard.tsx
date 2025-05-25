@@ -164,16 +164,30 @@ const ClientDashboard = () => {
     }
   };
 
-  const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean, retryCount = 0) => {
+  const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
     try {
-      console.log('🔄 Toggling website status:', { websiteId, currentStatus, retryCount });
+      console.log('🔄 Toggling website status:', { websiteId, currentStatus });
       
+      // التحديث المحلي الفوري لتحسين تجربة المستخدم
+      setWebsites(prev => prev.map(website => 
+        website.id === websiteId 
+          ? { ...website, is_active: !currentStatus }
+          : website
+      ));
+
       const { error } = await supabase
         .from('account_websites')
         .update({ is_active: !currentStatus })
         .eq('id', websiteId);
 
       if (error) {
+        // إعادة التحديث المحلي في حالة الخطأ
+        setWebsites(prev => prev.map(website => 
+          website.id === websiteId 
+            ? { ...website, is_active: currentStatus }
+            : website
+        ));
+        
         console.error('❌ Error updating website status:', error);
         throw error;
       }
@@ -181,17 +195,10 @@ const ClientDashboard = () => {
       console.log('✅ Website status updated successfully');
       toast({
         title: "تم تحديث حالة الموقع",
-        description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع`,
+        description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع بنجاح`,
       });
 
-      // Immediate local update for better UX
-      setWebsites(prev => prev.map(website => 
-        website.id === websiteId 
-          ? { ...website, is_active: !currentStatus }
-          : website
-      ));
-
-      // Fetch fresh data after a short delay to ensure consistency
+      // تحديث البيانات من الخادم بعد التأكد من نجاح العملية
       setTimeout(() => {
         fetchWebsites();
       }, 500);
@@ -199,21 +206,21 @@ const ClientDashboard = () => {
     } catch (error: any) {
       console.error('❌ Error in toggleWebsiteStatus:', error);
       
-      // Retry logic for network failures
-      if (retryCount < 2 && (error.message.includes('Failed to fetch') || error.message.includes('network'))) {
-        console.log(`🔄 Retrying... Attempt ${retryCount + 1}`);
-        setTimeout(() => {
-          toggleWebsiteStatus(websiteId, currentStatus, retryCount + 1);
-        }, 1000 * (retryCount + 1)); // Exponential backoff
-      } else {
-        toast({
-          title: "خطأ في تحديث الموقع",
-          description: error.message.includes('Failed to fetch') 
-            ? 'مشكلة في الاتصال - يرجى المحاولة مرة أخرى'
-            : error.message,
-          variant: "destructive",
-        });
+      let errorMessage = 'حدث خطأ غير متوقع';
+      
+      if (error.message?.includes('Failed to fetch')) {
+        errorMessage = 'مشكلة في الاتصال بالإنترنت - يرجى التحقق من الاتصال والمحاولة مرة أخرى';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = 'انتهت مهلة الاتصال - يرجى المحاولة مرة أخرى';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      toast({
+        title: "خطأ في تحديث حالة الموقع",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 
@@ -241,9 +248,18 @@ const ClientDashboard = () => {
       fetchWebsites();
     } catch (error: any) {
       console.error('❌ Error in deleteWebsite:', error);
+      
+      let errorMessage = 'حدث خطأ في حذف الموقع';
+      
+      if (error.message?.includes('Failed to fetch')) {
+        errorMessage = 'مشكلة في الاتصال بالإنترنت - يرجى التحقق من الاتصال والمحاولة مرة أخرى';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "خطأ في حذف الموقع",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
