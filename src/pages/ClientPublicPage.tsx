@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -179,7 +178,7 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes - FIXED VERSION
+  // Setup realtime listener for website changes - IMPROVED VERSION
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
@@ -205,28 +204,63 @@ const ClientPublicPage = () => {
           console.log('🔄 New record:', payload.new);
           console.log('🔄 Old record:', payload.old);
           
-          // Re-fetch and filter websites immediately
-          try {
-            const { data: allWebsites, error } = await supabase
-              .from('account_websites')
-              .select('*')
-              .eq('account_id', account.id)
-              .order('created_at', { ascending: true });
-
-            if (!error && allWebsites) {
-              const activeWebsites = allWebsites.filter(website => website.is_active);
-              console.log('🔄 Updated active websites:', activeWebsites);
-              setWebsites(activeWebsites);
+          // Handle real-time updates more precisely
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const updatedWebsite = payload.new as Website;
+            console.log('🔄 Processing website update:', updatedWebsite);
+            
+            setWebsites(prevWebsites => {
+              let updatedWebsites = [...prevWebsites];
               
-              // Reset index if no active websites
-              if (activeWebsites.length === 0) {
+              if (updatedWebsite.is_active) {
+                // If website is now active, add it if not already present
+                const existingIndex = updatedWebsites.findIndex(w => w.id === updatedWebsite.id);
+                if (existingIndex >= 0) {
+                  updatedWebsites[existingIndex] = updatedWebsite;
+                } else {
+                  updatedWebsites.push(updatedWebsite);
+                }
+                console.log('✅ Website activated/updated:', updatedWebsite.id);
+              } else {
+                // If website is now inactive, remove it
+                updatedWebsites = updatedWebsites.filter(w => w.id !== updatedWebsite.id);
+                console.log('❌ Website deactivated and removed:', updatedWebsite.id);
+              }
+              
+              console.log('🔄 Updated websites list:', updatedWebsites);
+              
+              // Reset index if current website was removed or if no websites left
+              if (updatedWebsites.length === 0) {
                 setCurrentWebsiteIndex(0);
-              } else if (currentWebsiteIndex >= activeWebsites.length) {
+              } else if (currentWebsiteIndex >= updatedWebsites.length) {
                 setCurrentWebsiteIndex(0);
               }
+              
+              return updatedWebsites;
+            });
+          } else {
+            // For INSERT/DELETE events, re-fetch all data to be safe
+            try {
+              const { data: allWebsites, error } = await supabase
+                .from('account_websites')
+                .select('*')
+                .eq('account_id', account.id)
+                .order('created_at', { ascending: true });
+
+              if (!error && allWebsites) {
+                const activeWebsites = allWebsites.filter(website => website.is_active);
+                console.log('🔄 Re-fetched active websites:', activeWebsites);
+                setWebsites(activeWebsites);
+                
+                if (activeWebsites.length === 0) {
+                  setCurrentWebsiteIndex(0);
+                } else if (currentWebsiteIndex >= activeWebsites.length) {
+                  setCurrentWebsiteIndex(0);
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error re-fetching websites after change:', error);
             }
-          } catch (error) {
-            console.error('❌ Error updating websites after change:', error);
           }
         }
       )
