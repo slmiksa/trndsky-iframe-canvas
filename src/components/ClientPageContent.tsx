@@ -38,16 +38,23 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     return () => clearInterval(interval);
   }, [websites.length, rotationInterval]);
 
-  // Reset current website index if needed
+  // Handle website list changes - reset index if current index is out of bounds
   useEffect(() => {
-    if (websites && websites.length > 0) {
-      setCurrentWebsiteIndex(prev => prev >= websites.length ? 0 : prev);
-    } else {
+    console.log('🔄 Websites list changed. Current count:', websites.length);
+    console.log('🔄 Current website index:', currentWebsiteIndex);
+    
+    if (websites.length === 0) {
+      console.log('🔄 No active websites, resetting index to 0');
+      setCurrentWebsiteIndex(0);
+    } else if (currentWebsiteIndex >= websites.length) {
+      console.log('🔄 Current index out of bounds, resetting to 0');
       setCurrentWebsiteIndex(0);
     }
-  }, [websites]);
+  }, [websites, currentWebsiteIndex]);
 
-  const currentWebsite = websites[currentWebsiteIndex];
+  const currentWebsite = websites.length > 0 ? websites[currentWebsiteIndex] : null;
+
+  console.log('🔄 Current website to display:', currentWebsite);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -67,13 +74,23 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
+              key={currentWebsite.id}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
             />
           </div>
-        ) : null}
+        ) : (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                جاري التحميل...
+              </h2>
+              <p className="text-gray-600">يتم تحديث المحتوى</p>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
