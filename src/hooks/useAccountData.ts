@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Account {
@@ -29,14 +29,15 @@ export const useAccountData = (accountId: string | undefined) => {
   const [error, setError] = useState<string | null>(null);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
 
   const isSubscriptionExpired = (account: Account) => {
     if (!account.activation_end_date) return false;
     return new Date(account.activation_end_date) < new Date();
   };
 
-  // Fetch websites function - جلب جميع المواقع النشطة
-  const fetchWebsites = async (accountData: Account) => {
+  // Stable fetch websites function with debouncing
+  const fetchWebsites = useCallback(async (accountData: Account) => {
     try {
       console.log('🔍 جلب المواقع للحساب:', accountData.id);
       
@@ -55,7 +56,7 @@ export const useAccountData = (accountId: string | undefined) => {
       console.log('✅ تم جلب المواقع بنجاح:', websiteData);
       console.log('📊 عدد المواقع النشطة:', (websiteData || []).length);
       
-      // تحديث حالة المواقع
+      // تحديث حالة المواقع بشكل مستقر
       const activeWebsites = websiteData || [];
       setWebsites(activeWebsites);
       
@@ -66,7 +67,7 @@ export const useAccountData = (accountId: string | undefined) => {
       setWebsites([]);
       throw error;
     }
-  };
+  }, []);
 
   // Initial data fetch
   useEffect(() => {
@@ -130,49 +131,10 @@ export const useAccountData = (accountId: string | undefined) => {
     };
 
     fetchAccountData();
-  }, [accountId]);
+  }, [accountId, fetchWebsites]);
 
-  // Realtime subscription للتحديثات الفورية
-  useEffect(() => {
-    if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ تخطي الاشتراك في التحديثات الفورية');
-      return;
-    }
-
-    console.log('🔄 إعداد الاشتراك في التحديثات الفورية للمواقع');
-    
-    const channelName = `website-updates-${account.id}`;
-    
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'account_websites',
-          filter: `account_id=eq.${account.id}`
-        },
-        async (payload) => {
-          console.log('🚀 تحديث موقع فوري:', payload);
-          
-          try {
-            await fetchWebsites(account);
-            console.log('✅ تم تحديث المواقع فورياً');
-          } catch (error) {
-            console.error('❌ خطأ في التحديث الفوري:', error);
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 حالة الاشتراك:', status);
-      });
-
-    return () => {
-      console.log('🔄 تنظيف الاشتراك في التحديثات الفورية');
-      supabase.removeChannel(channel);
-    };
-  }, [account?.id, subscriptionExpired]);
+  // Remove duplicate realtime subscription - will be handled by useRealtimeUpdates
+  // This prevents multiple listeners from causing rapid updates
 
   return {
     account,

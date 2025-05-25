@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Account {
@@ -29,6 +29,25 @@ export const useRealtimeUpdates = ({
   setAccount,
   fetchWebsites
 }: UseRealtimeUpdatesProps) => {
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced fetch function to prevent rapid successive calls
+  const debouncedFetchWebsites = (accountData: Account) => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    fetchTimeoutRef.current = setTimeout(async () => {
+      try {
+        console.log('🔄 تحديث المواقع المتأخر (debounced)');
+        await fetchWebsites(accountData);
+        console.log('✅ تم تحديث المواقع بنجاح');
+      } catch (error) {
+        console.error('❌ خطأ في التحديث المتأخر:', error);
+      }
+    }, 1000); // Wait 1 second before updating
+  };
+
   // Setup realtime listener for account changes
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
@@ -70,17 +89,17 @@ export const useRealtimeUpdates = ({
     };
   }, [account?.id, subscriptionExpired, setRotationInterval, setAccount]);
 
-  // Enhanced realtime listener for website changes
+  // Enhanced but stable realtime listener for website changes
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ تخطي إعداد التحديثات الفورية للمواقع');
       return;
     }
 
-    console.log('🌐 إعداد مستمع التحديثات الفورية للمواقع');
+    console.log('🌐 إعداد مستمع التحديثات الفورية الثابت للمواقع');
     console.log('🆔 معرف الحساب:', account.id);
     
-    const channelName = `website-realtime-${account.id}`;
+    const channelName = `website-stable-${account.id}`;
     
     const channel = supabase
       .channel(channelName)
@@ -93,36 +112,20 @@ export const useRealtimeUpdates = ({
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀 تحديث فوري للموقع:', payload);
+          console.log('🚀 تحديث فوري ثابت للموقع:', payload);
           console.log('📅 الوقت:', new Date().toISOString());
           console.log('🎯 نوع الحدث:', payload.eventType);
           
-          try {
-            console.log('🔄 إعادة جلب المواقع...');
-            await fetchWebsites(account);
-            console.log('✅ تم تحديث المواقع بنجاح');
-          } catch (error) {
-            console.error('❌ خطأ في تحديث المواقع:', error);
-            
-            // إعادة المحاولة مرة واحدة بعد تأخير قصير
-            setTimeout(async () => {
-              try {
-                console.log('🔄 إعادة المحاولة...');
-                await fetchWebsites(account);
-                console.log('✅ نجحت إعادة المحاولة');
-              } catch (retryError) {
-                console.error('❌ فشلت إعادة المحاولة:', retryError);
-              }
-            }, 1000);
-          }
+          // Use debounced fetch to prevent rapid updates
+          debouncedFetchWebsites(account);
         }
       )
       .subscribe((status) => {
-        console.log('📡 حالة اشتراك التحديثات للمواقع:', status);
+        console.log('📡 حالة اشتراك التحديثات الثابت للمواقع:', status);
         console.log('📺 اسم القناة:', channelName);
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ تم الاشتراك بنجاح في التحديثات الفورية للمواقع!');
+          console.log('✅ تم الاشتراك بنجاح في التحديثات الفورية الثابتة!');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ خطأ في الاشتراك');
         } else if (status === 'TIMED_OUT') {
@@ -131,9 +134,25 @@ export const useRealtimeUpdates = ({
       });
 
     return () => {
-      console.log('🧹 تنظيف مستمع التحديثات للمواقع');
+      console.log('🧹 تنظيف مستمع التحديثات الثابت للمواقع');
       console.log('📺 إزالة القناة:', channelName);
+      
+      // Clear any pending timeouts
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+      
       supabase.removeChannel(channel);
     };
   }, [account?.id, subscriptionExpired, fetchWebsites]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, []);
 };

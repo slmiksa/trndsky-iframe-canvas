@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface Account {
   id: string;
@@ -24,45 +24,71 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
   rotationInterval 
 }) => {
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastWebsitesLength = useRef(websites.length);
 
   console.log('🎯 ClientPageContent rendered with:');
   console.log('📊 عدد المواقع:', websites.length);
   console.log('🌐 المواقع:', websites.map(w => ({ id: w.id, url: w.website_url, title: w.website_title })));
   console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
 
-  // تبديل المواقع التلقائي
+  // Clear any existing interval when component unmounts or websites change
   useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        console.log('🧹 تنظيف مؤقت التبديل عند إلغاء التحميل');
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
+
+  // Reset index when websites list changes significantly
+  useEffect(() => {
+    if (websites.length !== lastWebsitesLength.current) {
+      console.log('🔄 تغيير في عدد المواقع من', lastWebsitesLength.current, 'إلى', websites.length);
+      lastWebsitesLength.current = websites.length;
+      
+      if (websites.length === 0) {
+        setCurrentWebsiteIndex(0);
+      } else if (currentWebsiteIndex >= websites.length) {
+        setCurrentWebsiteIndex(0);
+      }
+    }
+  }, [websites.length, currentWebsiteIndex]);
+
+  // Stable rotation timer
+  useEffect(() => {
+    // Clear any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     if (websites.length <= 1) {
       console.log('⏭️ عدد المواقع غير كافٍ للتبديل:', websites.length);
       return;
     }
 
-    console.log('🔄 بدء تبديل المواقع - عدد المواقع:', websites.length);
+    console.log('🔄 بدء تبديل المواقع الثابت - عدد المواقع:', websites.length);
+    console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
     
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setCurrentWebsiteIndex((prev) => {
         const newIndex = (prev + 1) % websites.length;
-        console.log('🔄 التبديل إلى الموقع رقم:', newIndex + 1, 'من', websites.length);
+        console.log('🔄 التبديل الثابت إلى الموقع رقم:', newIndex + 1, 'من', websites.length);
         return newIndex;
       });
     }, rotationInterval * 1000);
 
     return () => {
-      console.log('🧹 تنظيف مؤقت التبديل');
-      clearInterval(interval);
+      if (intervalRef.current) {
+        console.log('🧹 تنظيف مؤقت التبديل');
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [websites.length, rotationInterval]);
-
-  // إعادة تعيين الفهرس عند تغيير قائمة المواقع
-  useEffect(() => {
-    if (websites.length === 0) {
-      console.log('📭 لا توجد مواقع، إعادة تعيين الفهرس');
-      setCurrentWebsiteIndex(0);
-    } else if (currentWebsiteIndex >= websites.length) {
-      console.log('⚠️ الفهرس خارج النطاق، إعادة تعيين إلى 0');
-      setCurrentWebsiteIndex(0);
-    }
-  }, [websites.length, currentWebsiteIndex]);
 
   const currentWebsite = websites.length > 0 ? websites[currentWebsiteIndex] : null;
 
@@ -91,12 +117,12 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
-              key={`${currentWebsite.id}-${currentWebsiteIndex}-${Date.now()}`}
+              key={`stable-${currentWebsite.id}-${currentWebsiteIndex}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
-              onLoad={() => console.log('✅ تم تحميل الموقع:', currentWebsite.website_url)}
+              onLoad={() => console.log('✅ تم تحميل الموقع بشكل ثابت:', currentWebsite.website_url)}
               onError={() => console.error('❌ خطأ في تحميل الموقع:', currentWebsite.website_url)}
             />
           </div>
