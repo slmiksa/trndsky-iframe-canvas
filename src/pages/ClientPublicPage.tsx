@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,7 +78,7 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites - now fetches all websites and filters active ones in state
+  // Function to fetch websites with better error handling
   const fetchWebsites = async (accountData: Account) => {
     try {
       console.log('🔍 Fetching websites for account:', accountData.id);
@@ -90,22 +91,23 @@ const ClientPublicPage = () => {
 
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
+        throw websiteError;
+      }
+
+      console.log('✅ All websites data fetched:', websiteData);
+      
+      // Filter only active websites
+      const activeWebsites = (websiteData || []).filter(website => website.is_active);
+      console.log('✅ Active websites filtered:', activeWebsites);
+      
+      setWebsites(activeWebsites);
+      
+      // Reset current website index if needed
+      if (activeWebsites && activeWebsites.length > 0) {
+        setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
       } else {
-        console.log('✅ All websites data fetched:', websiteData);
-        
-        // Filter only active websites
-        const activeWebsites = (websiteData || []).filter(website => website.is_active);
-        console.log('✅ Active websites filtered:', activeWebsites);
-        
-        setWebsites(activeWebsites);
-        
-        // Reset current website index if needed
-        if (activeWebsites && activeWebsites.length > 0) {
-          setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
-        } else {
-          setCurrentWebsiteIndex(0);
-          console.log('⚠️ No active websites found');
-        }
+        setCurrentWebsiteIndex(0);
+        console.log('⚠️ No active websites found');
       }
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
@@ -175,21 +177,22 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Setup realtime listener for website changes - IMPROVED VERSION
+  // Enhanced realtime listener for immediate updates
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up realtime listener for websites');
+    console.log('🔄 Setting up enhanced realtime listener for websites');
     console.log('🔄 Account ID:', account.id);
     
-    // Create a unique channel name
-    const channelName = `account-websites-${account.id}`;
+    // Create multiple channels for better reliability
+    const channels = [];
     
-    const channel = supabase
-      .channel(channelName, {
+    // Primary channel for website updates
+    const websiteChannel = supabase
+      .channel(`websites-${account.id}-${Date.now()}`, {
         config: {
           broadcast: { self: true },
           presence: { key: account.id }
@@ -204,38 +207,42 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         (payload) => {
-          console.log('🔄 Website change detected:', payload);
+          console.log('🔄 Website realtime update detected:', payload);
           console.log('🔄 Event type:', payload.eventType);
           console.log('🔄 New record:', payload.new);
           console.log('🔄 Old record:', payload.old);
           console.log('🔄 Timestamp:', new Date().toISOString());
           
-          // Force re-fetch websites to get the latest data
-          console.log('🔄 Re-fetching websites due to change...');
-          fetchWebsites(account);
+          // Immediate update with a small delay to ensure data consistency
+          setTimeout(() => {
+            console.log('🔄 Fetching updated websites...');
+            fetchWebsites(account);
+          }, 100);
         }
       )
       .subscribe((status) => {
-        console.log('🔄 Realtime subscription status:', status);
-        console.log('🔄 Channel name:', channelName);
-        
+        console.log('🔄 Website channel status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to realtime updates!');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Error subscribing to realtime updates');
-        } else if (status === 'TIMED_OUT') {
-          console.error('⏰ Realtime subscription timed out');
+          console.log('✅ Successfully subscribed to website updates!');
         }
       });
 
+    channels.push(websiteChannel);
+
+    // Secondary polling as fallback
+    const pollInterval = setInterval(() => {
+      console.log('🔄 Polling for updates (fallback)');
+      fetchWebsites(account);
+    }, 5000); // Poll every 5 seconds as backup
+
     return () => {
-      console.log('🔄 Cleaning up realtime listener');
-      console.log('🔄 Removing channel:', channelName);
-      supabase.removeChannel(channel);
+      console.log('🔄 Cleaning up realtime listeners and polling');
+      channels.forEach(channel => supabase.removeChannel(channel));
+      clearInterval(pollInterval);
     };
   }, [account?.id, subscriptionExpired]);
 
-  // Check for active notifications - modify this to not auto-dismiss
+  // Check for active notifications
   useEffect(() => {
     const checkNotifications = async () => {
       if (!account?.id || subscriptionExpired) return;
@@ -257,7 +264,7 @@ const ClientPublicPage = () => {
     };
 
     checkNotifications();
-    const notificationInterval = setInterval(checkNotifications, 30000); // Check every 30 seconds
+    const notificationInterval = setInterval(checkNotifications, 30000);
 
     return () => clearInterval(notificationInterval);
   }, [account?.id, fetchActiveNotifications, shownNotifications, subscriptionExpired]);
@@ -277,26 +284,24 @@ const ClientPublicPage = () => {
     };
 
     checkTimers();
-    const timerInterval = setInterval(checkTimers, 10000); // Check every 10 seconds
+    const timerInterval = setInterval(checkTimers, 10000);
 
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Website rotation - now only if there are active websites
+  // Website rotation
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
-    }, 30000); // Switch every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
 
-  // Modified to only track that we've seen this notification, but don't remove it
   const handleNotificationClose = (notificationId: string) => {
     setShownNotifications(prev => new Set([...prev, notificationId]));
-    // We don't remove from activeNotifications anymore - they stay visible
   };
 
   const handleTimerClose = (timerId: string) => {
@@ -397,6 +402,7 @@ const ClientPublicPage = () => {
         ) : currentWebsite ? (
           <div className="h-screen">
             <iframe
+              key={`${currentWebsite.id}-${currentWebsite.is_active}`}
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
@@ -406,7 +412,7 @@ const ClientPublicPage = () => {
         ) : null}
       </main>
 
-      {/* Active Notifications - modify to show all active */}
+      {/* Active Notifications */}
       {activeNotifications.map((notification) => (
         <NotificationPopup
           key={notification.id}
