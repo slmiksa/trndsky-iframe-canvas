@@ -26,7 +26,7 @@ const App: React.FC = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/client/:accountId" element={<ClientPublicPage />} />
-            <Route path="/tv" element={<Navigate to="/client/demo" replace />} />
+            <Route path="/tv" element={<ClientPublicPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

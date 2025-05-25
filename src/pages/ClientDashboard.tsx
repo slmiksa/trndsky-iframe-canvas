@@ -6,15 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Settings, Image } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
-import GalleryManager from '@/components/GalleryManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import Footer from '@/components/Footer';
-import { Slider } from '@/components/ui/slider';
 
 interface Website {
   id: string;
@@ -28,7 +26,6 @@ interface AccountInfo {
   activation_start_date: string | null;
   activation_end_date: string | null;
   status: 'active' | 'suspended' | 'pending';
-  rotation_interval: number;
 }
 
 const ClientDashboard = () => {
@@ -43,8 +40,6 @@ const ClientDashboard = () => {
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [accountName, setAccountName] = useState<string>('');
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
-  const [rotationInterval, setRotationInterval] = useState<number>(30);
-  const [savingInterval, setSavingInterval] = useState(false);
 
   // Fetch account information including subscription details
   const fetchAccountInfo = async () => {
@@ -53,7 +48,7 @@ const ClientDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('accounts')
-        .select('name, activation_start_date, activation_end_date, status, rotation_interval')
+        .select('name, activation_start_date, activation_end_date, status')
         .eq('id', accountId)
         .single();
 
@@ -67,10 +62,8 @@ const ClientDashboard = () => {
       setAccountInfo({
         activation_start_date: data.activation_start_date,
         activation_end_date: data.activation_end_date,
-        status: data.status,
-        rotation_interval: data.rotation_interval || 30
+        status: data.status
       });
-      setRotationInterval(data.rotation_interval || 30);
     } catch (error) {
       console.error('❌ Error in fetchAccountInfo:', error);
     }
@@ -108,113 +101,9 @@ const ClientDashboard = () => {
     }
   };
 
-  // إعداد التحديثات الفورية للوحة التحكم
   useEffect(() => {
-    if (!accountId) return;
-
-    // جلب البيانات الأولية
     fetchWebsites();
     fetchAccountInfo();
-
-    console.log('🎯 إعداد التحديثات الفورية للوحة التحكم');
-
-    // إعداد مستمع التحديثات الفورية للمواقع
-    const websiteChannelName = `admin-websites-${accountId}`;
-    const websiteChannel = supabase
-      .channel(websiteChannelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // جميع الأحداث: INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'account_websites',
-          filter: `account_id=eq.${accountId}`
-        },
-        (payload) => {
-          console.log('🔄 تحديث فوري في لوحة التحكم:', payload);
-          
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const newWebsite = payload.new as Website;
-            console.log('➕ إضافة موقع جديد:', newWebsite);
-            setWebsites(prev => [newWebsite, ...prev]);
-            
-            toast({
-              title: "تم إضافة موقع جديد",
-              description: `تم إضافة ${newWebsite.website_title || newWebsite.website_url} بنجاح`,
-            });
-          } 
-          else if (payload.eventType === 'UPDATE' && payload.new) {
-            const updatedWebsite = payload.new as Website;
-            console.log('🔄 تحديث موقع:', updatedWebsite);
-            
-            setWebsites(prev => prev.map(website => 
-              website.id === updatedWebsite.id ? updatedWebsite : website
-            ));
-            
-            // تحديث الموقع المحدد إذا كان هو المعروض
-            setSelectedWebsite(prev => 
-              prev?.id === updatedWebsite.id ? updatedWebsite : prev
-            );
-            
-            const statusText = updatedWebsite.is_active ? 'تم تفعيل' : 'تم إيقاف';
-            toast({
-              title: "تم تحديث حالة الموقع",
-              description: `${statusText} ${updatedWebsite.website_title || updatedWebsite.website_url}`,
-            });
-          }
-          else if (payload.eventType === 'DELETE' && payload.old) {
-            const deletedWebsite = payload.old as Website;
-            console.log('🗑️ حذف موقع:', deletedWebsite);
-            
-            setWebsites(prev => prev.filter(website => website.id !== deletedWebsite.id));
-            
-            // إزالة التحديد إذا كان الموقع المحذوف هو المعروض
-            setSelectedWebsite(prev => 
-              prev?.id === deletedWebsite.id ? null : prev
-            );
-            
-            toast({
-              title: "تم حذف الموقع",
-              description: `تم حذف ${deletedWebsite.website_title || deletedWebsite.website_url}`,
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 حالة اشتراك التحديثات الفورية للوحة التحكم:', status);
-      });
-
-    // إعداد مستمع لتحديثات فترة التبديل
-    const accountChannelName = `admin-account-${accountId}`;
-    const accountChannel = supabase
-      .channel(accountChannelName)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'accounts',
-          filter: `id=eq.${accountId}`
-        },
-        (payload) => {
-          console.log('🔄 تحديث بيانات الحساب في لوحة التحكم:', payload.new);
-          
-          const newData = payload.new as any;
-          if (newData?.rotation_interval !== undefined) {
-            console.log('⏱️ تحديث فترة التبديل:', newData.rotation_interval);
-            setRotationInterval(newData.rotation_interval);
-            setAccountInfo(prev => prev ? { ...prev, rotation_interval: newData.rotation_interval } : null);
-          }
-        }
-      )
-      .subscribe();
-
-    // تنظيف المستمعات عند الإلغاء
-    return () => {
-      console.log('🧹 تنظيف مستمعات التحديثات الفورية للوحة التحكم');
-      supabase.removeChannel(websiteChannel);
-      supabase.removeChannel(accountChannel);
-    };
   }, [accountId]);
 
   const addWebsite = async (e: React.FormEvent) => {
@@ -248,11 +137,14 @@ const ClientDashboard = () => {
       }
 
       console.log('✅ Website added successfully');
-      
+      toast({
+        title: "تم إضافة الموقع بنجاح",
+        description: `تم إضافة ${newWebsite.title || newWebsite.url}`,
+      });
+
       setNewWebsite({ url: '', title: '' });
       setShowAddForm(false);
-      
-      // لا حاجة لجلب البيانات يدوياً - ستأتي عبر realtime
+      fetchWebsites();
     } catch (error: any) {
       console.error('❌ Error in addWebsite:', error);
       toast({
@@ -268,7 +160,7 @@ const ClientDashboard = () => {
   const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
     try {
       console.log('🔄 Toggling website status:', { websiteId, currentStatus });
-
+      
       const { error } = await supabase
         .from('account_websites')
         .update({ is_active: !currentStatus })
@@ -280,25 +172,17 @@ const ClientDashboard = () => {
       }
 
       console.log('✅ Website status updated successfully');
-      
-      // لا حاجة لتحديث البيانات يدوياً - ستأتي عبر realtime
+      toast({
+        title: "تم تحديث حالة الموقع",
+        description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع`,
+      });
 
+      fetchWebsites();
     } catch (error: any) {
       console.error('❌ Error in toggleWebsiteStatus:', error);
-      
-      let errorMessage = 'حدث خطأ غير متوقع';
-      
-      if (error.message?.includes('Failed to fetch')) {
-        errorMessage = 'مشكلة في الاتصال بالإنترنت - يرجى التحقق من الاتصال والمحاولة مرة أخرى';
-      } else if (error.message?.includes('timeout')) {
-        errorMessage = 'انتهت مهلة الاتصال - يرجى المحاولة مرة أخرى';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
       toast({
-        title: "خطأ في تحديث حالة الموقع",
-        description: errorMessage,
+        title: "خطأ في تحديث الموقع",
+        description: error.message,
         variant: "destructive",
       });
     }
@@ -319,69 +203,20 @@ const ClientDashboard = () => {
       }
 
       console.log('✅ Website deleted successfully');
-      
-      // لا حاجة لتحديث البيانات يدوياً - ستأتي عبر realtime
+      toast({
+        title: "تم حذف الموقع",
+        description: "تم حذف الموقع بنجاح",
+      });
 
+      setSelectedWebsite(null);
+      fetchWebsites();
     } catch (error: any) {
       console.error('❌ Error in deleteWebsite:', error);
-      
-      let errorMessage = 'حدث خطأ في حذف الموقع';
-      
-      if (error.message?.includes('Failed to fetch')) {
-        errorMessage = 'مشكلة في الاتصال بالإنترنت - يرجى التحقق من الاتصال والمحاولة مرة أخرى';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
       toast({
         title: "خطأ في حذف الموقع",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const updateRotationInterval = async () => {
-    if (!accountId) return;
-    
-    setSavingInterval(true);
-    
-    try {
-      console.log('🔄 Updating rotation interval:', rotationInterval);
-      
-      const { error } = await supabase
-        .from('accounts')
-        .update({ rotation_interval: rotationInterval })
-        .eq('id', accountId);
-
-      if (error) {
-        console.error('❌ Error updating rotation interval:', error);
-        throw error;
-      }
-
-      console.log('✅ Rotation interval updated successfully');
-      toast({
-        title: "تم تحديث فترة تبديل المواقع",
-        description: `تم تحديث فترة التبديل إلى ${rotationInterval} ثانية`,
-      });
-      
-      // Update local state to reflect the change
-      setAccountInfo(prev => prev ? { ...prev, rotation_interval: rotationInterval } : null);
-      
-    } catch (error: any) {
-      console.error('❌ Error in updateRotationInterval:', error);
-      toast({
-        title: "خطأ في تحديث فترة التبديل",
         description: error.message,
         variant: "destructive",
       });
-      
-      // Reset to previous value on error
-      if (accountInfo) {
-        setRotationInterval(accountInfo.rotation_interval);
-      }
-    } finally {
-      setSavingInterval(false);
     }
   };
 
@@ -401,12 +236,6 @@ const ClientDashboard = () => {
       const publicUrl = `/client/${accountName}`;
       window.open(publicUrl, '_blank');
     }
-  };
-
-  // Format time helper
-  const formatTime = (seconds: number) => {
-    if (seconds < 60) return `${seconds} ثانية`;
-    return `${Math.floor(seconds / 60)} دقيقة${seconds % 60 > 0 ? ` و ${seconds % 60} ثانية` : ''}`;
   };
 
   return (
@@ -454,14 +283,10 @@ const ClientDashboard = () => {
         )}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="websites" className="flex items-center gap-2">
               <Globe className="h-4 w-4" />
               المواقع
-            </TabsTrigger>
-            <TabsTrigger value="gallery" className="flex items-center gap-2">
-              <Image className="h-4 w-4" />
-              معرض الصور
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
@@ -470,10 +295,6 @@ const ClientDashboard = () => {
             <TabsTrigger value="timers" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               مؤقتات البريك
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              الإعدادات
             </TabsTrigger>
           </TabsList>
 
@@ -639,67 +460,12 @@ const ClientDashboard = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="gallery">
-            {accountId && <GalleryManager accountId={accountId} />}
-          </TabsContent>
-
           <TabsContent value="notifications">
             {accountId && <NotificationManager accountId={accountId} />}
           </TabsContent>
 
           <TabsContent value="timers">
             {accountId && <BreakTimerManager accountId={accountId} />}
-          </TabsContent>
-          
-          <TabsContent value="settings">
-            <div className="grid grid-cols-1 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>إعدادات عرض المواقع</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-4">فترة تبديل المواقع</h3>
-                    
-                    <div className="space-y-6">
-                      <div>
-                        <Label className="text-gray-700 mb-2">فترة التبديل: {formatTime(rotationInterval)}</Label>
-                        <div className="flex gap-4 items-center">
-                          <span className="text-sm text-gray-500">10 ثانية</span>
-                          <Slider 
-                            value={[rotationInterval]} 
-                            min={10} 
-                            max={300} 
-                            step={5} 
-                            className="flex-grow" 
-                            onValueChange={(values) => setRotationInterval(values[0])}
-                          />
-                          <span className="text-sm text-gray-500">5 دقائق</span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                          حدد فترة التبديل بين المواقع (من 10 ثواني إلى 5 دقائق)
-                        </p>
-                      </div>
-                      
-                      <Button 
-                        onClick={updateRotationInterval} 
-                        disabled={loading || savingInterval || (accountInfo?.rotation_interval === rotationInterval)}
-                      >
-                        {savingInterval ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            جاري الحفظ...
-                          </>
-                        ) : 'حفظ فترة التبديل'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </main>

@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { X } from 'lucide-react';
 
 interface Notification {
   id: string;
@@ -24,7 +23,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
     // Trigger animation after mount
     setTimeout(() => setIsVisible(true), 100);
 
-    // Auto close after display duration only if duration is set and greater than 0
+    // Auto close after display duration only if duration is set
     if (notification.display_duration > 0) {
       const timer = setTimeout(() => {
         handleClose();
@@ -85,23 +84,12 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
       }`}
     >
       <Card 
-        className={`${getSizeClasses()} rounded-2xl overflow-hidden relative`}
+        className={`${getSizeClasses()} rounded-2xl overflow-hidden`}
         style={getCardStyles()}
       >
         <CardContent className={`relative ${notification.position === 'center' ? 'p-12' : 'p-4'}`}>
-          {/* زر الإغلاق */}
-          <button
-            onClick={handleClose}
-            className={`absolute ${notification.position === 'center' ? 'top-6 right-6' : 'top-2 right-2'} 
-                      bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition-colors duration-200 
-                      z-10 shadow-sm`}
-            aria-label="إغلاق الإشعار"
-          >
-            <X className={`${notification.position === 'center' ? 'h-6 w-6' : 'h-4 w-4'} text-gray-600`} />
-          </button>
-
           {/* العنوان */}
-          <div className={notification.position === 'center' ? 'mb-8 pr-12' : 'mb-4 pr-8'}>
+          <div className={notification.position === 'center' ? 'mb-8' : 'mb-4'}>
             <h3 className={`font-bold text-gray-900 ${
               notification.position === 'center' ? 'text-4xl text-center' : 'text-lg'
             }`}>
