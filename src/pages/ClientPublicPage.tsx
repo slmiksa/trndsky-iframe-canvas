@@ -57,9 +57,24 @@ const ClientPublicPage = () => {
   const [iframeError, setIframeError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [lastWebsiteUpdate, setLastWebsiteUpdate] = useState(Date.now());
+  const [isMobile, setIsMobile] = useState(false);
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                     window.innerWidth <= 768;
+      setIsMobile(mobile);
+      console.log('📱 Device detection:', mobile ? 'Mobile' : 'Desktop');
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Function to check if subscription is expired
   const isSubscriptionExpired = (account: Account) => {
@@ -91,13 +106,13 @@ const ClientPublicPage = () => {
     }
   };
 
-  // ENHANCED function to fetch websites with GUARANTEED instant updates
+  // Enhanced function to fetch websites with mobile-optimized refresh
   const fetchWebsites = async (accountData?: Account) => {
     const targetAccount = accountData || account;
     if (!targetAccount?.id) return;
 
     try {
-      console.log('🚀 [WEBSITES FETCH] IMMEDIATE fetch for account:', targetAccount.id, 'at', new Date().toISOString());
+      console.log('🚀 [WEBSITES FETCH] Fetching for account:', targetAccount.id, 'Device:', isMobile ? 'Mobile' : 'Desktop');
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -124,9 +139,8 @@ const ClientPublicPage = () => {
       });
       
       console.log('✅ [WEBSITES FETCH] ACTIVE websites found:', activeWebsites.length);
-      console.log('📋 [WEBSITES FETCH] Active websites list:', activeWebsites.map(w => ({ url: w.website_url, active: w.is_active })));
       
-      // FORCE update state even if same data to trigger re-render
+      // Force update state to trigger re-render
       setWebsites(activeWebsites);
       setCurrentWebsiteIndex(0);
       setIframeLoading(activeWebsites.length > 0);
@@ -134,14 +148,14 @@ const ClientPublicPage = () => {
       setRefreshKey(prev => prev + 1);
       setLastWebsiteUpdate(Date.now());
       
-      console.log('🔄 [WEBSITES FETCH] State FORCED update completed with', activeWebsites.length, 'active websites');
+      console.log('🔄 [WEBSITES FETCH] State updated with', activeWebsites.length, 'active websites');
     } catch (error) {
       console.error('❌ [WEBSITES FETCH] Exception:', error);
       setWebsites([]);
     }
   };
 
-  // Force refresh function for manual testing
+  // Force refresh function
   const forceRefresh = async () => {
     if (account) {
       console.log('🔄 [MANUAL REFRESH] Triggered by user');
@@ -212,94 +226,101 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // SUPER ENHANCED realtime listener for INSTANT website updates with MULTIPLE fallback mechanisms
+  // Mobile-optimized realtime listener for websites
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('🚀 [REALTIME SETUP] Starting SUPER ENHANCED website listener for account:', account.id);
+    console.log('🚀 [REALTIME SETUP] Starting mobile-optimized website listener for account:', account.id);
     
-    // Create UNIQUE channel name with timestamp for fresh connection
-    const channelName = `websites_INSTANT_${account.id}_${Date.now()}`;
+    // Create channel with mobile-friendly settings
+    const channelName = `mobile_websites_${account.id}_${Date.now()}`;
     
     const websiteChannel = supabase
-      .channel(channelName)
+      .channel(channelName, {
+        config: {
+          broadcast: { self: true },
+          presence: { key: 'mobile_client' }
+        }
+      })
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to ALL events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀🚀🚀 [REALTIME] INSTANT website change detected!', {
+          console.log('🚀📱 [MOBILE REALTIME] Website change detected!', {
             event: payload.eventType,
             timestamp: new Date().toISOString(),
-            newData: payload.new,
-            oldData: payload.old
+            isMobile
           });
           
-          // IMMEDIATE response with NO delay
-          try {
-            await fetchWebsites();
-            console.log('✅✅✅ [REALTIME] Websites refreshed INSTANTLY after change');
-          } catch (error) {
-            console.error('❌ [REALTIME] Error in instant refresh:', error);
-          }
-          
-          // Additional backup refresh after short delay for safety
-          setTimeout(async () => {
-            try {
-              await fetchWebsites();
-              console.log('🔄 [REALTIME] Backup refresh completed');
-            } catch (error) {
-              console.error('❌ [REALTIME] Error in backup refresh:', error);
-            }
-          }, 500);
+          // Immediate response
+          await fetchWebsites();
         }
       )
       .subscribe((status) => {
-        console.log('📡 [REALTIME] Website channel status:', status, 'for channel:', channelName);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅✅✅ [REALTIME] Successfully connected to INSTANT website updates');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ [REALTIME] Channel error, attempting reconnection');
-        }
+        console.log('📡📱 [MOBILE REALTIME] Channel status:', status);
       });
 
-    // AGGRESSIVE backup refresh - every 10 seconds for maximum reliability
-    const aggressiveRefresh = setInterval(() => {
-      console.log('🔄 [BACKUP AGGRESSIVE] Running 10-second backup refresh');
+    // Mobile-specific refresh intervals
+    const mobileRefreshInterval = isMobile ? 5000 : 15000; // 5s for mobile, 15s for desktop
+    const refreshInterval = setInterval(() => {
+      console.log('🔄📱 [MOBILE REFRESH] Periodic refresh, interval:', mobileRefreshInterval);
       fetchWebsites();
-    }, 10000);
+    }, mobileRefreshInterval);
 
-    // ADDITIONAL visibility change listener for maximum reliability
+    // Mobile-specific event listeners
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('👁️ [VISIBILITY] Page visible again, forcing refresh');
+        console.log('👁️📱 [MOBILE VISIBILITY] Page visible again, forcing refresh');
+        setTimeout(() => fetchWebsites(), 500); // Small delay for mobile
+      }
+    };
+
+    const handleFocus = () => {
+      console.log('🎯📱 [MOBILE FOCUS] Window focused, forcing refresh');
+      setTimeout(() => fetchWebsites(), 300);
+    };
+
+    const handlePageShow = () => {
+      console.log('📄📱 [MOBILE PAGESHOW] Page shown, forcing refresh');
+      setTimeout(() => fetchWebsites(), 500);
+    };
+
+    // Mobile-specific: touchstart to refresh
+    const handleTouchStart = () => {
+      if (isMobile) {
+        console.log('👆📱 [MOBILE TOUCH] Touch detected, checking for updates');
         fetchWebsites();
       }
     };
 
-    // ADDITIONAL focus listener for extra reliability
-    const handleFocus = () => {
-      console.log('🎯 [FOCUS] Window focused, forcing refresh');
-      fetchWebsites();
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
+    
+    if (isMobile) {
+      document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    }
 
     return () => {
-      console.log('🧹 [CLEANUP] Removing all website listeners');
+      console.log('🧹📱 [MOBILE CLEANUP] Removing all listeners');
       supabase.removeChannel(websiteChannel);
-      clearInterval(aggressiveRefresh);
+      clearInterval(refreshInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
+      
+      if (isMobile) {
+        document.removeEventListener('touchstart', handleTouchStart);
+      }
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, isMobile]);
 
   // Enhanced realtime listener for notifications
   useEffect(() => {
@@ -549,7 +570,7 @@ const ClientPublicPage = () => {
         </div>
       )}
 
-      {/* Enhanced manual refresh button for testing with more info */}
+      {/* Enhanced manual refresh button for testing with mobile info */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute top-4 right-4 z-50 space-y-2">
           <button
@@ -559,6 +580,7 @@ const ClientPublicPage = () => {
             تحديث فوري
           </button>
           <div className="bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+            <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
             <div>المواقع النشطة: {websites.length}</div>
             <div>آخر تحديث: {new Date(lastWebsiteUpdate).toLocaleTimeString()}</div>
           </div>
@@ -574,7 +596,7 @@ const ClientPublicPage = () => {
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
-              🚀 متصل مع نظام التحديث الفوري - سيتم التحديث تلقائياً فوراً
+              📱 محسّن للجوال - سيتم التحديث تلقائياً
             </p>
             <p className="text-xs text-gray-500 mt-1">
               آخر تحديث: {new Date(lastWebsiteUpdate).toLocaleTimeString('ar-SA')}
@@ -624,16 +646,17 @@ const ClientPublicPage = () => {
         />
       ))}
 
-      {/* Enhanced debug info in development */}
+      {/* Enhanced debug info in development with mobile info */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
+          <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
           <div>✅ المواقع النشطة: {websites.length}</div>
           <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
           <div>🔄 Refresh Key: {refreshKey}</div>
           <div>⏰ Last Update: {new Date(lastWebsiteUpdate).toLocaleTimeString()}</div>
-          <div>🚀 Realtime: نشط</div>
+          <div>🚀 Realtime: نشط {isMobile ? '(موبايل)' : '(ديسكتوب)'}</div>
         </div>
       )}
     </div>
