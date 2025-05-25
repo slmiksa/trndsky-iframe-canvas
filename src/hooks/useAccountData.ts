@@ -47,16 +47,19 @@ export const useAccountData = (accountId: string | undefined) => {
 
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
+        setWebsites([]);
       } else {
         console.log('✅ All websites data fetched:', websiteData);
         
         const activeWebsites = (websiteData || []).filter(website => website.is_active);
         console.log('✅ Active websites filtered:', activeWebsites);
         
+        // Update websites immediately
         setWebsites(activeWebsites);
       }
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
+      setWebsites([]);
     }
   };
 

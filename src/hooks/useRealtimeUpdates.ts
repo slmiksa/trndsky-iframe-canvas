@@ -104,11 +104,9 @@ export const useRealtimeUpdates = ({
           console.log('🔄 Old record:', payload.old);
           console.log('🔄 Timestamp:', new Date().toISOString());
           
-          // Add a small delay to ensure database consistency
-          setTimeout(async () => {
-            console.log('🔄 Re-fetching websites due to change...');
-            await fetchWebsites(account);
-          }, 100);
+          // Immediate refresh without delay for better responsiveness
+          console.log('🔄 Immediately re-fetching websites due to change...');
+          await fetchWebsites(account);
         }
       )
       .subscribe((status) => {
