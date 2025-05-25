@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -77,10 +78,10 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites with better error handling
+  // Function to fetch websites
   const fetchWebsites = async (accountData: Account) => {
     try {
-      console.log(`🔍 Fetching websites for account: ${accountData.id}`);
+      console.log(`🔍 [WEBSITES] Fetching websites for account: ${accountData.id}`);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -89,16 +90,16 @@ const ClientPublicPage = () => {
         .order('created_at', { ascending: true });
 
       if (websiteError) {
-        console.error('❌ Error fetching websites:', websiteError);
+        console.error('❌ [WEBSITES] Error fetching websites:', websiteError);
         setWebsites([]);
         return;
       }
 
-      console.log('✅ Raw websites data:', websiteData);
+      console.log('✅ [WEBSITES] Raw data fetched:', websiteData);
       
       // Filter only active websites
       const activeWebsites = (websiteData || []).filter(website => website.is_active === true);
-      console.log('✅ Active websites after filtering:', activeWebsites);
+      console.log('✅ [WEBSITES] Active websites after filtering:', activeWebsites);
       
       setWebsites(activeWebsites);
       
@@ -107,10 +108,10 @@ const ClientPublicPage = () => {
         setCurrentWebsiteIndex(prev => prev >= activeWebsites.length ? 0 : prev);
       } else {
         setCurrentWebsiteIndex(0);
-        console.log('⚠️ No active websites found');
+        console.log('⚠️ [WEBSITES] No active websites found');
       }
     } catch (error) {
-      console.error('❌ Error in fetchWebsites:', error);
+      console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
       setWebsites([]);
     }
   };
@@ -178,17 +179,17 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener for websites with immediate updates
+  // Realtime listener for websites - Enhanced with proper state management
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
-      console.log('⏭️ Skipping realtime setup - no account or subscription expired');
+      console.log('⏭️ [REALTIME] Skipping realtime setup - no account or subscription expired');
       return;
     }
 
-    console.log('🔄 Setting up enhanced realtime listener for account:', account.id);
+    console.log('🔄 [REALTIME] Setting up website changes listener for account:', account.id);
     
-    const channel = supabase
-      .channel(`websites-changes-${account.id}`)
+    const websiteChannel = supabase
+      .channel(`websites-realtime-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -197,55 +198,80 @@ const ClientPublicPage = () => {
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
-        async (payload) => {
-          console.log('🔥 REALTIME: Website change detected!', payload);
-          console.log('🔥 Event type:', payload.eventType);
-          console.log('🔥 New data:', payload.new);
-          console.log('🔥 Old data:', payload.old);
+        (payload) => {
+          console.log('🔥 [REALTIME] Website change detected!', {
+            event: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          });
           
-          // Handle different types of changes
           if (payload.eventType === 'UPDATE') {
             const updatedWebsite = payload.new as Website;
-            console.log('🔄 Website updated:', updatedWebsite);
+            console.log('🔄 [REALTIME] Processing UPDATE for website:', updatedWebsite.id, 'active:', updatedWebsite.is_active);
             
             setWebsites(prevWebsites => {
-              const updatedWebsites = prevWebsites.map(website => 
-                website.id === updatedWebsite.id ? updatedWebsite : website
-              );
+              console.log('📊 [REALTIME] Current websites before update:', prevWebsites.map(w => ({ id: w.id, active: w.is_active })));
+              
+              let updatedWebsites;
+              
+              // Check if website exists in current list
+              const existingIndex = prevWebsites.findIndex(w => w.id === updatedWebsite.id);
+              
+              if (existingIndex >= 0) {
+                // Website exists - update it
+                updatedWebsites = prevWebsites.map(website => 
+                  website.id === updatedWebsite.id ? updatedWebsite : website
+                );
+              } else {
+                // Website doesn't exist - add it if active
+                updatedWebsites = updatedWebsite.is_active 
+                  ? [...prevWebsites, updatedWebsite]
+                  : prevWebsites;
+              }
               
               // Filter only active websites
               const activeWebsites = updatedWebsites.filter(website => website.is_active === true);
-              console.log('✅ Updated active websites:', activeWebsites);
+              console.log('✅ [REALTIME] Final active websites after UPDATE:', activeWebsites.map(w => ({ id: w.id, url: w.website_url })));
+              
               return activeWebsites;
             });
+            
           } else if (payload.eventType === 'INSERT') {
             const newWebsite = payload.new as Website;
+            console.log('➕ [REALTIME] Processing INSERT for website:', newWebsite.id, 'active:', newWebsite.is_active);
+            
             if (newWebsite.is_active) {
-              setWebsites(prevWebsites => [...prevWebsites, newWebsite]);
+              setWebsites(prevWebsites => {
+                const updatedWebsites = [...prevWebsites, newWebsite];
+                console.log('✅ [REALTIME] Added new website to list:', updatedWebsites.map(w => ({ id: w.id, url: w.website_url })));
+                return updatedWebsites;
+              });
             }
+            
           } else if (payload.eventType === 'DELETE') {
             const deletedWebsite = payload.old as Website;
-            setWebsites(prevWebsites => 
-              prevWebsites.filter(website => website.id !== deletedWebsite.id)
-            );
+            console.log('🗑️ [REALTIME] Processing DELETE for website:', deletedWebsite.id);
+            
+            setWebsites(prevWebsites => {
+              const filteredWebsites = prevWebsites.filter(website => website.id !== deletedWebsite.id);
+              console.log('✅ [REALTIME] Removed website from list:', filteredWebsites.map(w => ({ id: w.id, url: w.website_url })));
+              return filteredWebsites;
+            });
           }
         }
       )
       .subscribe((status) => {
-        console.log('🔄 REALTIME: Channel status:', status);
+        console.log('🔄 [REALTIME] Website channel status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ REALTIME: Successfully subscribed to website changes');
+          console.log('✅ [REALTIME] Successfully subscribed to website changes');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ REALTIME: Channel error, attempting to reconnect...');
-          setTimeout(() => {
-            fetchWebsites(account);
-          }, 1000);
+          console.error('❌ [REALTIME] Website channel error');
         }
       });
 
     return () => {
-      console.log('🧹 REALTIME: Cleaning up website listener');
-      supabase.removeChannel(channel);
+      console.log('🧹 [REALTIME] Cleaning up website listener');
+      supabase.removeChannel(websiteChannel);
     };
   }, [account?.id, subscriptionExpired]);
 
