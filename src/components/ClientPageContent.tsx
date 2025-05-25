@@ -25,24 +25,27 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
 }) => {
   const [currentWebsiteIndex, setCurrentWebsiteIndex] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastWebsitesUpdate = useRef<number>(Date.now());
-  const stableWebsites = useRef<Website[]>(websites);
+  const mountedRef = useRef<boolean>(true);
+  const stableWebsites = useRef<Website[]>([]);
   const currentWebsiteRef = useRef<Website | null>(null);
+  const lastRotationTime = useRef<number>(0);
 
-  console.log('🎯 ClientPageContent مع استقرار محسن:');
+  console.log('🎯 ClientPageContent محسن ومستقر:');
   console.log('📊 عدد المواقع:', websites.length);
   console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
 
-  // Update stable websites only when actually needed
+  // Enhanced website stability management
   useEffect(() => {
+    if (!mountedRef.current) return;
+
+    // Create a stable copy only when websites actually change
     const websitesChanged = JSON.stringify(websites) !== JSON.stringify(stableWebsites.current);
     
     if (websitesChanged) {
-      console.log('🔄 تحديث المواقع المستقرة');
+      console.log('🔄 تحديث المواقع المستقرة - تغيير حقيقي');
       stableWebsites.current = [...websites];
-      lastWebsitesUpdate.current = Date.now();
       
-      // Reset index if needed
+      // Reset index if current is out of bounds
       if (currentWebsiteIndex >= websites.length && websites.length > 0) {
         console.log('🔄 إعادة تعيين الفهرس إلى 0');
         setCurrentWebsiteIndex(0);
@@ -52,7 +55,10 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
 
   // Enhanced cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
+    
     return () => {
+      mountedRef.current = false;
       if (intervalRef.current) {
         console.log('🧹 تنظيف مؤقت التبديل عند إلغاء التحميل');
         clearInterval(intervalRef.current);
@@ -61,8 +67,10 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     };
   }, []);
 
-  // Stable rotation timer
+  // Enhanced stable rotation with better timing control
   useEffect(() => {
+    if (!mountedRef.current) return;
+
     // Clear any existing interval
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -76,19 +84,38 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
       return;
     }
 
-    console.log('🔄 بدء التبديل المستقر - عدد المواقع:', activeWebsites.length);
-    console.log('⏱️ فترة التبديل:', rotationInterval, 'ثانية');
+    console.log('🔄 بدء التبديل المحسن:', {
+      websitesCount: activeWebsites.length,
+      interval: rotationInterval
+    });
     
-    // Set minimum interval for stability
-    const actualInterval = Math.max(rotationInterval * 1000, 5000);
+    // Enhanced interval with minimum safety threshold
+    const safeInterval = Math.max(rotationInterval * 1000, 5000);
     
     intervalRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      
+      const now = Date.now();
+      
+      // Additional safety check to prevent too rapid rotation
+      if (now - lastRotationTime.current < 4000) {
+        console.log('⏭️ منع التبديل السريع');
+        return;
+      }
+      
       setCurrentWebsiteIndex((prev) => {
         const newIndex = (prev + 1) % activeWebsites.length;
-        console.log('🔄 التبديل المستقر إلى الموقع رقم:', newIndex + 1, 'من', activeWebsites.length);
+        lastRotationTime.current = now;
+        
+        console.log('🔄 التبديل المحسن إلى الموقع:', {
+          newIndex: newIndex + 1,
+          total: activeWebsites.length,
+          websiteId: activeWebsites[newIndex]?.id
+        });
+        
         return newIndex;
       });
-    }, actualInterval);
+    }, safeInterval);
 
     return () => {
       if (intervalRef.current) {
@@ -99,19 +126,32 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
     };
   }, [rotationInterval, stableWebsites.current.length]);
 
-  // Get current website from stable reference
+  // Enhanced current website management
   const currentWebsite = stableWebsites.current.length > 0 ? stableWebsites.current[currentWebsiteIndex] : null;
   
-  // Only update ref if website actually changed
+  // Only update ref when website actually changes
   if (currentWebsite && currentWebsite.id !== currentWebsiteRef.current?.id) {
     currentWebsiteRef.current = currentWebsite;
-    console.log('🎯 الموقع الجديد المختار:', {
+    console.log('🎯 الموقع الجديد محدد:', {
       index: currentWebsiteIndex,
       id: currentWebsite.id,
       url: currentWebsite.website_url,
       title: currentWebsite.website_title
     });
   }
+
+  // Enhanced error handling for iframe
+  const handleIframeLoad = useCallback(() => {
+    if (currentWebsiteRef.current) {
+      console.log('✅ تم تحميل الموقع بنجاح:', currentWebsiteRef.current.website_url);
+    }
+  }, []);
+
+  const handleIframeError = useCallback(() => {
+    if (currentWebsiteRef.current) {
+      console.error('❌ خطأ في تحميل الموقع:', currentWebsiteRef.current.website_url);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -131,22 +171,23 @@ const ClientPageContent: React.FC<ClientPageContentProps> = ({
         ) : currentWebsiteRef.current ? (
           <div className="h-screen">
             <iframe
-              key={`stable-${currentWebsiteRef.current.id}`}
+              key={`enhanced-${currentWebsiteRef.current.id}-${Date.now()}`}
               src={currentWebsiteRef.current.website_url}
               title={currentWebsiteRef.current.website_title || currentWebsiteRef.current.website_url}
               className="w-full h-full border-0"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
-              onLoad={() => {
-                console.log('✅ تم تحميل الموقع بشكل مستقر:', currentWebsiteRef.current?.website_url);
-              }}
-              onError={() => {
-                console.error('❌ خطأ في تحميل الموقع:', currentWebsiteRef.current?.website_url);
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-top-navigation"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+              style={{
+                backgroundColor: '#f5f5f5',
+                transition: 'opacity 0.3s ease-in-out'
               }}
             />
           </div>
         ) : (
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
                 جاري التحميل...
               </h2>

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Account {
@@ -29,36 +29,54 @@ export const useAccountData = (accountId: string | undefined) => {
   const [error, setError] = useState<string | null>(null);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
-  const [websitesHash, setWebsitesHash] = useState<string>('');
+  
+  // Refs for stability and deduplication
+  const lastFetchTime = useRef<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isCurrentlyFetching = useRef<boolean>(false);
+  const mountedRef = useRef<boolean>(true);
+  const websitesSnapshot = useRef<string>('');
 
-  // Function to create a simple hash of websites data
-  const createWebsitesHash = (websitesData: Website[]) => {
-    return JSON.stringify(websitesData.map(w => ({
-      id: w.id,
-      url: w.website_url,
-      active: w.is_active
-    })));
-  };
+  // Enhanced deduplication hash
+  const createWebsitesHash = useCallback((websitesData: Website[]) => {
+    return JSON.stringify(
+      websitesData
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(w => ({
+          id: w.id,
+          url: w.website_url,
+          active: w.is_active,
+          title: w.website_title
+        }))
+    );
+  }, []);
 
-  const isSubscriptionExpired = (account: Account) => {
+  const isSubscriptionExpired = useCallback((account: Account) => {
     if (!account.activation_end_date) return false;
     return new Date(account.activation_end_date) < new Date();
-  };
+  }, []);
 
-  // Enhanced fetch websites function with data comparison
-  const fetchWebsites = useCallback(async (accountData: Account) => {
+  // Enhanced fetch with retry logic and better error handling
+  const fetchWebsites = useCallback(async (accountData: Account, forceRefresh = false) => {
+    if (!mountedRef.current || !accountData?.id) return [];
+
+    const now = Date.now();
+    
+    // Prevent rapid successive calls with better timing
+    if (!forceRefresh && (now - lastFetchTime.current < 2000 || isCurrentlyFetching.current)) {
+      console.log('⏭️ منع الجلب السريع - الانتظار للاستقرار');
+      return websites;
+    }
+
+    isCurrentlyFetching.current = true;
+    
     try {
-      const now = Date.now();
-      
-      // Prevent rapid successive calls - increased interval for stability
-      if (now - lastFetchTime < 1000) {
-        console.log('⏭️ تخطي الجلب - منع التحديث السريع');
-        return websites;
-      }
-      
-      console.log('🔍 جلب المواقع مع فحص التغييرات للحساب:', accountData.id);
-      
+      console.log('🔍 جلب المواقع مع محاولة إعادة تحسينة:', {
+        accountId: accountData.id,
+        forceRefresh,
+        lastFetch: now - lastFetchTime.current
+      });
+
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
@@ -75,102 +93,163 @@ export const useAccountData = (accountId: string | undefined) => {
       const newHash = createWebsitesHash(activeWebsites);
       
       // Only update if data actually changed
-      if (newHash !== websitesHash) {
-        console.log('🔄 تغيير حقيقي في المواقع - التحديث مطلوب');
-        console.log('📊 عدد المواقع الجديدة:', activeWebsites.length);
+      if (forceRefresh || newHash !== websitesSnapshot.current) {
+        console.log('✅ تحديث المواقع - تغيير حقيقي مكتشف:', {
+          websitesCount: activeWebsites.length,
+          forced: forceRefresh
+        });
         
-        setWebsites([...activeWebsites]);
-        setWebsitesHash(newHash);
-        setLastFetchTime(now);
-        
-        console.log('✅ تم تحديث المواقع بنجاح');
+        if (mountedRef.current) {
+          setWebsites([...activeWebsites]);
+          websitesSnapshot.current = newHash;
+          setError(null);
+        }
       } else {
-        console.log('⏺️ لا توجد تغييرات في المواقع - لا حاجة للتحديث');
-        setLastFetchTime(now);
+        console.log('ℹ️ لا توجد تغييرات في المواقع');
       }
       
+      lastFetchTime.current = now;
       return activeWebsites;
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ خطأ في fetchWebsites:', error);
-      setWebsites([]);
-      throw error;
+      
+      if (mountedRef.current) {
+        setError('فشل في تحميل المواقع');
+        
+        // Retry logic for network errors
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('network')) {
+          console.log('🔄 محاولة إعادة الاتصال خلال 5 ثوانٍ...');
+          
+          retryTimeoutRef.current = setTimeout(() => {
+            if (mountedRef.current) {
+              console.log('🔄 إعادة محاولة جلب المواقع');
+              fetchWebsites(accountData, true);
+            }
+          }, 5000);
+        }
+      }
+      
+      return [];
+    } finally {
+      isCurrentlyFetching.current = false;
     }
-  }, [lastFetchTime, websitesHash]);
+  }, [websites, createWebsitesHash]);
 
-  // Enhanced initial data fetch
+  // Enhanced initial data fetch with better error handling
   useEffect(() => {
     const fetchAccountData = async () => {
-      if (!accountId) {
+      if (!accountId || !mountedRef.current) {
         setError('معرف الحساب غير صحيح');
         setLoading(false);
         return;
       }
 
       try {
-        console.log('🔍 جلب بيانات الحساب:', accountId);
+        console.log('🔍 جلب بيانات الحساب المحسن:', accountId);
         
+        // Try by ID first
         let { data: accountData, error: accountError } = await supabase
           .from('accounts')
           .select('*')
           .eq('id', accountId)
           .eq('status', 'active')
-          .single();
+          .maybeSingle();
 
-        if (accountError || !accountData) {
+        // If not found by ID, try by name
+        if (!accountData && !accountError) {
           console.log('🔍 البحث بالاسم:', accountId);
           const { data: accountByName, error: nameError } = await supabase
             .from('accounts')
             .select('*')
             .eq('name', accountId)
             .eq('status', 'active')
-            .single();
+            .maybeSingle();
             
-          if (nameError || !accountByName) {
-            console.error('❌ خطأ في جلب الحساب:', nameError);
-            setError('لم يتم العثور على الحساب أو أنه غير نشط');
-            setLoading(false);
-            return;
+          if (nameError) {
+            throw nameError;
           }
           
           accountData = accountByName;
         }
 
-        console.log('✅ تم جلب بيانات الحساب:', accountData);
-        
-        setAccount(accountData);
-        setRotationInterval(accountData.rotation_interval || 30);
-        
-        if (isSubscriptionExpired(accountData)) {
-          setSubscriptionExpired(true);
+        if (accountError) {
+          throw accountError;
+        }
+
+        if (!accountData) {
+          setError('لم يتم العثور على الحساب أو أنه غير نشط');
           setLoading(false);
           return;
         }
 
-        // جلب المواقع النشطة
-        const activeWebsites = await fetchWebsites(accountData);
-        console.log('🌐 المواقع النشطة المحملة:', activeWebsites.length);
+        console.log('✅ تم جلب بيانات الحساب بنجاح:', {
+          id: accountData.id,
+          name: accountData.name,
+          status: accountData.status
+        });
+        
+        if (mountedRef.current) {
+          setAccount(accountData);
+          setRotationInterval(accountData.rotation_interval || 30);
+          
+          if (isSubscriptionExpired(accountData)) {
+            setSubscriptionExpired(true);
+            setLoading(false);
+            return;
+          }
 
-      } catch (error) {
+          // Fetch websites with initial force refresh
+          await fetchWebsites(accountData, true);
+        }
+
+      } catch (error: any) {
         console.error('❌ خطأ في fetchAccountData:', error);
-        setError('حدث خطأ في تحميل البيانات');
+        
+        if (mountedRef.current) {
+          let errorMessage = 'حدث خطأ في تحميل البيانات';
+          
+          if (error.message?.includes('Failed to fetch')) {
+            errorMessage = 'مشكلة في الاتصال - يرجى التحقق من الإنترنت';
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          
+          setError(errorMessage);
+        }
       } finally {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchAccountData();
-  }, [accountId, fetchWebsites]);
+  }, [accountId, fetchWebsites, isSubscriptionExpired]);
 
-  // Force refresh function for manual updates
+  // Force refresh function
   const forceRefresh = useCallback(async () => {
-    if (account) {
+    if (account && mountedRef.current) {
       console.log('🔄 تحديث يدوي للمواقع');
-      // Reset hash to force update
-      setWebsitesHash('');
-      await fetchWebsites(account);
+      setError(null);
+      await fetchWebsites(account, true);
     }
   }, [account, fetchWebsites]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    return () => {
+      mountedRef.current = false;
+      isCurrentlyFetching.current = false;
+      
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return {
     account,
