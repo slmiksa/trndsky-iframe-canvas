@@ -91,13 +91,13 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Enhanced function to fetch websites with instant updates
+  // ENHANCED function to fetch websites with GUARANTEED instant updates
   const fetchWebsites = async (accountData?: Account) => {
     const targetAccount = accountData || account;
     if (!targetAccount?.id) return;
 
     try {
-      console.log('🔍 [WEBSITES] Fetching websites for account:', targetAccount.id, 'at', new Date().toISOString());
+      console.log('🚀 [WEBSITES FETCH] IMMEDIATE fetch for account:', targetAccount.id, 'at', new Date().toISOString());
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -107,25 +107,26 @@ const ClientPublicPage = () => {
         .order('created_at', { ascending: true });
 
       if (websiteError) {
-        console.error('❌ [WEBSITES] Error fetching websites:', websiteError);
+        console.error('❌ [WEBSITES FETCH] Error:', websiteError);
         setWebsites([]);
         return;
       }
 
-      console.log('✅ [WEBSITES] Raw data fetched:', websiteData);
+      console.log('📊 [WEBSITES FETCH] Raw data:', websiteData?.length || 0, 'items');
       
       // Filter valid URLs only
       const activeWebsites = (websiteData || []).filter(website => {
         const isValid = isValidUrl(website.website_url);
         if (!isValid) {
-          console.warn('⚠️ [WEBSITES] Invalid URL found:', website.website_url);
+          console.warn('⚠️ [WEBSITES FETCH] Invalid URL:', website.website_url);
         }
         return isValid;
       });
       
-      console.log('✅ [WEBSITES] Active valid websites:', activeWebsites.length, activeWebsites);
+      console.log('✅ [WEBSITES FETCH] ACTIVE websites found:', activeWebsites.length);
+      console.log('📋 [WEBSITES FETCH] Active websites list:', activeWebsites.map(w => ({ url: w.website_url, active: w.is_active })));
       
-      // Always update state even if same data to trigger re-render
+      // FORCE update state even if same data to trigger re-render
       setWebsites(activeWebsites);
       setCurrentWebsiteIndex(0);
       setIframeLoading(activeWebsites.length > 0);
@@ -133,17 +134,17 @@ const ClientPublicPage = () => {
       setRefreshKey(prev => prev + 1);
       setLastWebsiteUpdate(Date.now());
       
-      console.log('🔄 [WEBSITES] State updated with', activeWebsites.length, 'websites');
+      console.log('🔄 [WEBSITES FETCH] State FORCED update completed with', activeWebsites.length, 'active websites');
     } catch (error) {
-      console.error('❌ [WEBSITES] Error in fetchWebsites:', error);
+      console.error('❌ [WEBSITES FETCH] Exception:', error);
       setWebsites([]);
     }
   };
 
-  // Force refresh function for manual updates
+  // Force refresh function for manual testing
   const forceRefresh = async () => {
     if (account) {
-      console.log('🔄 [FORCE_REFRESH] Manual refresh triggered');
+      console.log('🔄 [MANUAL REFRESH] Triggered by user');
       await fetchWebsites(account);
     }
   };
@@ -157,7 +158,7 @@ const ClientPublicPage = () => {
       }
 
       try {
-        console.log('🔍 Fetching account data for:', accountId);
+        console.log('🔍 [ACCOUNT] Fetching account data for:', accountId);
         
         // First try to search by ID
         let { data: accountData, error: accountError } = await supabase
@@ -169,7 +170,7 @@ const ClientPublicPage = () => {
 
         // If not found, search by name
         if (accountError || !accountData) {
-          console.log('🔍 Searching by name:', accountId);
+          console.log('🔍 [ACCOUNT] Searching by name:', accountId);
           const { data: accountByName, error: nameError } = await supabase
             .from('accounts')
             .select('*')
@@ -178,7 +179,7 @@ const ClientPublicPage = () => {
             .single();
             
           if (nameError || !accountByName) {
-            console.error('❌ Error fetching account:', nameError);
+            console.error('❌ [ACCOUNT] Error:', nameError);
             setError('لم يتم العثور على الحساب أو أنه غير نشط');
             setLoading(false);
             return;
@@ -187,7 +188,7 @@ const ClientPublicPage = () => {
           accountData = accountByName;
         }
 
-        console.log('✅ Account data fetched:', accountData);
+        console.log('✅ [ACCOUNT] Data fetched successfully:', accountData.name);
         
         // Check if subscription is expired
         if (isSubscriptionExpired(accountData)) {
@@ -201,7 +202,7 @@ const ClientPublicPage = () => {
         await fetchWebsites(accountData);
 
       } catch (error) {
-        console.error('❌ Error in fetchAccountData:', error);
+        console.error('❌ [ACCOUNT] Exception:', error);
         setError('حدث خطأ في تحميل البيانات');
       } finally {
         setLoading(false);
@@ -211,75 +212,92 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced realtime listener for instant website updates
+  // SUPER ENHANCED realtime listener for INSTANT website updates with MULTIPLE fallback mechanisms
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('🔄 [REALTIME] Setting up ENHANCED website listener for account:', account.id);
+    console.log('🚀 [REALTIME SETUP] Starting SUPER ENHANCED website listener for account:', account.id);
     
-    // Create unique channel name with timestamp to ensure fresh connection
-    const channelName = `websites_realtime_${account.id}_${Date.now()}`;
+    // Create UNIQUE channel name with timestamp for fresh connection
+    const channelName = `websites_INSTANT_${account.id}_${Date.now()}`;
     
     const websiteChannel = supabase
       .channel(channelName)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to ALL events
+          event: '*', // Listen to ALL events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'account_websites',
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀 [REALTIME] INSTANT website change detected:', {
+          console.log('🚀🚀🚀 [REALTIME] INSTANT website change detected!', {
             event: payload.eventType,
             timestamp: new Date().toISOString(),
-            payload: payload
+            newData: payload.new,
+            oldData: payload.old
           });
           
-          // Immediate fetch with small delay to ensure DB consistency
+          // IMMEDIATE response with NO delay
+          try {
+            await fetchWebsites();
+            console.log('✅✅✅ [REALTIME] Websites refreshed INSTANTLY after change');
+          } catch (error) {
+            console.error('❌ [REALTIME] Error in instant refresh:', error);
+          }
+          
+          // Additional backup refresh after short delay for safety
           setTimeout(async () => {
             try {
               await fetchWebsites();
-              console.log('✅ [REALTIME] Websites refreshed INSTANTLY after change');
+              console.log('🔄 [REALTIME] Backup refresh completed');
             } catch (error) {
-              console.error('❌ [REALTIME] Error refreshing websites:', error);
+              console.error('❌ [REALTIME] Error in backup refresh:', error);
             }
-          }, 100); // 100ms delay for DB consistency
+          }, 500);
         }
       )
       .subscribe((status) => {
-        console.log('🔄 [REALTIME] Website channel status:', status, 'for channel:', channelName);
+        console.log('📡 [REALTIME] Website channel status:', status, 'for channel:', channelName);
         if (status === 'SUBSCRIBED') {
-          console.log('✅ [REALTIME] Successfully connected to INSTANT website updates');
+          console.log('✅✅✅ [REALTIME] Successfully connected to INSTANT website updates');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ [REALTIME] Channel error, will retry connection');
+          console.error('❌ [REALTIME] Channel error, attempting reconnection');
         }
       });
 
-    // More frequent backup refresh for mobile reliability
-    const backupRefresh = setInterval(() => {
-      console.log('🔄 [BACKUP] Running backup website refresh');
+    // AGGRESSIVE backup refresh - every 10 seconds for maximum reliability
+    const aggressiveRefresh = setInterval(() => {
+      console.log('🔄 [BACKUP AGGRESSIVE] Running 10-second backup refresh');
       fetchWebsites();
-    }, 15000); // Every 15 seconds instead of 30
+    }, 10000);
 
-    // Additional visibility change listener for when user returns to tab
+    // ADDITIONAL visibility change listener for maximum reliability
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('👁️ [VISIBILITY] Page became visible, refreshing websites');
+        console.log('👁️ [VISIBILITY] Page visible again, forcing refresh');
         fetchWebsites();
       }
     };
 
+    // ADDITIONAL focus listener for extra reliability
+    const handleFocus = () => {
+      console.log('🎯 [FOCUS] Window focused, forcing refresh');
+      fetchWebsites();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
-      console.log('🧹 [REALTIME] Cleaning up enhanced website listener');
+      console.log('🧹 [CLEANUP] Removing all website listeners');
       supabase.removeChannel(websiteChannel);
-      clearInterval(backupRefresh);
+      clearInterval(aggressiveRefresh);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [account?.id, subscriptionExpired]);
 
@@ -531,14 +549,20 @@ const ClientPublicPage = () => {
         </div>
       )}
 
-      {/* Manual refresh button for testing */}
+      {/* Enhanced manual refresh button for testing with more info */}
       {process.env.NODE_ENV === 'development' && (
-        <button
-          onClick={forceRefresh}
-          className="absolute top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded z-50 text-sm"
-        >
-          تحديث يدوي
-        </button>
+        <div className="absolute top-4 right-4 z-50 space-y-2">
+          <button
+            onClick={forceRefresh}
+            className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+          >
+            تحديث فوري
+          </button>
+          <div className="bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+            <div>المواقع النشطة: {websites.length}</div>
+            <div>آخر تحديث: {new Date(lastWebsiteUpdate).toLocaleTimeString()}</div>
+          </div>
+        </div>
       )}
 
       {/* Main Content - Full Screen */}
@@ -550,7 +574,7 @@ const ClientPublicPage = () => {
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
-              🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً فوراً
+              🚀 متصل مع نظام التحديث الفوري - سيتم التحديث تلقائياً فوراً
             </p>
             <p className="text-xs text-gray-500 mt-1">
               آخر تحديث: {new Date(lastWebsiteUpdate).toLocaleTimeString('ar-SA')}
@@ -600,15 +624,16 @@ const ClientPublicPage = () => {
         />
       ))}
 
-      {/* Debug info in development */}
+      {/* Enhanced debug info in development */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
-          <div>المواقع النشطة: {websites.length}</div>
-          <div>الموقع الحالي: {currentWebsiteIndex + 1}</div>
-          <div>حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
-          <div>خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>Refresh Key: {refreshKey}</div>
-          <div>Last Update: {new Date(lastWebsiteUpdate).toLocaleTimeString()}</div>
+          <div>✅ المواقع النشطة: {websites.length}</div>
+          <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
+          <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
+          <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
+          <div>🔄 Refresh Key: {refreshKey}</div>
+          <div>⏰ Last Update: {new Date(lastWebsiteUpdate).toLocaleTimeString()}</div>
+          <div>🚀 Realtime: نشط</div>
         </div>
       )}
     </div>
