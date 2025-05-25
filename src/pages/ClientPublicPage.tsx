@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -83,7 +82,6 @@ const ClientPublicPage = () => {
     try {
       console.log(`🔍 [WEBSITES] Fetching websites for account: ${accountData.id}`);
       
-      // Use a more compatible query approach
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
         .select('*')
@@ -177,15 +175,14 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Enhanced cross-browser realtime listener for websites
+  // Enhanced realtime listener for websites with immediate response
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('🔄 [REALTIME] Setting up cross-browser website listener for account:', account.id);
+    console.log('🔄 [REALTIME] Setting up immediate website listener for account:', account.id);
     
-    // Use a simpler channel name for better compatibility
     const channelName = `websites_${account.id}`;
     
     const websiteChannel = supabase
@@ -204,17 +201,14 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔥 [REALTIME] Website change detected:', payload.eventType);
+          console.log('🔥 [REALTIME] Website change detected:', payload.eventType, payload);
           
-          // Add a small delay to ensure database consistency across browsers
-          setTimeout(async () => {
-            try {
-              // Re-fetch all websites to ensure consistency
-              await fetchWebsites(account);
-            } catch (error) {
-              console.error('❌ [REALTIME] Error refreshing websites:', error);
-            }
-          }, 100);
+          // Immediate response without delay
+          try {
+            await fetchWebsites(account);
+          } catch (error) {
+            console.error('❌ [REALTIME] Error refreshing websites:', error);
+          }
         }
       )
       .subscribe((status) => {
@@ -227,7 +221,7 @@ const ClientPublicPage = () => {
     };
   }, [account?.id, subscriptionExpired]);
 
-  // Initial fetch and realtime listener for notifications
+  // Enhanced realtime listener for notifications with immediate response
   useEffect(() => {
     if (!account?.id || subscriptionExpired) return;
 
@@ -242,10 +236,8 @@ const ClientPublicPage = () => {
       }
     };
 
-    // Fetch initial notifications
     fetchAndSetNotifications();
 
-    // Setup realtime listener for notifications
     const notificationChannel = supabase
       .channel(`notifications-${account.id}`)
       .on(
@@ -257,8 +249,9 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🔔 Notification change detected:', payload);
+          console.log('🔔 Notification change detected:', payload.eventType, payload);
           
+          // Immediate response based on event type
           if (payload.eventType === 'INSERT' && (payload.new as any)?.is_active) {
             setActiveNotifications(prev => [...prev, payload.new as Notification]);
           } else if (payload.eventType === 'UPDATE') {
@@ -287,7 +280,7 @@ const ClientPublicPage = () => {
     };
   }, [account?.id, fetchActiveNotifications, subscriptionExpired]);
 
-  // Check for active timers
+  // Enhanced realtime listener for break timers with immediate response
   useEffect(() => {
     const checkTimers = async () => {
       if (!account?.id || subscriptionExpired) return;
@@ -302,7 +295,33 @@ const ClientPublicPage = () => {
     };
 
     checkTimers();
-    const timerInterval = setInterval(checkTimers, 10000); // Check every 10 seconds
+    const timerInterval = setInterval(checkTimers, 10000);
+
+    // Add realtime listener for break timers
+    if (account?.id && !subscriptionExpired) {
+      const timerChannel = supabase
+        .channel(`break_timers-${account.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'break_timers',
+            filter: `account_id=eq.${account.id}`
+          },
+          async (payload) => {
+            console.log('⏰ Timer change detected:', payload.eventType, payload);
+            // Immediate check for active timers
+            await checkTimers();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        clearInterval(timerInterval);
+        supabase.removeChannel(timerChannel);
+      };
+    }
 
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
@@ -313,7 +332,7 @@ const ClientPublicPage = () => {
 
     const interval = setInterval(() => {
       setCurrentWebsiteIndex((prev) => (prev + 1) % websites.length);
-    }, 30000); // Switch every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
@@ -419,7 +438,7 @@ const ClientPublicPage = () => {
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`${currentWebsite.id}-${Date.now()}`}
+          key={currentWebsite.id}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full"
