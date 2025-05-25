@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,9 +53,36 @@ const ClientPublicPage = () => {
   const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const [isBrowserSupported, setIsBrowserSupported] = useState(true);
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
+
+  // Check browser compatibility
+  useEffect(() => {
+    const checkBrowserSupport = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const isModernBrowser = (
+        'fetch' in window &&
+        'Promise' in window &&
+        'WebSocket' in window &&
+        'addEventListener' in window
+      );
+
+      console.log('🌐 Browser detection:', {
+        userAgent: userAgent,
+        isChrome: userAgent.includes('chrome'),
+        isFirefox: userAgent.includes('firefox'),
+        isSafari: userAgent.includes('safari') && !userAgent.includes('chrome'),
+        isEdge: userAgent.includes('edge'),
+        isModernBrowser
+      });
+
+      setIsBrowserSupported(isModernBrowser);
+    };
+
+    checkBrowserSupport();
+  }, []);
 
   // Function to check if subscription is expired
   const isSubscriptionExpired = (account: Account) => {
@@ -78,10 +104,12 @@ const ClientPublicPage = () => {
     return currentTime >= startTimeSeconds && currentTime <= endTimeSeconds;
   };
 
-  // Function to fetch websites
-  const fetchWebsites = async (accountData: Account) => {
+  // Function to fetch websites with retry mechanism
+  const fetchWebsites = async (accountData: Account, retryCount = 0) => {
+    const maxRetries = 3;
+    
     try {
-      console.log('🔍 Fetching websites for account:', accountData.id);
+      console.log(`🔍 Fetching websites for account: ${accountData.id} (attempt ${retryCount + 1})`);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -91,6 +119,13 @@ const ClientPublicPage = () => {
 
       if (websiteError) {
         console.error('❌ Error fetching websites:', websiteError);
+        
+        if (retryCount < maxRetries) {
+          console.log(`🔄 Retrying website fetch in 2 seconds...`);
+          setTimeout(() => fetchWebsites(accountData, retryCount + 1), 2000);
+          return;
+        }
+        
         setWebsites([]);
         return;
       }
@@ -112,6 +147,13 @@ const ClientPublicPage = () => {
       }
     } catch (error) {
       console.error('❌ Error in fetchWebsites:', error);
+      
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Retrying website fetch in 2 seconds due to error...`);
+        setTimeout(() => fetchWebsites(accountData, retryCount + 1), 2000);
+        return;
+      }
+      
       setWebsites([]);
     }
   };
@@ -179,29 +221,45 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Realtime listener with improved error handling and recovery
+  // Enhanced realtime listener with cross-browser compatibility
   useEffect(() => {
-    let channel: any = null;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 3;
+    if (!account?.id || subscriptionExpired || !isBrowserSupported) {
+      console.log('⏭️ Skipping realtime setup - no account, subscription expired, or unsupported browser');
+      return;
+    }
 
+    let channel: any = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    
     const setupRealtimeListener = () => {
-      if (!account?.id || subscriptionExpired) {
-        console.log('⏭️ Skipping realtime setup - no account or subscription expired');
-        return;
+      // Clear previous reconnect timer
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
       }
 
       // Clean up previous channel
       if (channel) {
         console.log('🧹 Cleaning up previous channel');
-        supabase.removeChannel(channel);
+        try {
+          supabase.removeChannel(channel);
+        } catch (e) {
+          console.warn('⚠️ Error removing previous channel:', e);
+        }
       }
 
-      const channelName = `websites-stable-${account.id}-${Date.now()}`;
-      console.log('🔄 Setting up realtime listener:', channelName);
+      const channelName = `websites-cross-browser-${account.id}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      console.log('🔄 Setting up cross-browser realtime listener:', channelName);
       
       channel = supabase
-        .channel(channelName)
+        .channel(channelName, {
+          config: {
+            broadcast: { self: false },
+            presence: { key: `user-${Date.now()}` }
+          }
+        })
         .on(
           'postgres_changes',
           {
@@ -215,11 +273,12 @@ const ClientPublicPage = () => {
               event: payload.eventType,
               websiteId: (payload.new as any)?.id || (payload.old as any)?.id,
               isActive: (payload.new as any)?.is_active,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              browser: navigator.userAgent
             });
             
-            // Small delay to ensure database consistency
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Add delay for database consistency across all browsers
+            await new Promise(resolve => setTimeout(resolve, 150));
             
             try {
               const { data: freshWebsites, error } = await supabase
@@ -253,39 +312,46 @@ const ClientPublicPage = () => {
           }
         )
         .subscribe((status) => {
-          console.log('🔄 REALTIME: Subscription status:', status, 'for channel:', channelName);
+          console.log('🔄 REALTIME: Subscription status:', status, 'for channel:', channelName, 'Browser:', navigator.userAgent.split(' ')[0]);
           
           if (status === 'SUBSCRIBED') {
             console.log('✅ REALTIME: Successfully subscribed!');
             reconnectAttempts = 0;
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error('❌ REALTIME: Channel error or timeout');
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            console.error('❌ REALTIME: Channel error, timeout, or closed');
             
             if (reconnectAttempts < maxReconnectAttempts) {
               reconnectAttempts++;
-              console.log(`🔄 REALTIME: Attempting reconnection ${reconnectAttempts}/${maxReconnectAttempts}`);
+              const delay = Math.min(2000 * Math.pow(2, reconnectAttempts - 1), 30000); // Exponential backoff, max 30s
+              console.log(`🔄 REALTIME: Attempting reconnection ${reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms`);
               
-              setTimeout(() => {
+              reconnectTimer = setTimeout(() => {
                 setupRealtimeListener();
-              }, 2000 * reconnectAttempts); // Exponential backoff
+              }, delay);
             } else {
               console.error('❌ REALTIME: Max reconnection attempts reached');
             }
-          } else if (status === 'CLOSED') {
-            console.log('🔒 REALTIME: Channel closed');
           }
         });
     };
 
     setupRealtimeListener();
 
+    // Cleanup function
     return () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
       if (channel) {
         console.log('🧹 REALTIME: Cleaning up listener');
-        supabase.removeChannel(channel);
+        try {
+          supabase.removeChannel(channel);
+        } catch (e) {
+          console.warn('⚠️ Error during cleanup:', e);
+        }
       }
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, isBrowserSupported]);
 
   // Initial fetch and realtime listener for notifications
   useEffect(() => {
@@ -398,6 +464,9 @@ const ClientPublicPage = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
           <p className="mt-4 text-gray-600">جاري التحميل...</p>
+          <p className="mt-2 text-xs text-gray-400">
+            🌐 متوافق مع جميع المتصفحات الحديثة
+          </p>
         </div>
       </div>
     );
@@ -481,6 +550,9 @@ const ClientPublicPage = () => {
               <p className="text-sm text-gray-400 mt-2">
                 🔄 متصل مع لوحة التحكم - سيتم التحديث تلقائياً
               </p>
+              <p className="text-xs text-gray-400 mt-1">
+                🌐 متوافق مع جميع المتصفحات الحديثة
+              </p>
             </div>
           </div>
         ) : currentWebsite ? (
@@ -489,7 +561,10 @@ const ClientPublicPage = () => {
               src={currentWebsite.website_url}
               title={currentWebsite.website_title || currentWebsite.website_url}
               className="w-full h-full border-0"
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation-by-user-activation"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="fullscreen; picture-in-picture; autoplay; clipboard-read; clipboard-write"
             />
           </div>
         ) : null}

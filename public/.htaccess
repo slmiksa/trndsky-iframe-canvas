@@ -1,23 +1,31 @@
 
-# TrndSky TV Apache Configuration - Production Ready
+# TrndSky TV Apache Configuration - Production Ready with Cross-Browser Support
 RewriteEngine On
 
-# Force correct MIME types for JavaScript modules
+# Force correct MIME types for JavaScript modules across all browsers
 <FilesMatch "\\.js$">
     Header set Content-Type "application/javascript"
     Header set X-Content-Type-Options "nosniff"
+    Header set Cache-Control "public, max-age=31536000, immutable"
 </FilesMatch>
 
 <FilesMatch "\\.mjs$">
     Header set Content-Type "application/javascript"
     Header set X-Content-Type-Options "nosniff"
+    Header set Cache-Control "public, max-age=31536000, immutable"
 </FilesMatch>
 
-# Set correct MIME types explicitly
+<FilesMatch "\\.css$">
+    Header set Content-Type "text/css"
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# Set correct MIME types explicitly for all browsers
 AddType application/javascript .js .mjs
 AddType text/css .css
 AddType application/json .json
 AddType text/html .html
+AddType application/wasm .wasm
 
 # Handle client-side routing - redirect all requests to index.html
 # Exclude assets directory from rewriting
@@ -27,21 +35,33 @@ RewriteCond %{REQUEST_URI} !^/tv/assets/
 RewriteCond %{REQUEST_URI} !^/tv/test\.html$
 RewriteRule ^(.*)$ /tv/index.html [L,QSA]
 
-# CORS headers for Supabase integration
+# Enhanced CORS headers for Supabase integration and cross-browser compatibility
 Header always set Access-Control-Allow-Origin "*"
-Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma"
+Header always set Access-Control-Expose-Headers "Content-Length, Content-Range"
+Header always set Access-Control-Max-Age "86400"
 
-# Handle preflight requests
+# Handle preflight requests for all browsers
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^(.*)$ $1 [R=200,L]
 
-# Security headers
+# Enhanced security headers compatible with all browsers
 Header always set X-Frame-Options "SAMEORIGIN"
 Header always set X-Content-Type-Options "nosniff"
 Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
-# Cache static assets
+# Safari specific headers
+<IfModule mod_headers.c>
+    # WebKit specific optimizations
+    Header set X-WebKit-CSP "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; frame-src *;"
+    # Safari cache optimization
+    Header set Vary "Accept-Encoding, User-Agent"
+</IfModule>
+
+# Cache static assets with browser-specific optimizations
 <IfModule mod_expires.c>
     ExpiresActive on
     ExpiresByType application/javascript "access plus 1 year"
@@ -52,9 +72,14 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"
     ExpiresByType image/jpeg "access plus 1 year"
     ExpiresByType image/gif "access plus 1 year"
     ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
 </IfModule>
 
-# Enable compression
+# Enhanced compression for all browsers
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE application/javascript
     AddOutputFilterByType DEFLATE text/css
@@ -65,16 +90,56 @@ Header always set Referrer-Policy "strict-origin-when-cross-origin"
     AddOutputFilterByType DEFLATE application/xhtml+xml
     AddOutputFilterByType DEFLATE application/rss+xml
     AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE image/svg+xml
+    
+    # Browser-specific compression
+    BrowserMatch ^Mozilla/4 gzip-only-text/html
+    BrowserMatch ^Mozilla/4\.0[678] no-gzip
+    BrowserMatch \bMSIE !no-gzip !gzip-only-text/html
+    BrowserMatch \bMSI[E] !no-gzip !gzip-only-text/html
+</IfModule>
+
+# Cross-browser WebSocket support headers
+<IfModule mod_headers.c>
+    Header set Connection "Upgrade"
+    Header set Upgrade "websocket"
 </IfModule>
 
 # Prevent access to sensitive files
 <Files ~ "^\.">
-    Order allow,deny
-    Deny from all
+    Require all denied
 </Files>
 
 # Prevent access to build files
 <Files "*.log">
-    Order allow,deny
-    Deny from all
+    Require all denied
 </Files>
+
+<Files "*.env">
+    Require all denied
+</Files>
+
+# Browser-specific optimizations
+<IfModule mod_setenvif.c>
+    # Chrome optimizations
+    SetEnvIf User-Agent "Chrome" chrome
+    Header set X-Chrome-Optimized "true" env=chrome
+    
+    # Firefox optimizations
+    SetEnvIf User-Agent "Firefox" firefox
+    Header set X-Firefox-Optimized "true" env=firefox
+    
+    # Safari optimizations
+    SetEnvIf User-Agent "Safari" safari
+    Header set X-Safari-Optimized "true" env=safari
+    
+    # Edge optimizations
+    SetEnvIf User-Agent "Edge" edge
+    Header set X-Edge-Optimized "true" env=edge
+</IfModule>
+
+# Error pages with browser detection
+ErrorDocument 404 /tv/index.html
+ErrorDocument 403 /tv/index.html
+ErrorDocument 500 /tv/index.html
