@@ -32,52 +32,45 @@ export const useRealtimeUpdates = ({
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectedRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateTime = useRef<number>(0);
 
-  // Enhanced debounced fetch function
+  // Enhanced debounced fetch function with stronger debouncing
   const debouncedFetchWebsites = (accountData: Account) => {
+    const now = Date.now();
+    
+    // Stronger debouncing for stability - minimum 3 seconds between updates
+    if (now - lastUpdateTime.current < 3000) {
+      console.log('⏭️ تخطي التحديث - فترة الانتظار لم تنته');
+      return;
+    }
+
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
 
     fetchTimeoutRef.current = setTimeout(async () => {
       try {
-        console.log('🔄 تحديث المواقع المحسن (enhanced debounced)');
+        console.log('🔄 تحديث المواقع مع استقرار محسن');
+        lastUpdateTime.current = Date.now();
         await fetchWebsites(accountData);
-        console.log('✅ تم تحديث المواقع بنجاح');
+        console.log('✅ تم تحديث المواقع بنجاح مع الاستقرار');
       } catch (error) {
-        console.error('❌ خطأ في التحديث المحسن:', error);
+        console.error('❌ خطأ في التحديث المستقر:', error);
       }
-    }, 500); // Reduced debounce time for faster updates
+    }, 1500); // Increased delay for more stability
   };
 
-  // Enhanced connection monitoring and recovery
-  const setupConnectionMonitoring = () => {
-    // Clear existing heartbeat
-    if (heartbeatIntervalRef.current) {
-      clearInterval(heartbeatIntervalRef.current);
-    }
-
-    // Setup heartbeat to monitor connection
-    heartbeatIntervalRef.current = setInterval(() => {
-      if (!isConnectedRef.current && account?.id) {
-        console.log('🔄 إعادة محاولة الاتصال للتحديثات الفورية');
-        setupRealtimeListeners();
-      }
-    }, 15000); // Check every 15 seconds
-  };
-
-  // Enhanced realtime listener setup
+  // Enhanced realtime listener setup with better stability
   const setupRealtimeListeners = () => {
     if (!account?.id || subscriptionExpired) {
       console.log('⏭️ تخطي إعداد التحديثات الفورية');
       return;
     }
 
-    console.log('🌐 إعداد مستمعات التحديث المحسنة');
+    console.log('🌐 إعداد مستمعات التحديث المستقرة');
     
     // Account changes listener
-    const accountChannelName = `account-enhanced-${account.id}-${Date.now()}`;
+    const accountChannelName = `account-stable-${account.id}`;
     const accountChannel = supabase
       .channel(accountChannelName)
       .on(
@@ -89,22 +82,22 @@ export const useRealtimeUpdates = ({
           filter: `id=eq.${account.id}`
         },
         (payload) => {
-          console.log('🔄 تغيير محسن في بيانات الحساب:', payload);
+          console.log('🔄 تغيير مستقر في بيانات الحساب:', payload);
           
           if (payload.new?.rotation_interval !== undefined) {
-            console.log('⏱️ تحديث فترة التبديل المحسن:', payload.new.rotation_interval);
+            console.log('⏱️ تحديث فترة التبديل المستقر:', payload.new.rotation_interval);
             setRotationInterval(payload.new.rotation_interval);
             setAccount(prev => prev ? { ...prev, rotation_interval: payload.new.rotation_interval } : null);
           }
         }
       )
       .subscribe((status) => {
-        console.log('📡 حالة اشتراك الحساب المحسن:', status);
+        console.log('📡 حالة اشتراك الحساب المستقر:', status);
         isConnectedRef.current = status === 'SUBSCRIBED';
       });
 
-    // Websites changes listener with enhanced reliability
-    const websiteChannelName = `websites-enhanced-${account.id}-${Date.now()}`;
+    // Websites changes listener with enhanced stability
+    const websiteChannelName = `websites-stable-${account.id}`;
     const websiteChannel = supabase
       .channel(websiteChannelName)
       .on(
@@ -116,29 +109,20 @@ export const useRealtimeUpdates = ({
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🚀 تحديث محسن للموقع:', payload);
+          console.log('🚀 تحديث مستقر للموقع:', payload);
           console.log('📅 الوقت:', new Date().toISOString());
           console.log('🎯 نوع الحدث:', payload.eventType);
-          console.log('🖥️ نوع الجهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
           
-          // Force immediate update for desktop browsers
+          // Enhanced debounced update for maximum stability
           debouncedFetchWebsites(account);
-          
-          // Additional force refresh for desktop after short delay
-          if (!navigator.userAgent.includes('Mobile')) {
-            setTimeout(() => {
-              console.log('🖥️ تحديث إضافي للكمبيوتر');
-              debouncedFetchWebsites(account);
-            }, 1000);
-          }
         }
       )
       .subscribe((status) => {
-        console.log('📡 حالة اشتراك المواقع المحسن:', status);
+        console.log('📡 حالة اشتراك المواقع المستقر:', status);
         isConnectedRef.current = status === 'SUBSCRIBED';
         
         if (status === 'SUBSCRIBED') {
-          console.log('✅ تم الاشتراك بنجاح في التحديثات المحسنة!');
+          console.log('✅ تم الاشتراك بنجاح في التحديثات المستقرة!');
           // Clear any retry attempts
           if (retryTimeoutRef.current) {
             clearTimeout(retryTimeoutRef.current);
@@ -150,14 +134,14 @@ export const useRealtimeUpdates = ({
           
           // Retry connection after delay
           retryTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 إعادة محاولة الاتصال');
+            console.log('🔄 إعادة محاولة الاتصال المستقر');
             setupRealtimeListeners();
-          }, 5000);
+          }, 10000); // Increased retry delay
         }
       });
 
     return () => {
-      console.log('🧹 تنظيف مستمعات التحديث المحسنة');
+      console.log('🧹 تنظيف مستمعات التحديث المستقرة');
       supabase.removeChannel(accountChannel);
       supabase.removeChannel(websiteChannel);
       isConnectedRef.current = false;
@@ -167,17 +151,13 @@ export const useRealtimeUpdates = ({
   // Setup realtime listeners for account changes
   useEffect(() => {
     const cleanup = setupRealtimeListeners();
-    setupConnectionMonitoring();
 
     return () => {
       if (cleanup) cleanup();
       
-      // Clear all timeouts and intervals
+      // Clear all timeouts
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
-      }
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
       }
     };
   }, [account?.id, subscriptionExpired, setRotationInterval, setAccount, fetchWebsites]);
@@ -190,9 +170,6 @@ export const useRealtimeUpdates = ({
       }
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
-      }
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current);
       }
     };
   }, []);

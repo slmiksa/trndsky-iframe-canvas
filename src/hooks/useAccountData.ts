@@ -30,25 +30,34 @@ export const useAccountData = (accountId: string | undefined) => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [websitesHash, setWebsitesHash] = useState<string>('');
+
+  // Function to create a simple hash of websites data
+  const createWebsitesHash = (websitesData: Website[]) => {
+    return JSON.stringify(websitesData.map(w => ({
+      id: w.id,
+      url: w.website_url,
+      active: w.is_active
+    })));
+  };
 
   const isSubscriptionExpired = (account: Account) => {
     if (!account.activation_end_date) return false;
     return new Date(account.activation_end_date) < new Date();
   };
 
-  // Enhanced fetch websites function with better error handling
+  // Enhanced fetch websites function with data comparison
   const fetchWebsites = useCallback(async (accountData: Account) => {
     try {
       const now = Date.now();
       
-      // Prevent rapid successive calls
-      if (now - lastFetchTime < 200) {
-        console.log('⏭️ تخطي الجلب - طلب سريع جداً');
+      // Prevent rapid successive calls - increased interval for stability
+      if (now - lastFetchTime < 1000) {
+        console.log('⏭️ تخطي الجلب - منع التحديث السريع');
         return websites;
       }
       
-      console.log('🔍 جلب المواقع المحسن للحساب:', accountData.id);
-      console.log('🖥️ نوع الجهاز:', navigator.userAgent.includes('Mobile') ? 'جوال' : 'كمبيوتر');
+      console.log('🔍 جلب المواقع مع فحص التغييرات للحساب:', accountData.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -62,25 +71,32 @@ export const useAccountData = (accountId: string | undefined) => {
         throw websiteError;
       }
 
-      console.log('✅ تم جلب المواقع بنجاح:', websiteData);
-      console.log('📊 عدد المواقع النشطة:', (websiteData || []).length);
-      
       const activeWebsites = websiteData || [];
+      const newHash = createWebsitesHash(activeWebsites);
       
-      // Force update state even if data seems the same
-      setWebsites([...activeWebsites]);
-      setLastFetchTime(now);
-      
-      console.log('🔄 تم تحديث حالة المواقع بنجاح');
+      // Only update if data actually changed
+      if (newHash !== websitesHash) {
+        console.log('🔄 تغيير حقيقي في المواقع - التحديث مطلوب');
+        console.log('📊 عدد المواقع الجديدة:', activeWebsites.length);
+        
+        setWebsites([...activeWebsites]);
+        setWebsitesHash(newHash);
+        setLastFetchTime(now);
+        
+        console.log('✅ تم تحديث المواقع بنجاح');
+      } else {
+        console.log('⏺️ لا توجد تغييرات في المواقع - لا حاجة للتحديث');
+        setLastFetchTime(now);
+      }
       
       return activeWebsites;
       
     } catch (error) {
-      console.error('❌ خطأ في fetchWebsites المحسن:', error);
+      console.error('❌ خطأ في fetchWebsites:', error);
       setWebsites([]);
       throw error;
     }
-  }, [lastFetchTime, websites]);
+  }, [lastFetchTime, websitesHash]);
 
   // Enhanced initial data fetch
   useEffect(() => {
@@ -92,7 +108,7 @@ export const useAccountData = (accountId: string | undefined) => {
       }
 
       try {
-        console.log('🔍 جلب بيانات الحساب المحسن:', accountId);
+        console.log('🔍 جلب بيانات الحساب:', accountId);
         
         let { data: accountData, error: accountError } = await supabase
           .from('accounts')
@@ -150,6 +166,8 @@ export const useAccountData = (accountId: string | undefined) => {
   const forceRefresh = useCallback(async () => {
     if (account) {
       console.log('🔄 تحديث يدوي للمواقع');
+      // Reset hash to force update
+      setWebsitesHash('');
       await fetchWebsites(account);
     }
   }, [account, fetchWebsites]);
