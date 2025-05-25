@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,6 +55,7 @@ const ClientPublicPage = () => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [iframeError, setIframeError] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(0); // Add force refresh state
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -129,6 +129,9 @@ const ClientPublicPage = () => {
       } else {
         setCurrentWebsiteIndex(0);
       }
+      
+      // Force refresh to ensure immediate UI update
+      setForceRefresh(prev => prev + 1);
       
       console.log('✅ [WEBSITES] Valid websites set:', activeWebsites.length);
     } catch (error) {
@@ -458,6 +461,7 @@ const ClientPublicPage = () => {
   }
 
   const currentWebsite = websites[currentWebsiteIndex];
+  const hasActiveWebsites = websites.length > 0;
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
@@ -489,11 +493,11 @@ const ClientPublicPage = () => {
       )}
 
       {/* Main Content - Full Screen */}
-      {websites.length === 0 ? (
+      {!hasActiveWebsites ? (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center text-white">
             <h2 className="text-xl font-semibold mb-2">
-              مرحباً بك في {account.name}
+              مرحباً بك في {account?.name}
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
@@ -503,7 +507,7 @@ const ClientPublicPage = () => {
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}`}
+          key={`website-${currentWebsite.id}-${forceRefresh}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -551,6 +555,7 @@ const ClientPublicPage = () => {
           <div>الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>خطأ: {iframeError ? 'نعم' : 'لا'}</div>
+          <div>Force Refresh: {forceRefresh}</div>
         </div>
       )}
     </div>
