@@ -29,49 +29,52 @@ export const useRealtimeUpdates = ({
   setAccount,
   fetchWebsites
 }: UseRealtimeUpdatesProps) => {
-  // Refs for managing state and preventing memory leaks
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Enhanced stability refs
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastUpdateTime = useRef<number>(0);
-  const isConnectedRef = useRef(false);
   const channelsRef = useRef<any[]>([]);
   const mountedRef = useRef(true);
+  const isProcessingUpdate = useRef(false);
 
-  // Enhanced debounced fetch with better stability
+  // Super stable debounced fetch with longer delays
   const debouncedFetchWebsites = useCallback((accountData: Account, reason = 'update') => {
-    if (!mountedRef.current || !accountData) return;
+    if (!mountedRef.current || !accountData || isProcessingUpdate.current) return;
 
     const now = Date.now();
     
-    // Strong debouncing - minimum 3 seconds between updates
-    if (now - lastUpdateTime.current < 3000) {
-      console.log('⏭️ تخطي التحديث المكرر - منع التحديث السريع:', reason);
+    // Much stronger debouncing - minimum 5 seconds between updates
+    if (now - lastUpdateTime.current < 5000) {
+      console.log('⏭️ تخطي التحديث - منع الوميض:', reason);
       return;
     }
 
     // Clear any existing timeout
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-      fetchTimeoutRef.current = null;
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
     }
 
-    fetchTimeoutRef.current = setTimeout(async () => {
-      if (!mountedRef.current) return;
+    // Longer debounce delay to prevent flickering
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (!mountedRef.current || isProcessingUpdate.current) return;
       
       try {
-        console.log('🔄 تحديث مستقر للمواقع:', { reason, accountId: accountData.id });
+        isProcessingUpdate.current = true;
+        console.log('🔄 تحديث مستقر بدون وميض:', { reason, accountId: accountData.id });
         lastUpdateTime.current = Date.now();
         await fetchWebsites(accountData, true);
-        console.log('✅ تم تحديث المواقع بنجاح');
+        console.log('✅ تم التحديث بنجاح بدون وميض');
       } catch (error) {
         console.error('❌ خطأ في التحديث المستقر:', error);
+      } finally {
+        isProcessingUpdate.current = false;
       }
-    }, 2000);
+    }, 3000); // Increased to 3 seconds delay
   }, [fetchWebsites]);
 
-  // Enhanced connection cleanup
+  // Enhanced cleanup
   const cleanupChannels = useCallback(() => {
-    console.log('🧹 تنظيف الاتصالات المفتوحة');
+    console.log('🧹 تنظيف جميع الاتصالات');
     
     channelsRef.current.forEach(channel => {
       try {
@@ -82,21 +85,16 @@ export const useRealtimeUpdates = ({
     });
     
     channelsRef.current = [];
-    isConnectedRef.current = false;
     
-    // Clear timeouts
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-      fetchTimeoutRef.current = null;
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
     }
     
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
+    isProcessingUpdate.current = false;
   }, []);
 
-  // Enhanced realtime listener setup
+  // Enhanced realtime setup with better stability
   const setupRealtimeListeners = useCallback(() => {
     if (!account?.id || subscriptionExpired || !mountedRef.current) {
       console.log('⏭️ تخطي إعداد التحديثات الفورية:', {
@@ -107,14 +105,14 @@ export const useRealtimeUpdates = ({
       return;
     }
 
-    // Clean up existing connections first
+    // Clean up first
     cleanupChannels();
 
-    console.log('🌐 إعداد مستمعات التحديث المحسنة للحساب:', account.id);
+    console.log('🌐 إعداد مستمعات مستقرة للحساب:', account.id);
     
     try {
-      // Account changes listener with enhanced error handling
-      const accountChannelName = `account-enhanced-${account.id}-${Date.now()}`;
+      // Account changes with minimal updates
+      const accountChannelName = `account-stable-${account.id}`;
       const accountChannel = supabase
         .channel(accountChannelName)
         .on(
@@ -128,12 +126,8 @@ export const useRealtimeUpdates = ({
           (payload) => {
             if (!mountedRef.current) return;
             
-            console.log('🔄 تحديث بيانات الحساب المحسن:', {
-              timestamp: new Date().toISOString(),
-              changes: payload.new
-            });
+            console.log('🔄 تحديث بيانات الحساب المستقر:', payload.new);
             
-            // Type-safe access to payload properties
             const newData = payload.new as any;
             if (newData?.rotation_interval !== undefined) {
               console.log('⏱️ تحديث فترة التبديل:', newData.rotation_interval);
@@ -142,13 +136,10 @@ export const useRealtimeUpdates = ({
             }
           }
         )
-        .subscribe((status) => {
-          console.log('📡 حالة اشتراك الحساب:', status);
-          isConnectedRef.current = status === 'SUBSCRIBED';
-        });
+        .subscribe();
 
-      // Website changes listener with enhanced stability
-      const websiteChannelName = `websites-enhanced-${account.id}-${Date.now()}`;
+      // Website changes with heavy stability measures
+      const websiteChannelName = `websites-stable-${account.id}`;
       const websiteChannel = supabase
         .channel(websiteChannelName)
         .on(
@@ -160,68 +151,30 @@ export const useRealtimeUpdates = ({
             filter: `account_id=eq.${account.id}`
           },
           (payload) => {
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || isProcessingUpdate.current) return;
             
-            // Type-safe access to payload properties
-            const newRecord = payload.new as any;
-            const oldRecord = payload.old as any;
-            const websiteId = newRecord?.id || oldRecord?.id || 'unknown';
-            
-            console.log('🚀 تحديث موقع محسن:', {
+            console.log('🚀 تحديث موقع مستقر:', {
               event: payload.eventType,
-              timestamp: new Date().toISOString(),
-              websiteId: websiteId
+              timestamp: new Date().toISOString()
             });
             
-            // Enhanced debounced update
+            // Super stable debounced update
             debouncedFetchWebsites(account, `realtime-${payload.eventType}`);
           }
         )
         .subscribe((status) => {
-          console.log('📡 حالة اشتراك المواقع:', status);
-          
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ تم الاشتراك بنجاح في التحديثات المحسنة!');
-            isConnectedRef.current = true;
-            
-            // Clear retry attempts on successful connection
-            if (retryTimeoutRef.current) {
-              clearTimeout(retryTimeoutRef.current);
-              retryTimeoutRef.current = null;
-            }
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error('❌ خطأ في الاشتراك - إعادة الاتصال:', status);
-            isConnectedRef.current = false;
-            
-            // Enhanced retry with exponential backoff
-            const retryDelay = isConnectedRef.current ? 5000 : 15000;
-            
-            retryTimeoutRef.current = setTimeout(() => {
-              if (mountedRef.current) {
-                console.log('🔄 إعادة محاولة الاتصال المحسن');
-                setupRealtimeListeners();
-              }
-            }, retryDelay);
-          }
+          console.log('📡 حالة اشتراك المواقع المستقر:', status);
         });
 
-      // Store channels for cleanup
+      // Store channels
       channelsRef.current = [accountChannel, websiteChannel];
 
     } catch (error) {
-      console.error('❌ خطأ في إعداد المستمعات:', error);
-      
-      // Retry setup on error
-      retryTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current) {
-          console.log('🔄 إعادة محاولة إعداد المستمعات');
-          setupRealtimeListeners();
-        }
-      }, 10000);
+      console.error('❌ خطأ في إعداد المستمعات المستقرة:', error);
     }
   }, [account, subscriptionExpired, debouncedFetchWebsites, setRotationInterval, setAccount, cleanupChannels]);
 
-  // Setup listeners with account changes
+  // Setup with account changes
   useEffect(() => {
     setupRealtimeListeners();
     
@@ -236,6 +189,7 @@ export const useRealtimeUpdates = ({
     
     return () => {
       mountedRef.current = false;
+      isProcessingUpdate.current = false;
       cleanupChannels();
     };
   }, [cleanupChannels]);

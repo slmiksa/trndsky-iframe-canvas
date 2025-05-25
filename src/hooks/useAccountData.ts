@@ -30,26 +30,12 @@ export const useAccountData = (accountId: string | undefined) => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
   
-  // Refs for stability and deduplication
-  const lastFetchTime = useRef<number>(0);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isCurrentlyFetching = useRef<boolean>(false);
+  // Enhanced stability refs
   const mountedRef = useRef<boolean>(true);
-  const websitesSnapshot = useRef<string>('');
-
-  // Enhanced deduplication hash
-  const createWebsitesHash = useCallback((websitesData: Website[]) => {
-    return JSON.stringify(
-      websitesData
-        .sort((a, b) => a.id.localeCompare(b.id))
-        .map(w => ({
-          id: w.id,
-          url: w.website_url,
-          active: w.is_active,
-          title: w.website_title
-        }))
-    );
-  }, []);
+  const lastFetchTime = useRef<number>(0);
+  const isCurrentlyFetching = useRef<boolean>(false);
+  const stableWebsitesRef = useRef<Website[]>([]);
+  const lastWebsitesHash = useRef<string>('');
 
   const isSubscriptionExpired = useCallback((account: Account) => {
     if (!account.activation_end_date) return false;
@@ -62,26 +48,31 @@ export const useAccountData = (accountId: string | undefined) => {
     return uuidRegex.test(str);
   };
 
-  // Enhanced fetch with retry logic and better error handling
+  // Create a stable hash for websites comparison
+  const createWebsitesHash = useCallback((websitesData: Website[]) => {
+    return JSON.stringify(
+      websitesData
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(w => ({ id: w.id, url: w.website_url, active: w.is_active }))
+    );
+  }, []);
+
+  // Fetch websites with enhanced stability
   const fetchWebsites = useCallback(async (accountData: Account, forceRefresh = false) => {
-    if (!mountedRef.current || !accountData?.id) return [];
+    if (!mountedRef.current || !accountData?.id) return stableWebsitesRef.current;
 
     const now = Date.now();
     
-    // Prevent rapid successive calls with better timing
-    if (!forceRefresh && (now - lastFetchTime.current < 2000 || isCurrentlyFetching.current)) {
-      console.log('⏭️ منع الجلب السريع - الانتظار للاستقرار');
-      return websites;
+    // Prevent rapid calls - minimum 3 seconds between fetches
+    if (!forceRefresh && (now - lastFetchTime.current < 3000 || isCurrentlyFetching.current)) {
+      console.log('⏭️ منع الجلب السريع للاستقرار');
+      return stableWebsitesRef.current;
     }
 
     isCurrentlyFetching.current = true;
     
     try {
-      console.log('🔍 جلب المواقع مع محاولة إعادة تحسينة:', {
-        accountId: accountData.id,
-        forceRefresh,
-        lastFetch: now - lastFetchTime.current
-      });
+      console.log('🔍 جلب المواقع المستقر:', { accountId: accountData.id, forceRefresh });
 
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -98,51 +89,41 @@ export const useAccountData = (accountId: string | undefined) => {
       const activeWebsites = websiteData || [];
       const newHash = createWebsitesHash(activeWebsites);
       
-      // Only update if data actually changed
-      if (forceRefresh || newHash !== websitesSnapshot.current) {
-        console.log('✅ تحديث المواقع - تغيير حقيقي مكتشف:', {
-          websitesCount: activeWebsites.length,
-          forced: forceRefresh
+      // Only update if there's a real change or forced refresh
+      if (forceRefresh || newHash !== lastWebsitesHash.current) {
+        console.log('✅ تحديث المواقع المستقر:', {
+          count: activeWebsites.length,
+          forced: forceRefresh,
+          changed: newHash !== lastWebsitesHash.current
         });
         
         if (mountedRef.current) {
+          stableWebsitesRef.current = [...activeWebsites];
           setWebsites([...activeWebsites]);
-          websitesSnapshot.current = newHash;
+          lastWebsitesHash.current = newHash;
           setError(null);
         }
       } else {
-        console.log('ℹ️ لا توجد تغييرات في المواقع');
+        console.log('ℹ️ لا توجد تغييرات في المواقع - الحفاظ على الاستقرار');
       }
       
       lastFetchTime.current = now;
-      return activeWebsites;
+      return stableWebsitesRef.current;
       
     } catch (error: any) {
       console.error('❌ خطأ في fetchWebsites:', error);
       
       if (mountedRef.current) {
         setError('فشل في تحميل المواقع');
-        
-        // Retry logic for network errors
-        if (error.message?.includes('Failed to fetch') || error.message?.includes('network')) {
-          console.log('🔄 محاولة إعادة الاتصال خلال 5 ثوانٍ...');
-          
-          retryTimeoutRef.current = setTimeout(() => {
-            if (mountedRef.current) {
-              console.log('🔄 إعادة محاولة جلب المواقع');
-              fetchWebsites(accountData, true);
-            }
-          }, 5000);
-        }
       }
       
-      return [];
+      return stableWebsitesRef.current;
     } finally {
       isCurrentlyFetching.current = false;
     }
-  }, [websites, createWebsitesHash]);
+  }, [createWebsitesHash]);
 
-  // Enhanced initial data fetch with better error handling
+  // Enhanced initial data fetch
   useEffect(() => {
     const fetchAccountData = async () => {
       if (!accountId || !mountedRef.current) {
@@ -214,7 +195,7 @@ export const useAccountData = (accountId: string | undefined) => {
             return;
           }
 
-          // Fetch websites with initial force refresh
+          // Fetch websites with initial stable fetch
           await fetchWebsites(accountData, true);
         }
 
@@ -244,10 +225,10 @@ export const useAccountData = (accountId: string | undefined) => {
     fetchAccountData();
   }, [accountId, fetchWebsites, isSubscriptionExpired]);
 
-  // Force refresh function
+  // Force refresh function with stability
   const forceRefresh = useCallback(async () => {
-    if (account && mountedRef.current) {
-      console.log('🔄 تحديث يدوي للمواقع');
+    if (account && mountedRef.current && !isCurrentlyFetching.current) {
+      console.log('🔄 تحديث يدوي مستقر للمواقع');
       setError(null);
       await fetchWebsites(account, true);
     }
@@ -260,17 +241,12 @@ export const useAccountData = (accountId: string | undefined) => {
     return () => {
       mountedRef.current = false;
       isCurrentlyFetching.current = false;
-      
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-        retryTimeoutRef.current = null;
-      }
     };
   }, []);
 
   return {
     account,
-    websites,
+    websites: stableWebsitesRef.current, // Return stable reference
     loading,
     error,
     subscriptionExpired,
