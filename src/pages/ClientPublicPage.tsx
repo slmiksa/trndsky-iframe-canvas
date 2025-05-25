@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -402,18 +401,16 @@ const ClientPublicPage = () => {
 
   const currentWebsite = websites[currentWebsiteIndex];
 
+  // Debug logging (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🖥️ [DEBUG] Browser:', navigator.userAgent);
+    console.log('🖥️ [DEBUG] Websites count:', websites.length);
+    console.log('🖥️ [DEBUG] Current index:', currentWebsiteIndex);
+    console.log('🖥️ [DEBUG] Current website:', currentWebsite);
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Debug info - visible in console */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{ display: 'none' }}>
-          {console.log('🖥️ [DEBUG] Browser:', navigator.userAgent)}
-          {console.log('🖥️ [DEBUG] Websites count:', websites.length)}
-          {console.log('🖥️ [DEBUG] Current index:', currentWebsiteIndex)}
-          {console.log('🖥️ [DEBUG] Current website:', currentWebsite)}
-        </div>
-      )}
-
       {/* Main Content - Full Screen */}
       <main className="flex-1">
         {websites.length === 0 ? (
