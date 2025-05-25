@@ -133,10 +133,12 @@ export const useRealtimeUpdates = ({
               changes: payload.new
             });
             
-            if (payload.new?.rotation_interval !== undefined) {
-              console.log('⏱️ تحديث فترة التبديل:', payload.new.rotation_interval);
-              setRotationInterval(payload.new.rotation_interval);
-              setAccount(prev => prev ? { ...prev, rotation_interval: payload.new.rotation_interval } : null);
+            // Type-safe access to payload properties
+            const newData = payload.new as any;
+            if (newData?.rotation_interval !== undefined) {
+              console.log('⏱️ تحديث فترة التبديل:', newData.rotation_interval);
+              setRotationInterval(newData.rotation_interval);
+              setAccount(prev => prev ? { ...prev, rotation_interval: newData.rotation_interval } : null);
             }
           }
         )
@@ -160,10 +162,15 @@ export const useRealtimeUpdates = ({
           (payload) => {
             if (!mountedRef.current) return;
             
+            // Type-safe access to payload properties
+            const newRecord = payload.new as any;
+            const oldRecord = payload.old as any;
+            const websiteId = newRecord?.id || oldRecord?.id || 'unknown';
+            
             console.log('🚀 تحديث موقع محسن:', {
               event: payload.eventType,
               timestamp: new Date().toISOString(),
-              websiteId: payload.new?.id || payload.old?.id
+              websiteId: websiteId
             });
             
             // Enhanced debounced update
