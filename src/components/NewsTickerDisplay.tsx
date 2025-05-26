@@ -22,12 +22,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   const fetchNews = async () => {
     try {
-      console.log('🔍 جاري تحميل الأخبار للعرض:', accountId);
+      console.log('🔍 جاري تحميل الأخبار النشطة للعرض:', accountId);
       const { data, error } = await supabase
         .from('news_ticker')
         .select('*')
         .eq('account_id', accountId)
-        .eq('is_active', true)
+        .eq('is_active', true)  // فقط الأخبار النشطة
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -35,14 +35,19 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         return;
       }
 
-      console.log('✅ تم تحميل الأخبار:', data?.length || 0);
+      console.log('✅ تم تحميل الأخبار النشطة:', data?.length || 0);
       const activeNews = data || [];
+      
+      if (activeNews.length === 0) {
+        console.log('📭 لا توجد أخبار نشطة - إخفاء الشريط');
+        setNewsItems([]);
+        return;
+      }
+
       setNewsItems(activeNews);
       
-      // إعادة تعيين الفهرس إذا لم تعد هناك أخبار نشطة
-      if (activeNews.length === 0) {
-        setCurrentIndex(0);
-      } else if (activeNews.length <= currentIndex) {
+      // إعادة تعيين الفهرس إذا كان الفهرس الحالي خارج النطاق
+      if (activeNews.length <= currentIndex) {
         setCurrentIndex(0);
       }
     } catch (error) {
@@ -71,10 +76,8 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         (payload) => {
           console.log('📰 تحديث فوري في الأخبار:', payload.eventType, payload);
           
-          // إعادة تحميل الأخبار النشطة فقط عند أي تغيير
-          setTimeout(() => {
-            fetchNews();
-          }, 100);
+          // إعادة تحميل الأخبار فوراً عند أي تغيير
+          fetchNews();
         }
       )
       .subscribe((status) => {
