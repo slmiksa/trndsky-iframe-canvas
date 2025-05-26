@@ -36,12 +36,13 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       }
 
       console.log('✅ تم تحميل الأخبار:', data?.length || 0);
-      setNewsItems(data || []);
+      const activeNews = data || [];
+      setNewsItems(activeNews);
       
-      // إعادة تعيين الفهرس إذا لم تعد هناك أخبار أو إذا كان الفهرس الحالي خارج النطاق
-      if (!data || data.length === 0) {
+      // إعادة تعيين الفهرس إذا لم تعد هناك أخبار نشطة
+      if (activeNews.length === 0) {
         setCurrentIndex(0);
-      } else if (data.length <= currentIndex) {
+      } else if (activeNews.length <= currentIndex) {
         setCurrentIndex(0);
       }
     } catch (error) {
@@ -70,8 +71,10 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         (payload) => {
           console.log('📰 تحديث فوري في الأخبار:', payload.eventType, payload);
           
-          // إعادة تحميل الأخبار فوراً عند أي تغيير
-          fetchNews();
+          // إعادة تحميل الأخبار النشطة فقط عند أي تغيير
+          setTimeout(() => {
+            fetchNews();
+          }, 100);
         }
       )
       .subscribe((status) => {
@@ -106,19 +109,24 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     setFade(true);
   }, [currentIndex]);
 
-  // إذا لم توجد أخبار نشطة، لا تظهر أي شيء
+  // إذا لم توجد أخبار نشطة، اخفاء الشريط تماماً
   if (!newsItems.length) {
-    console.log('📭 لا توجد أخبار نشطة للعرض');
+    console.log('📭 لا توجد أخبار نشطة للعرض - إخفاء الشريط');
     return null;
   }
 
   const currentNews = newsItems[currentIndex];
-  if (!currentNews) return null;
+  if (!currentNews) {
+    console.log('📭 لا يوجد خبر حالي للعرض');
+    return null;
+  }
 
   // تجهيز نص الخبر
   const newsText = currentNews.content 
     ? `${currentNews.title} - ${currentNews.content}` 
     : currentNews.title;
+
+  console.log('📺 عرض الخبر:', currentNews.title, 'نشط:', currentNews.is_active);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
