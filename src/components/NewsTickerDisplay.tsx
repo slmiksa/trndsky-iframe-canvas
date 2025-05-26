@@ -44,7 +44,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     fetchNews();
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة مع معالجة أفضل للتحديثات
+  // الاشتراك في التحديثات المباشرة مع معالجة فورية للتحديثات
   useEffect(() => {
     const channel = supabase
       .channel(`news_ticker_${accountId}`)
@@ -68,8 +68,9 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
             }
           } else if (payload.eventType === 'UPDATE') {
             const updatedItem = payload.new as NewsItem;
-            if (updatedItem.is_active) {
-              setNewsItems(prev => {
+            setNewsItems(prev => {
+              if (updatedItem.is_active) {
+                // إضافة أو تحديث الخبر النشط
                 const exists = prev.find(item => item.id === updatedItem.id);
                 if (exists) {
                   return prev.map(item => 
@@ -80,11 +81,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
                     (a.display_order || 0) - (b.display_order || 0)
                   );
                 }
-              });
-            } else {
-              // إزالة الخبر فوراً عند إيقاف تنشيطه
-              setNewsItems(prev => prev.filter(item => item.id !== updatedItem.id));
-            }
+              } else {
+                // إزالة الخبر فوراً عند إيقاف تنشيطه
+                console.log('🚫 إزالة الخبر غير النشط:', updatedItem.title);
+                return prev.filter(item => item.id !== updatedItem.id);
+              }
+            });
           } else if (payload.eventType === 'DELETE') {
             const deletedItem = payload.old as NewsItem;
             setNewsItems(prev => prev.filter(item => item.id !== deletedItem.id));
