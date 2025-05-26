@@ -57,6 +57,9 @@ const ClientPublicPage = () => {
   const [iframeLoading, setIframeLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
+  const [failedWebsites, setFailedWebsites] = useState<Set<string>>(new Set());
+  const [retryCount, setRetryCount] = useState(0);
+  const [currentErrorMessage, setCurrentErrorMessage] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   const { fetchActiveNotifications } = useNotifications();
@@ -133,6 +136,55 @@ const ClientPublicPage = () => {
     } catch (error) {
       console.error('❌ Exception fetching websites:', error);
     }
+  };
+
+  // Enhanced website switching with error handling
+  const switchToNextWebsite = () => {
+    if (websites.length <= 1) return;
+
+    setCurrentWebsiteIndex((prev) => {
+      let nextIndex = (prev + 1) % websites.length;
+      let attempts = 0;
+      
+      // Skip failed websites
+      while (failedWebsites.has(websites[nextIndex]?.id) && attempts < websites.length) {
+        nextIndex = (nextIndex + 1) % websites.length;
+        attempts++;
+      }
+      
+      // If all websites are failed, reset failed list and try again
+      if (attempts >= websites.length) {
+        console.log('🔄 All websites failed, resetting failed list');
+        setFailedWebsites(new Set());
+        nextIndex = (prev + 1) % websites.length;
+      }
+      
+      const nextWebsite = websites[nextIndex];
+      if (nextWebsite) {
+        console.log('🔄 Switching to website:', nextWebsite.website_url);
+        setIframeLoading(true);
+        setIframeError(false);
+        setCurrentErrorMessage(null);
+        setRetryCount(0);
+      }
+      
+      return nextIndex;
+    });
+  };
+
+  // Retry failed website
+  const retryCurrentWebsite = () => {
+    const currentWebsite = websites[currentWebsiteIndex];
+    if (!currentWebsite) return;
+
+    console.log('🔄 Retrying website:', currentWebsite.website_url, 'Attempt:', retryCount + 1);
+    setRetryCount(prev => prev + 1);
+    setIframeLoading(true);
+    setIframeError(false);
+    setCurrentErrorMessage(null);
+    
+    // Force iframe refresh by updating the key
+    setCurrentWebsiteIndex(prev => prev);
   };
 
   // Window focus/blur event handlers for desktop
@@ -419,27 +471,42 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Fast website rotation - 3 seconds for all devices
+  // Enhanced website rotation with error handling
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
     const interval = setInterval(() => {
-      setCurrentWebsiteIndex((prev) => {
-        const nextIndex = (prev + 1) % websites.length;
-        const nextWebsite = websites[nextIndex];
-        
-        if (nextWebsite) {
-          console.log('🔄 Switching to website:', nextWebsite.website_url);
-          setIframeLoading(true);
-          setIframeError(false);
-        }
-        
-        return nextIndex;
-      });
+      switchToNextWebsite();
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [websites.length, subscriptionExpired]);
+  }, [websites.length, subscriptionExpired, failedWebsites]);
+
+  // Auto-retry failed websites
+  useEffect(() => {
+    if (!iframeError || retryCount >= 3) return;
+
+    const retryTimeout = setTimeout(() => {
+      retryCurrentWebsite();
+    }, 2000);
+
+    return () => clearTimeout(retryTimeout);
+  }, [iframeError, retryCount]);
+
+  // Auto-skip after max retries
+  useEffect(() => {
+    if (iframeError && retryCount >= 3) {
+      const currentWebsite = websites[currentWebsiteIndex];
+      if (currentWebsite) {
+        console.log('❌ Max retries reached, marking website as failed:', currentWebsite.website_url);
+        setFailedWebsites(prev => new Set([...prev, currentWebsite.id]));
+        
+        setTimeout(() => {
+          switchToNextWebsite();
+        }, 1000);
+      }
+    }
+  }, [iframeError, retryCount, currentWebsiteIndex]);
 
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 Closing notification:', notificationId);
@@ -452,9 +519,20 @@ const ClientPublicPage = () => {
 
   const handleIframeLoad = () => {
     const currentWebsite = websites[currentWebsiteIndex];
-    console.log('✅ Website loaded:', currentWebsite?.website_url);
+    console.log('✅ Website loaded successfully:', currentWebsite?.website_url);
     setIframeLoading(false);
     setIframeError(false);
+    setCurrentErrorMessage(null);
+    setRetryCount(0);
+    
+    // Remove from failed list if it was there
+    if (currentWebsite) {
+      setFailedWebsites(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(currentWebsite.id);
+        return newSet;
+      });
+    }
   };
 
   const handleIframeError = () => {
@@ -462,6 +540,16 @@ const ClientPublicPage = () => {
     console.error('❌ Website failed to load:', currentWebsite?.website_url);
     setIframeLoading(false);
     setIframeError(true);
+    
+    // Set specific error message based on common issues
+    const errorMessages = [
+      'فشل في تحميل الموقع - قد يكون الموقع لا يدعم العرض في iframe',
+      'خطأ في الشبكة - جاري إعادة المحاولة',
+      'الموقع غير متاح مؤقتاً',
+      'مشكلة في سياسات الأمان للموقع'
+    ];
+    
+    setCurrentErrorMessage(errorMessages[Math.min(retryCount, errorMessages.length - 1)]);
   };
 
   if (loading) {
@@ -542,29 +630,58 @@ const ClientPublicPage = () => {
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Loading indicator */}
+      {/* Enhanced Loading indicator */}
       {(iframeLoading && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
           <div className="text-center text-white">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-lg">جاري تحميل الموقع...</p>
+            <p className="text-lg">
+              {retryCount > 0 ? `إعادة المحاولة ${retryCount}/3...` : 'جاري تحميل الموقع...'}
+            </p>
             <p className="text-sm text-gray-300 mt-2">{currentWebsite.website_url}</p>
           </div>
         </div>
       )}
 
-      {/* Error indicator */}
+      {/* Enhanced Error indicator */}
       {(iframeError && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-red-900 z-10">
-          <div className="text-center text-white">
+          <div className="text-center text-white max-w-md mx-4">
             <div className="w-16 h-16 bg-red-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-lg">فشل في تحميل الموقع</p>
-            <p className="text-sm text-gray-300 mt-2">{currentWebsite.website_url}</p>
-            <p className="text-xs text-gray-400 mt-2">قد يكون الموقع لا يدعم العرض في iframe</p>
+            <p className="text-lg mb-2">
+              {currentErrorMessage || 'فشل في تحميل الموقع'}
+            </p>
+            <p className="text-sm text-gray-300 mb-4">{currentWebsite.website_url}</p>
+            
+            {retryCount < 3 ? (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">
+                  جاري إعادة المحاولة ({retryCount}/3)...
+                </p>
+                <div className="w-full bg-red-800 rounded-full h-2">
+                  <div 
+                    className="bg-white h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${((retryCount + 1) / 3) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">
+                  تم تخطي هذا الموقع - الانتقال للموقع التالي...
+                </p>
+                <button 
+                  onClick={retryCurrentWebsite}
+                  className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors"
+                >
+                  إعادة المحاولة يدوياً
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -584,7 +701,7 @@ const ClientPublicPage = () => {
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={currentWebsiteIndex}
+          key={`${currentWebsiteIndex}-${retryCount}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -634,9 +751,9 @@ const ClientPublicPage = () => {
           <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
+          <div>🔄 المحاولات: {retryCount}/3</div>
+          <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
           <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
-          <div>💪 التحديث السريع: 1 ثانية</div>
-          <div>🔥 Force Refresh: 5 ثوان</div>
         </div>
       )}
     </div>
