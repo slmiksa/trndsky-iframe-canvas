@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +56,7 @@ const ClientPublicPage = () => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
+  const [isWindowFocused, setIsWindowFocused] = useState(true);
   const isMobile = useIsMobile();
 
   const { fetchActiveNotifications } = useNotifications();
@@ -92,7 +92,7 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Fetch websites function - simplified and unified
+  // Enhanced fetch websites function with better error handling
   const fetchWebsites = async (accountData?: Account) => {
     const targetAccount = accountData || account;
     if (!targetAccount?.id) return;
@@ -134,6 +134,51 @@ const ClientPublicPage = () => {
       console.error('❌ Exception fetching websites:', error);
     }
   };
+
+  // Window focus/blur event handlers for desktop
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('🔍 Window focused - refreshing websites');
+      setIsWindowFocused(true);
+      if (account?.id && !subscriptionExpired) {
+        fetchWebsites();
+      }
+    };
+
+    const handleBlur = () => {
+      console.log('👋 Window blurred');
+      setIsWindowFocused(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('👁️ Page visible - refreshing websites');
+        setIsWindowFocused(true);
+        if (account?.id && !subscriptionExpired) {
+          fetchWebsites();
+        }
+      } else {
+        console.log('🙈 Page hidden');
+        setIsWindowFocused(false);
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      console.log('🚪 Page unloading');
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [account?.id, subscriptionExpired]);
 
   // Initial account data fetch
   useEffect(() => {
@@ -199,53 +244,79 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Unified realtime listener for all devices - no mobile restrictions
+  // Enhanced realtime listener with reconnection logic
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('📡 Setting up realtime listener for all devices:', account.id);
+    console.log('📡 Setting up enhanced realtime listener:', account.id);
     
     let timeoutId: NodeJS.Timeout;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
     
-    const websiteChannel = supabase
-      .channel(`websites_${account.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'account_websites',
-          filter: `account_id=eq.${account.id}`
-        },
-        async (payload) => {
-          console.log('📡 Website change detected:', payload.eventType);
+    const setupChannel = () => {
+      const websiteChannel = supabase
+        .channel(`websites_${account.id}_${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'account_websites',
+            filter: `account_id=eq.${account.id}`
+          },
+          async (payload) => {
+            console.log('📡 Website change detected:', payload.eventType);
+            
+            // Debounce rapid changes
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+              fetchWebsites();
+            }, 100);
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Realtime status:', status);
           
-          // Debounce rapid changes
-          clearTimeout(timeoutId);
-          timeoutId = setTimeout(() => {
-            fetchWebsites();
-          }, 300);
-        }
-      )
-      .subscribe((status) => {
-        console.log('📡 Realtime status:', status);
-      });
+          if (status === 'SUBSCRIBED') {
+            reconnectAttempts = 0;
+            console.log('✅ Realtime connected successfully');
+          } else if (status === 'CHANNEL_ERROR' && reconnectAttempts < maxReconnectAttempts) {
+            reconnectAttempts++;
+            console.log(`🔄 Reconnecting... Attempt ${reconnectAttempts}`);
+            setTimeout(setupChannel, 1000 * reconnectAttempts);
+          }
+        });
 
-    // Unified polling for all devices - works on desktop and mobile
-    const unifiedInterval = setInterval(() => {
-      console.log('🔄 Polling websites (unified for all devices)');
+      return websiteChannel;
+    };
+
+    const channel = setupChannel();
+
+    // Aggressive polling for all devices - 1 second intervals
+    const aggressiveInterval = setInterval(() => {
+      if (isWindowFocused) {
+        console.log('🔄 Aggressive polling (1s interval)');
+        fetchWebsites();
+      }
+    }, 1000);
+
+    // Force refresh every 5 seconds as fallback
+    const forceRefreshInterval = setInterval(() => {
+      console.log('💪 Force refresh (5s fallback)');
       fetchWebsites();
-    }, 2000); // Every 2 seconds for all devices
+    }, 5000);
 
     return () => {
-      console.log('🧹 Cleaning up listeners');
+      console.log('🧹 Cleaning up enhanced listeners');
       clearTimeout(timeoutId);
-      clearInterval(unifiedInterval);
-      supabase.removeChannel(websiteChannel);
+      clearInterval(aggressiveInterval);
+      clearInterval(forceRefreshInterval);
+      supabase.removeChannel(channel);
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, isWindowFocused]);
 
   // Enhanced realtime listener for notifications
   useEffect(() => {
@@ -348,7 +419,7 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Website rotation - simplified and works for all devices
+  // Fast website rotation - 3 seconds for all devices
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
@@ -365,7 +436,7 @@ const ClientPublicPage = () => {
         
         return nextIndex;
       });
-    }, 3000); // 3 seconds rotation
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [websites.length, subscriptionExpired]);
@@ -507,13 +578,13 @@ const ClientPublicPage = () => {
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
-              ⚡ التحديث التلقائي مُفعّل لجميع الأجهزة
+              ⚡ التحديث السريع مُفعّل (1 ثانية)
             </p>
           </div>
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}-${currentWebsiteIndex}`}
+          key={currentWebsiteIndex}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -527,10 +598,10 @@ const ClientPublicPage = () => {
             left: 0,
             border: 'none'
           }}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation allow-downloads"
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation allow-downloads allow-pointer-lock"
           loading="eager"
           referrerPolicy="no-referrer-when-downgrade"
-          allow="fullscreen; picture-in-picture; autoplay; encrypted-media; accelerometer; gyroscope; camera; microphone; geolocation; payment"
+          allow="fullscreen; picture-in-picture; autoplay; encrypted-media; accelerometer; gyroscope; camera; microphone; geolocation; payment; display-capture"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
         />
@@ -554,7 +625,7 @@ const ClientPublicPage = () => {
         />
       ))}
 
-      {/* Debug info in development */}
+      {/* Enhanced debug info */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
           <div>🔄 النقل: كل 3 ثوان</div>
@@ -563,7 +634,9 @@ const ClientPublicPage = () => {
           <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>🌐 جميع الأجهزة: مُفعّل</div>
+          <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
+          <div>💪 التحديث السريع: 1 ثانية</div>
+          <div>🔥 Force Refresh: 5 ثوان</div>
         </div>
       )}
     </div>
