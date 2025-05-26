@@ -22,7 +22,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   const fetchNews = async () => {
     try {
-      console.log('🔍 جاري تحميل الأخبار النشطة للعرض:', accountId);
+      console.log('🔍 [NewsTickerDisplay] جاري تحميل الأخبار النشطة للعرض:', accountId);
       const { data, error } = await supabase
         .from('news_ticker')
         .select('*')
@@ -31,37 +31,41 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         .order('display_order', { ascending: true });
 
       if (error) {
-        console.error('❌ خطأ في تحميل الأخبار:', error);
+        console.error('❌ [NewsTickerDisplay] خطأ في تحميل الأخبار:', error);
         return;
       }
 
-      console.log('✅ تم تحميل الأخبار النشطة:', data?.length || 0);
       const activeNews = data || [];
+      console.log('✅ [NewsTickerDisplay] تم تحميل الأخبار النشطة:', activeNews.length, activeNews);
       
       if (activeNews.length === 0) {
-        console.log('📭 لا توجد أخبار نشطة - إخفاء الشريط');
+        console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة - تعيين قائمة فارغة');
         setNewsItems([]);
+        setCurrentIndex(0);
         return;
       }
 
+      console.log('📺 [NewsTickerDisplay] تعيين الأخبار النشطة:', activeNews.map(n => ({ id: n.id, title: n.title, is_active: n.is_active })));
       setNewsItems(activeNews);
       
       // إعادة تعيين الفهرس إذا كان الفهرس الحالي خارج النطاق
       if (activeNews.length <= currentIndex) {
+        console.log('🔄 [NewsTickerDisplay] إعادة تعيين الفهرس من', currentIndex, 'إلى 0');
         setCurrentIndex(0);
       }
     } catch (error) {
-      console.error('❌ خطأ في fetchNews:', error);
+      console.error('❌ [NewsTickerDisplay] خطأ في fetchNews:', error);
     }
   };
 
   useEffect(() => {
+    console.log('🚀 [NewsTickerDisplay] تحميل أولي للأخبار');
     fetchNews();
   }, [accountId]);
 
   // الاشتراك في التحديثات المباشرة
   useEffect(() => {
-    console.log('📡 إعداد قناة التحديثات المباشرة للأخبار');
+    console.log('📡 [NewsTickerDisplay] إعداد قناة التحديثات المباشرة للأخبار');
     
     const channel = supabase
       .channel(`news_ticker_realtime_${accountId}`)
@@ -74,18 +78,21 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           filter: `account_id=eq.${accountId}`
         },
         (payload) => {
-          console.log('📰 تحديث فوري في الأخبار:', payload.eventType, payload);
+          console.log('📰 [NewsTickerDisplay] تحديث فوري في الأخبار:', payload.eventType, payload);
+          console.log('📰 [NewsTickerDisplay] البيانات الجديدة:', payload.new);
+          console.log('📰 [NewsTickerDisplay] البيانات القديمة:', payload.old);
           
           // إعادة تحميل الأخبار فوراً عند أي تغيير
+          console.log('🔄 [NewsTickerDisplay] إعادة تحميل الأخبار بسبب التحديث المباشر');
           fetchNews();
         }
       )
       .subscribe((status) => {
-        console.log('📡 حالة قناة الأخبار:', status);
+        console.log('📡 [NewsTickerDisplay] حالة قناة الأخبار:', status);
       });
 
     return () => {
-      console.log('🧹 تنظيف قناة الأخبار');
+      console.log('🧹 [NewsTickerDisplay] تنظيف قناة الأخبار');
       supabase.removeChannel(channel);
     };
   }, [accountId]);
@@ -112,15 +119,23 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     setFade(true);
   }, [currentIndex]);
 
+  // متابعة تغييرات newsItems
+  useEffect(() => {
+    console.log('📋 [NewsTickerDisplay] تغيير في قائمة الأخبار:', {
+      length: newsItems.length,
+      items: newsItems.map(n => ({ id: n.id, title: n.title, is_active: n.is_active }))
+    });
+  }, [newsItems]);
+
   // إذا لم توجد أخبار نشطة، اخفاء الشريط تماماً
   if (!newsItems.length) {
-    console.log('📭 لا توجد أخبار نشطة للعرض - إخفاء الشريط');
+    console.log('🚫 [NewsTickerDisplay] لا توجد أخبار نشطة للعرض - إرجاع null');
     return null;
   }
 
   const currentNews = newsItems[currentIndex];
   if (!currentNews) {
-    console.log('📭 لا يوجد خبر حالي للعرض');
+    console.log('🚫 [NewsTickerDisplay] لا يوجد خبر حالي للعرض');
     return null;
   }
 
@@ -129,7 +144,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     ? `${currentNews.title} - ${currentNews.content}` 
     : currentNews.title;
 
-  console.log('📺 عرض الخبر:', currentNews.title, 'نشط:', currentNews.is_active);
+  console.log('📺 [NewsTickerDisplay] عرض الخبر:', currentNews.title, 'نشط:', currentNews.is_active);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
