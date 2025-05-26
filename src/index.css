@@ -74,7 +74,27 @@ body {
   }
 }
 
-/* News Ticker Animation */
+/* News Ticker Animation - حركة مستمرة بدون انقطاع */
+@keyframes marquee-continuous {
+  0% { 
+    transform: translateX(100%); 
+  }
+  100% { 
+    transform: translateX(-100%); 
+  }
+}
+
+.animate-marquee-continuous {
+  display: inline-block;
+  animation: marquee-continuous 25s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-continuous:hover {
+  animation-play-state: paused;
+}
+
+/* الحركة السابقة للتوافق مع المكونات الأخرى */
 @keyframes marquee {
   0% { 
     transform: translateX(100%); 
@@ -95,6 +115,10 @@ body {
 
 /* Responsive adjustments for news ticker */
 @media (max-width: 768px) {
+  .animate-marquee-continuous {
+    animation-duration: 20s;
+  }
+  
   .animate-marquee {
     animation-duration: 15s;
   }

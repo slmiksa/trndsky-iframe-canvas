@@ -84,33 +84,42 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     return () => clearInterval(interval);
   }, [newsItems.length]);
 
+  // إظهار جميع الأخبار النشطة واحدة تلو الأخرى
   if (!newsItems.length) {
     return null;
   }
 
-  const currentNews = newsItems[currentIndex];
-
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-blue-600 text-white z-40">
-      <div className="flex items-center px-4 py-2">
-        <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold ml-4">
-          أخبار
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <div className="animate-marquee whitespace-nowrap">
-            <span className="font-semibold ml-2">{currentNews.title}</span>
-            {currentNews.content && (
-              <span className="text-blue-100">- {currentNews.content}</span>
+    <>
+      {newsItems.map((newsItem, index) => (
+        <div
+          key={newsItem.id}
+          className={`fixed bottom-0 left-0 right-0 bg-blue-600 text-white z-40 transition-all duration-300 ${
+            index === currentIndex ? 'opacity-100 visible' : 'opacity-0 invisible'
+          }`}
+          style={{ transform: `translateY(${index === currentIndex ? '0' : '100%'})` }}
+        >
+          <div className="flex items-center px-4 py-2">
+            <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold ml-4">
+              أخبار
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <div className="animate-marquee-continuous whitespace-nowrap">
+                <span className="font-semibold ml-2">{newsItem.title}</span>
+                {newsItem.content && (
+                  <span className="text-blue-100">- {newsItem.content}</span>
+                )}
+              </div>
+            </div>
+            {newsItems.length > 1 && (
+              <div className="flex-shrink-0 text-xs text-blue-200 mr-4">
+                {currentIndex + 1} / {newsItems.length}
+              </div>
             )}
           </div>
         </div>
-        {newsItems.length > 1 && (
-          <div className="flex-shrink-0 text-xs text-blue-200 mr-4">
-            {currentIndex + 1} / {newsItems.length}
-          </div>
-        )}
-      </div>
-    </div>
+      ))}
+    </>
   );
 };
 
