@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useBreakTimers } from '@/hooks/useBreakTimers';
+import { useIsMobile } from '@/hooks/use-mobile';
 import NotificationPopup from '@/components/NotificationPopup';
 import BreakTimerDisplay from '@/components/BreakTimerDisplay';
 
@@ -56,25 +57,10 @@ const ClientPublicPage = () => {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [iframeLoading, setIframeLoading] = useState(false);
   const [iframeError, setIframeError] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [lastWebsiteId, setLastWebsiteId] = useState<string>('');
+  const isMobile = useIsMobile();
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
-
-  // Detect mobile device
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                     window.innerWidth <= 768;
-      setIsMobile(mobile);
-      console.log('📱 Device detection:', mobile ? 'Mobile' : 'Desktop');
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Function to check if subscription is expired
   const isSubscriptionExpired = (account: Account) => {
@@ -106,13 +92,13 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Optimized websites fetch - prevent unnecessary re-renders
+  // Fetch websites function - simplified and unified
   const fetchWebsites = async (accountData?: Account) => {
     const targetAccount = accountData || account;
     if (!targetAccount?.id) return;
 
     try {
-      console.log('⚡ Fetching websites for:', targetAccount.id);
+      console.log('🔄 Fetching websites for:', targetAccount.id);
       
       const { data: websiteData, error: websiteError } = await supabase
         .from('account_websites')
@@ -126,7 +112,7 @@ const ClientPublicPage = () => {
         return;
       }
 
-      console.log('📊 Raw website data:', websiteData?.length || 0, 'websites');
+      console.log('📊 Fetched websites:', websiteData?.length || 0);
       
       // Filter valid URLs only
       const activeWebsites = (websiteData || []).filter(website => {
@@ -137,16 +123,11 @@ const ClientPublicPage = () => {
         return isValid;
       });
       
-      console.log('✅ Active websites:', activeWebsites.length);
+      console.log('✅ Valid active websites:', activeWebsites.length);
       
-      // Only update if websites actually changed
-      const websiteIds = activeWebsites.map(w => w.id).join(',');
-      const currentIds = websites.map(w => w.id).join(',');
-      
-      if (websiteIds !== currentIds) {
-        setWebsites(activeWebsites);
+      setWebsites(activeWebsites);
+      if (activeWebsites.length > 0 && currentWebsiteIndex >= activeWebsites.length) {
         setCurrentWebsiteIndex(0);
-        console.log('🔄 Websites updated:', activeWebsites.length);
       }
       
     } catch (error) {
@@ -154,6 +135,7 @@ const ClientPublicPage = () => {
     }
   };
 
+  // Initial account data fetch
   useEffect(() => {
     const fetchAccountData = async () => {
       if (!accountId) {
@@ -217,13 +199,13 @@ const ClientPublicPage = () => {
     fetchAccountData();
   }, [accountId]);
 
-  // Realtime listener with debounce
+  // Unified realtime listener for all devices - no mobile restrictions
   useEffect(() => {
     if (!account?.id || subscriptionExpired) {
       return;
     }
 
-    console.log('📡 Setting up realtime listener for:', account.id);
+    console.log('📡 Setting up realtime listener for all devices:', account.id);
     
     let timeoutId: NodeJS.Timeout;
     
@@ -244,27 +226,26 @@ const ClientPublicPage = () => {
           clearTimeout(timeoutId);
           timeoutId = setTimeout(() => {
             fetchWebsites();
-          }, 500);
+          }, 300);
         }
       )
       .subscribe((status) => {
         console.log('📡 Realtime status:', status);
       });
 
-    // Mobile-specific polling (reduced frequency)
-    const mobileInterval = setInterval(() => {
-      if (isMobile) {
-        fetchWebsites();
-      }
-    }, 5000); // Every 5 seconds for mobile
+    // Unified polling for all devices - works on desktop and mobile
+    const unifiedInterval = setInterval(() => {
+      console.log('🔄 Polling websites (unified for all devices)');
+      fetchWebsites();
+    }, 2000); // Every 2 seconds for all devices
 
     return () => {
       console.log('🧹 Cleaning up listeners');
       clearTimeout(timeoutId);
-      clearInterval(mobileInterval);
+      clearInterval(unifiedInterval);
       supabase.removeChannel(websiteChannel);
     };
-  }, [account?.id, subscriptionExpired, isMobile]);
+  }, [account?.id, subscriptionExpired]);
 
   // Enhanced realtime listener for notifications
   useEffect(() => {
@@ -367,7 +348,7 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Optimized website rotation - only when website actually changes
+  // Website rotation - simplified and works for all devices
   useEffect(() => {
     if (websites.length <= 1 || subscriptionExpired) return;
 
@@ -376,10 +357,8 @@ const ClientPublicPage = () => {
         const nextIndex = (prev + 1) % websites.length;
         const nextWebsite = websites[nextIndex];
         
-        // Only trigger loading state if website actually changed
-        if (nextWebsite && nextWebsite.id !== lastWebsiteId) {
+        if (nextWebsite) {
           console.log('🔄 Switching to website:', nextWebsite.website_url);
-          setLastWebsiteId(nextWebsite.id);
           setIframeLoading(true);
           setIframeError(false);
         }
@@ -389,7 +368,7 @@ const ClientPublicPage = () => {
     }, 3000); // 3 seconds rotation
 
     return () => clearInterval(interval);
-  }, [websites.length, subscriptionExpired, lastWebsiteId]);
+  }, [websites.length, subscriptionExpired]);
 
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 Closing notification:', notificationId);
@@ -492,7 +471,7 @@ const ClientPublicPage = () => {
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Loading indicator - only show when actually loading */}
+      {/* Loading indicator */}
       {(iframeLoading && currentWebsite) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
           <div className="text-center text-white">
@@ -528,13 +507,13 @@ const ClientPublicPage = () => {
             </h2>
             <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
             <p className="text-sm text-gray-400 mt-2">
-              ⚡ التحديث التلقائي مُفعّل
+              ⚡ التحديث التلقائي مُفعّل لجميع الأجهزة
             </p>
           </div>
         </div>
       ) : currentWebsite ? (
         <iframe
-          key={`website-${currentWebsite.id}`}
+          key={`website-${currentWebsite.id}-${currentWebsiteIndex}`}
           src={currentWebsite.website_url}
           title={currentWebsite.website_title || currentWebsite.website_url}
           className="w-full h-full border-0"
@@ -584,7 +563,7 @@ const ClientPublicPage = () => {
           <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
           <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
           <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>🆔 آخر موقع: {lastWebsiteId}</div>
+          <div>🌐 جميع الأجهزة: مُفعّل</div>
         </div>
       )}
     </div>
