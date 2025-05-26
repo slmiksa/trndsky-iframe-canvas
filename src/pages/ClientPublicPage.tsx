@@ -6,6 +6,7 @@ import { useBreakTimers } from '@/hooks/useBreakTimers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import NotificationPopup from '@/components/NotificationPopup';
 import BreakTimerDisplay from '@/components/BreakTimerDisplay';
+import NewsTickerDisplay from '@/components/NewsTickerDisplay';
 
 interface Account {
   id: string;
@@ -723,6 +724,11 @@ const ClientPublicPage = () => {
           onError={handleIframeError}
         />
       ) : null}
+
+      {/* News Ticker Display */}
+      {account?.id && !subscriptionExpired && (
+        <NewsTickerDisplay accountId={account.id} />
+      )}
 
       {/* Active Notifications */}
       {activeNotifications.map((notification) => (
