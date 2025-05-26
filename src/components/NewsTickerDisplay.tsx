@@ -53,12 +53,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     fetchNews();
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة مع استجابة فورية
+  // الاشتراك في التحديثات المباشرة
   useEffect(() => {
     console.log('📡 إعداد قناة التحديثات المباشرة للأخبار');
     
     const channel = supabase
-      .channel(`news_ticker_realtime_${accountId}_${Date.now()}`)
+      .channel(`news_ticker_realtime_${accountId}`)
       .on(
         'postgres_changes',
         {
@@ -70,69 +70,8 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         (payload) => {
           console.log('📰 تحديث فوري في الأخبار:', payload.eventType, payload);
           
-          if (payload.eventType === 'INSERT') {
-            const newItem = payload.new as NewsItem;
-            if (newItem.is_active) {
-              console.log('➕ إضافة خبر جديد:', newItem.title);
-              setNewsItems(prev => {
-                const updated = [...prev, newItem].sort((a, b) => 
-                  (a.display_order || 0) - (b.display_order || 0)
-                );
-                return updated;
-              });
-            }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedItem = payload.new as NewsItem;
-            console.log('🔄 تحديث خبر:', updatedItem.title, 'نشط:', updatedItem.is_active);
-            
-            setNewsItems(prev => {
-              if (updatedItem.is_active) {
-                // إضافة أو تحديث الخبر النشط
-                const existingIndex = prev.findIndex(item => item.id === updatedItem.id);
-                if (existingIndex >= 0) {
-                  // تحديث الخبر الموجود
-                  const updated = prev.map(item => 
-                    item.id === updatedItem.id ? updatedItem : item
-                  ).sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
-                  return updated;
-                } else {
-                  // إضافة خبر جديد
-                  const updated = [...prev, updatedItem].sort((a, b) => 
-                    (a.display_order || 0) - (b.display_order || 0)
-                  );
-                  return updated;
-                }
-              } else {
-                // إزالة الخبر فوراً عند إيقاف تنشيطه
-                console.log('🚫 إزالة الخبر غير النشط فوراً:', updatedItem.title);
-                const filtered = prev.filter(item => item.id !== updatedItem.id);
-                
-                // إذا كان الخبر المحذوف هو الخبر الحالي، انتقل للتالي
-                setCurrentIndex(prevIndex => {
-                  if (filtered.length === 0) return 0;
-                  if (prevIndex >= filtered.length) return 0;
-                  return prevIndex;
-                });
-                
-                return filtered;
-              }
-            });
-          } else if (payload.eventType === 'DELETE') {
-            const deletedItem = payload.old as NewsItem;
-            console.log('🗑️ حذف خبر:', deletedItem.title);
-            setNewsItems(prev => {
-              const filtered = prev.filter(item => item.id !== deletedItem.id);
-              
-              // إذا كان الخبر المحذوف هو الخبر الحالي، انتقل للتالي
-              setCurrentIndex(prevIndex => {
-                if (filtered.length === 0) return 0;
-                if (prevIndex >= filtered.length) return 0;
-                return prevIndex;
-              });
-              
-              return filtered;
-            });
-          }
+          // إعادة تحميل الأخبار فوراً عند أي تغيير
+          fetchNews();
         }
       )
       .subscribe((status) => {
@@ -155,9 +94,9 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       setTimeout(() => {
         setCurrentIndex(prev => (prev + 1) % newsItems.length);
         setFade(true);
-      }, 300); // انتظار انتهاء تأثير التلاشي
+      }, 300);
       
-    }, 4000); // تغيير كل 4 ثوان
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [newsItems.length]);
@@ -182,9 +121,9 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     : currentNews.title;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-40">
-      <div className="bg-blue-600 text-white px-8 py-4 rounded-lg shadow-2xl max-w-4xl mx-4">
-        <div className="flex items-center space-x-4 rtl:space-x-reverse">
+    <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
+      <div className="bg-blue-600 text-white px-8 py-4 w-full">
+        <div className="flex items-center justify-center space-x-4 rtl:space-x-reverse">
           <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold">
             أخبار
           </div>
