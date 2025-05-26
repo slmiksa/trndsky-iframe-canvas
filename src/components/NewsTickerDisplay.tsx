@@ -38,15 +38,29 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       const activeNews = data || [];
       console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة:', activeNews.length, activeNews);
       
-      setNewsItems(activeNews);
+      setNewsItems(prevNews => {
+        // إذا تغيرت الأخبار، نحتاج لإعادة ضبط الفهرس بذكاء
+        if (JSON.stringify(prevNews) !== JSON.stringify(activeNews)) {
+          console.log('🔄 [NewsTickerDisplay] تغيير في الأخبار - إعادة ضبط الفهرس');
+          
+          // إذا لم تعد هناك أخبار نشطة
+          if (activeNews.length === 0) {
+            console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة');
+            setCurrentIndex(0);
+            return activeNews;
+          }
+          
+          // إذا كان الفهرس الحالي أكبر من عدد الأخبار الجديد
+          setCurrentIndex(prev => {
+            const newIndex = prev >= activeNews.length ? 0 : prev;
+            console.log('📍 [NewsTickerDisplay] تحديث الفهرس من', prev, 'إلى', newIndex);
+            return newIndex;
+          });
+        }
+        
+        return activeNews;
+      });
       
-      if (activeNews.length === 0) {
-        console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة - إخفاء الشريط');
-        setCurrentIndex(0);
-      } else if (currentIndex >= activeNews.length) {
-        console.log('🔄 [NewsTickerDisplay] إعادة تعيين الفهرس إلى 0');
-        setCurrentIndex(0);
-      }
     } catch (error) {
       console.error('❌ [NewsTickerDisplay] خطأ في fetchNews:', error);
     }
@@ -58,7 +72,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     fetchNews();
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة مع إعادة تحميل فورية
+  // الاشتراك في التحديثات المباشرة
   useEffect(() => {
     if (!accountId) return;
 
@@ -105,27 +119,44 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     };
   }, [accountId]);
 
-  // تبديل الأخبار تلقائياً
+  // تبديل الأخبار تلقائياً مع التحقق من صحة الفهرس
   useEffect(() => {
     if (newsItems.length <= 1) return;
 
     const interval = setInterval(() => {
-      setFade(false);
-      
-      setTimeout(() => {
-        setCurrentIndex(prev => (prev + 1) % newsItems.length);
-        setFade(true);
-      }, 300);
-      
+      setCurrentIndex(prev => {
+        // التأكد من أن الفهرس صحيح
+        if (prev >= newsItems.length) {
+          console.log('⚠️ [NewsTickerDisplay] فهرس غير صحيح، إعادة تعيين إلى 0');
+          setFade(true);
+          return 0;
+        }
+        
+        setFade(false);
+        
+        setTimeout(() => {
+          setFade(true);
+        }, 300);
+        
+        const nextIndex = (prev + 1) % newsItems.length;
+        console.log('🔄 [NewsTickerDisplay] الانتقال من الفهرس', prev, 'إلى', nextIndex);
+        return nextIndex;
+      });
     }, 4000);
 
     return () => clearInterval(interval);
   }, [newsItems.length]);
 
-  // إعادة تعيين تأثير التلاشي
+  // إعادة تعيين تأثير التلاشي مع التحقق من صحة الفهرس
   useEffect(() => {
-    setFade(true);
-  }, [currentIndex]);
+    if (currentIndex < newsItems.length) {
+      setFade(true);
+    } else if (newsItems.length > 0) {
+      // إذا كان الفهرس خارج النطاق، أعد تعيينه
+      console.log('🔧 [NewsTickerDisplay] إصلاح فهرس خارج النطاق');
+      setCurrentIndex(0);
+    }
+  }, [currentIndex, newsItems.length]);
 
   // عدم عرض أي شيء إذا لم توجد أخبار نشطة
   if (!newsItems.length) {
@@ -133,10 +164,19 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     return null;
   }
 
-  const currentNews = newsItems[currentIndex];
+  // التحقق من صحة الفهرس الحالي
+  const safeCurrentIndex = currentIndex >= newsItems.length ? 0 : currentIndex;
+  const currentNews = newsItems[safeCurrentIndex];
+  
   if (!currentNews) {
-    console.log('🚫 [NewsTickerDisplay] لا يوجد خبر حالي');
+    console.log('🚫 [NewsTickerDisplay] لا يوجد خبر حالي للفهرس', safeCurrentIndex);
     return null;
+  }
+
+  // تحديث الفهرس إذا كان غير صحيح
+  if (safeCurrentIndex !== currentIndex) {
+    console.log('🔧 [NewsTickerDisplay] تصحيح الفهرس من', currentIndex, 'إلى', safeCurrentIndex);
+    setCurrentIndex(safeCurrentIndex);
   }
 
   const newsText = currentNews.content 
@@ -145,8 +185,9 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   console.log('📺 [NewsTickerDisplay] عرض الخبر:', {
     title: currentNews.title,
-    index: currentIndex,
-    total: newsItems.length
+    index: safeCurrentIndex,
+    total: newsItems.length,
+    actualCurrentIndex: currentIndex
   });
 
   return (
@@ -171,7 +212,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               <div
                 key={index}
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentIndex ? 'bg-white' : 'bg-white/50'
+                  index === safeCurrentIndex ? 'bg-white' : 'bg-white/50'
                 }`}
               />
             ))}
