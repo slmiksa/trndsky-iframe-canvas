@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
@@ -299,6 +301,14 @@ const ClientDashboard = () => {
           </TabsList>
 
           <TabsContent value="websites">
+            {/* Important Note Alert */}
+            <Alert className="mb-6 border-orange-200 bg-orange-50">
+              <Info className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="text-orange-800">
+                <strong>ملاحظة مهمة:</strong> لكي لا يحصل خطأ أو تعليق، يجب إيقاف الموقع النشط أولاً قبل تفعيل موقع آخر. يُنصح بتشغيل موقع واحد فقط في الوقت الواحد لضمان الأداء الأمثل.
+              </AlertDescription>
+            </Alert>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* قائمة المواقع */}
               <div>
