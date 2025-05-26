@@ -22,12 +22,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   const fetchNews = async () => {
     try {
-      console.log('🔍 [NewsTickerDisplay] جاري تحميل الأخبار النشطة للعرض:', accountId);
+      console.log('🔍 [NewsTickerDisplay] تحميل الأخبار النشطة للحساب:', accountId);
       const { data, error } = await supabase
         .from('news_ticker')
         .select('*')
         .eq('account_id', accountId)
-        .eq('is_active', true)  // فقط الأخبار النشطة
+        .eq('is_active', true)
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -36,21 +36,15 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       }
 
       const activeNews = data || [];
-      console.log('✅ [NewsTickerDisplay] تم تحميل الأخبار النشطة:', activeNews.length, activeNews);
+      console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة:', activeNews.length, activeNews);
       
-      if (activeNews.length === 0) {
-        console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة - تعيين قائمة فارغة');
-        setNewsItems([]);
-        setCurrentIndex(0);
-        return;
-      }
-
-      console.log('📺 [NewsTickerDisplay] تعيين الأخبار النشطة:', activeNews.map(n => ({ id: n.id, title: n.title, is_active: n.is_active })));
       setNewsItems(activeNews);
       
-      // إعادة تعيين الفهرس إذا كان الفهرس الحالي خارج النطاق
-      if (activeNews.length <= currentIndex) {
-        console.log('🔄 [NewsTickerDisplay] إعادة تعيين الفهرس من', currentIndex, 'إلى 0');
+      if (activeNews.length === 0) {
+        console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة - إخفاء الشريط');
+        setCurrentIndex(0);
+      } else if (currentIndex >= activeNews.length) {
+        console.log('🔄 [NewsTickerDisplay] إعادة تعيين الفهرس إلى 0');
         setCurrentIndex(0);
       }
     } catch (error) {
@@ -58,17 +52,20 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     }
   };
 
+  // تحميل أولي للأخبار
   useEffect(() => {
-    console.log('🚀 [NewsTickerDisplay] تحميل أولي للأخبار');
+    console.log('🚀 [NewsTickerDisplay] بدء التحميل الأولي للأخبار');
     fetchNews();
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة
+  // الاشتراك في التحديثات المباشرة مع إعادة تحميل فورية
   useEffect(() => {
-    console.log('📡 [NewsTickerDisplay] إعداد قناة التحديثات المباشرة للأخبار');
+    if (!accountId) return;
+
+    console.log('📡 [NewsTickerDisplay] إعداد قناة التحديثات المباشرة');
     
     const channel = supabase
-      .channel(`news_ticker_realtime_${accountId}`)
+      .channel(`news_ticker_display_${accountId}_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -78,26 +75,37 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           filter: `account_id=eq.${accountId}`
         },
         (payload) => {
-          console.log('📰 [NewsTickerDisplay] تحديث فوري في الأخبار:', payload.eventType, payload);
-          console.log('📰 [NewsTickerDisplay] البيانات الجديدة:', payload.new);
-          console.log('📰 [NewsTickerDisplay] البيانات القديمة:', payload.old);
+          console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار:', {
+            event: payload.eventType,
+            new: payload.new,
+            old: payload.old
+          });
           
-          // إعادة تحميل الأخبار فوراً عند أي تغيير
-          console.log('🔄 [NewsTickerDisplay] إعادة تحميل الأخبار بسبب التحديث المباشر');
-          fetchNews();
+          // إعادة تحميل فورية عند أي تغيير
+          setTimeout(() => {
+            console.log('🔄 [NewsTickerDisplay] إعادة تحميل الأخبار بعد التحديث');
+            fetchNews();
+          }, 100);
         }
       )
       .subscribe((status) => {
-        console.log('📡 [NewsTickerDisplay] حالة قناة الأخبار:', status);
+        console.log('📡 [NewsTickerDisplay] حالة الاشتراك:', status);
       });
 
+    // تحديث دوري كل 3 ثوان للتأكد
+    const interval = setInterval(() => {
+      console.log('⏰ [NewsTickerDisplay] تحديث دوري للأخبار');
+      fetchNews();
+    }, 3000);
+
     return () => {
-      console.log('🧹 [NewsTickerDisplay] تنظيف قناة الأخبار');
+      console.log('🧹 [NewsTickerDisplay] تنظيف الموارد');
+      clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, [accountId]);
 
-  // تبديل الأخبار تلقائياً مع تأثير التلاشي
+  // تبديل الأخبار تلقائياً
   useEffect(() => {
     if (newsItems.length <= 1) return;
 
@@ -114,37 +122,32 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     return () => clearInterval(interval);
   }, [newsItems.length]);
 
-  // إعادة تعيين تأثير التلاشي عند تغيير الأخبار
+  // إعادة تعيين تأثير التلاشي
   useEffect(() => {
     setFade(true);
   }, [currentIndex]);
 
-  // متابعة تغييرات newsItems
-  useEffect(() => {
-    console.log('📋 [NewsTickerDisplay] تغيير في قائمة الأخبار:', {
-      length: newsItems.length,
-      items: newsItems.map(n => ({ id: n.id, title: n.title, is_active: n.is_active }))
-    });
-  }, [newsItems]);
-
-  // إذا لم توجد أخبار نشطة، اخفاء الشريط تماماً
+  // عدم عرض أي شيء إذا لم توجد أخبار نشطة
   if (!newsItems.length) {
-    console.log('🚫 [NewsTickerDisplay] لا توجد أخبار نشطة للعرض - إرجاع null');
+    console.log('🚫 [NewsTickerDisplay] لا توجد أخبار نشطة - إرجاع null');
     return null;
   }
 
   const currentNews = newsItems[currentIndex];
   if (!currentNews) {
-    console.log('🚫 [NewsTickerDisplay] لا يوجد خبر حالي للعرض');
+    console.log('🚫 [NewsTickerDisplay] لا يوجد خبر حالي');
     return null;
   }
 
-  // تجهيز نص الخبر
   const newsText = currentNews.content 
     ? `${currentNews.title} - ${currentNews.content}` 
     : currentNews.title;
 
-  console.log('📺 [NewsTickerDisplay] عرض الخبر:', currentNews.title, 'نشط:', currentNews.is_active);
+  console.log('📺 [NewsTickerDisplay] عرض الخبر:', {
+    title: currentNews.title,
+    index: currentIndex,
+    total: newsItems.length
+  });
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
@@ -162,7 +165,6 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           </div>
         </div>
         
-        {/* مؤشر الأخبار المتعددة */}
         {newsItems.length > 1 && (
           <div className="flex justify-center mt-3 space-x-1 rtl:space-x-reverse">
             {newsItems.map((_, index) => (
