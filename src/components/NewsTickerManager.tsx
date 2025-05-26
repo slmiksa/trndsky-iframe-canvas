@@ -34,27 +34,50 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
     display_order: 0
   });
 
+  // دالة إعادة المحاولة
+  const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        console.error(`❌ المحاولة ${attempt} فشلت:`, error);
+        
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        
+        // انتظار قبل إعادة المحاولة
+        await new Promise(resolve => setTimeout(resolve, delay * attempt));
+      }
+    }
+  };
+
   const fetchNewsItems = async () => {
     try {
       console.log('🔍 جاري تحميل الأخبار للحساب:', accountId);
-      const { data, error } = await supabase
-        .from('news_ticker')
-        .select('*')
-        .eq('account_id', accountId)
-        .order('display_order', { ascending: true });
+      
+      const result = await retryOperation(async () => {
+        const { data, error } = await supabase
+          .from('news_ticker')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('display_order', { ascending: true });
 
-      if (error) {
-        console.error('❌ خطأ في تحميل الأخبار:', error);
-        throw error;
-      }
+        if (error) {
+          console.error('❌ خطأ في تحميل الأخبار:', error);
+          throw error;
+        }
 
-      console.log('✅ تم تحميل الأخبار بنجاح:', data);
-      setNewsItems(data || []);
+        return data;
+      });
+
+      console.log('✅ تم تحميل الأخبار بنجاح:', result);
+      setNewsItems(result || []);
     } catch (error: any) {
       console.error('❌ خطأ في fetchNewsItems:', error);
       toast({
         title: "خطأ في تحميل الأخبار",
-        description: error.message,
+        description: "تعذر تحميل الأخبار. يرجى المحاولة مرة أخرى.",
         variant: "destructive"
       });
     } finally {
@@ -74,48 +97,60 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.title.trim()) {
+      toast({
+        title: "خطأ في البيانات",
+        description: "يرجى إدخال عنوان الخبر",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      if (editingItem) {
-        // تحديث الخبر الموجود
-        console.log('📝 تحديث الخبر:', editingItem.id);
-        const { error } = await supabase
-          .from('news_ticker')
-          .update({
-            title: formData.title,
-            content: formData.content || null,
-            display_order: formData.display_order,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingItem.id);
+      await retryOperation(async () => {
+        if (editingItem) {
+          // تحديث الخبر الموجود
+          console.log('📝 تحديث الخبر:', editingItem.id);
+          const { error } = await supabase
+            .from('news_ticker')
+            .update({
+              title: formData.title.trim(),
+              content: formData.content?.trim() || null,
+              display_order: formData.display_order,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', editingItem.id);
 
-        if (error) throw error;
+          if (error) throw error;
 
-        toast({
-          title: "تم تحديث الخبر بنجاح",
-          description: `تم تحديث: ${formData.title}`
-        });
-      } else {
-        // إضافة خبر جديد
-        console.log('➕ إضافة خبر جديد');
-        const { error } = await supabase
-          .from('news_ticker')
-          .insert({
-            account_id: accountId,
-            title: formData.title,
-            content: formData.content || null,
-            display_order: formData.display_order,
-            is_active: true
+          toast({
+            title: "تم تحديث الخبر بنجاح",
+            description: `تم تحديث: ${formData.title}`
           });
+        } else {
+          // إضافة خبر جديد
+          console.log('➕ إضافة خبر جديد');
+          const { error } = await supabase
+            .from('news_ticker')
+            .insert({
+              account_id: accountId,
+              title: formData.title.trim(),
+              content: formData.content?.trim() || null,
+              display_order: formData.display_order,
+              is_active: true
+            });
 
-        if (error) throw error;
+          if (error) throw error;
 
-        toast({
-          title: "تم إضافة الخبر بنجاح",
-          description: `تم إضافة: ${formData.title}`
-        });
-      }
+          toast({
+            title: "تم إضافة الخبر بنجاح",
+            description: `تم إضافة: ${formData.title}`
+          });
+        }
+      });
 
       resetForm();
       fetchNewsItems();
@@ -123,7 +158,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
       console.error('❌ خطأ في حفظ الخبر:', error);
       toast({
         title: "خطأ في حفظ الخبر",
-        description: error.message,
+        description: "تعذر حفظ الخبر. يرجى المحاولة مرة أخرى.",
         variant: "destructive"
       });
     } finally {
@@ -134,15 +169,18 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
   const toggleNewsStatus = async (newsId: string, currentStatus: boolean) => {
     try {
       console.log('🔄 تغيير حالة الخبر:', { newsId, currentStatus });
-      const { error } = await supabase
-        .from('news_ticker')
-        .update({ 
-          is_active: !currentStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', newsId);
+      
+      await retryOperation(async () => {
+        const { error } = await supabase
+          .from('news_ticker')
+          .update({ 
+            is_active: !currentStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', newsId);
 
-      if (error) throw error;
+        if (error) throw error;
+      });
 
       toast({
         title: "تم تحديث حالة الخبر",
@@ -154,21 +192,28 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
       console.error('❌ خطأ في تحديث حالة الخبر:', error);
       toast({
         title: "خطأ في تحديث الخبر",
-        description: error.message,
+        description: "تعذر تحديث حالة الخبر. يرجى المحاولة مرة أخرى.",
         variant: "destructive"
       });
     }
   };
 
   const deleteNews = async (newsId: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الخبر؟')) {
+      return;
+    }
+
     try {
       console.log('🗑️ حذف الخبر:', newsId);
-      const { error } = await supabase
-        .from('news_ticker')
-        .delete()
-        .eq('id', newsId);
+      
+      await retryOperation(async () => {
+        const { error } = await supabase
+          .from('news_ticker')
+          .delete()
+          .eq('id', newsId);
 
-      if (error) throw error;
+        if (error) throw error;
+      });
 
       toast({
         title: "تم حذف الخبر",
@@ -180,7 +225,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
       console.error('❌ خطأ في حذف الخبر:', error);
       toast({
         title: "خطأ في حذف الخبر",
-        description: error.message,
+        description: "تعذر حذف الخبر. يرجى المحاولة مرة أخرى.",
         variant: "destructive"
       });
     }
@@ -202,7 +247,11 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>إدارة شريط الأخبار ({newsItems.length})</CardTitle>
-            <Button onClick={() => setShowAddForm(true)} size="sm">
+            <Button 
+              onClick={() => setShowAddForm(true)} 
+              size="sm"
+              disabled={loading}
+            >
               <Plus className="h-4 w-4 mr-2" />
               إضافة خبر
             </Button>
@@ -245,6 +294,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                         size="sm"
                         variant="ghost"
                         onClick={() => toggleNewsStatus(item.id, item.is_active)}
+                        disabled={loading}
                       >
                         {item.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
@@ -252,6 +302,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                         size="sm"
                         variant="ghost"
                         onClick={() => startEdit(item)}
+                        disabled={loading}
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -259,6 +310,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                         size="sm"
                         variant="ghost"
                         onClick={() => deleteNews(item.id)}
+                        disabled={loading}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -283,6 +335,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     placeholder="اكتب عنوان الخبر"
                     required
+                    disabled={loading}
                   />
                 </div>
                 <div>
@@ -293,6 +346,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     placeholder="اكتب تفاصيل الخبر"
                     rows={3}
+                    disabled={loading}
                   />
                 </div>
                 <div>
@@ -303,13 +357,19 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                     value={formData.display_order}
                     onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
                     placeholder="0"
+                    disabled={loading}
                   />
                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading}>
-                    {editingItem ? 'تحديث' : 'إضافة'}
+                    {loading ? 'جاري الحفظ...' : (editingItem ? 'تحديث' : 'إضافة')}
                   </Button>
-                  <Button type="button" variant="outline" onClick={resetForm}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={resetForm}
+                    disabled={loading}
+                  >
                     إلغاء
                   </Button>
                 </div>
