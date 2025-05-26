@@ -163,6 +163,27 @@ const ClientDashboard = () => {
     try {
       console.log('🔄 Toggling website status:', { websiteId, currentStatus });
       
+      // إذا كان المستخدم يريد تفعيل موقع جديد (currentStatus = false)
+      // فيجب إيقاف جميع المواقع النشطة أولاً
+      if (!currentStatus) {
+        console.log('🛑 إيقاف جميع المواقع النشطة قبل تفعيل الموقع الجديد');
+        
+        // إيقاف جميع المواقع النشطة
+        const { error: deactivateError } = await supabase
+          .from('account_websites')
+          .update({ is_active: false })
+          .eq('account_id', accountId)
+          .eq('is_active', true);
+
+        if (deactivateError) {
+          console.error('❌ خطأ في إيقاف المواقع النشطة:', deactivateError);
+          throw deactivateError;
+        }
+        
+        console.log('✅ تم إيقاف جميع المواقع النشطة');
+      }
+      
+      // الآن تفعيل أو إيقاف الموقع المحدد
       const { error } = await supabase
         .from('account_websites')
         .update({ is_active: !currentStatus })
@@ -174,9 +195,14 @@ const ClientDashboard = () => {
       }
 
       console.log('✅ Website status updated successfully');
+      
+      const statusMessage = !currentStatus 
+        ? 'تم تفعيل الموقع وإيقاف المواقع الأخرى تلقائياً' 
+        : 'تم إيقاف الموقع';
+        
       toast({
         title: "تم تحديث حالة الموقع",
-        description: `تم ${!currentStatus ? 'تفعيل' : 'إيقاف'} الموقع`,
+        description: statusMessage,
       });
 
       fetchWebsites();
