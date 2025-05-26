@@ -186,6 +186,39 @@ export type Database = {
           },
         ]
       }
+      news_ticker: {
+        Row: {
+          account_id: string
+          content: string | null
+          created_at: string
+          display_order: number | null
+          id: string
+          is_active: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          content?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          content?: string | null
+          created_at?: string
+          display_order?: number | null
+          id?: string
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           account_id: string

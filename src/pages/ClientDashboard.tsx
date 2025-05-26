@@ -6,14 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info, Newspaper } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
+import NewsTickerManager from '@/components/NewsTickerManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import Footer from '@/components/Footer';
+
 interface Website {
   id: string;
   website_url: string;
@@ -276,7 +278,7 @@ const ClientDashboard = () => {
           </div>}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="websites" className="flex items-center gap-2">
               <Globe className="h-4 w-4" />
               المواقع
@@ -288,6 +290,10 @@ const ClientDashboard = () => {
             <TabsTrigger value="timers" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               مؤقتات البريك
+            </TabsTrigger>
+            <TabsTrigger value="news" className="flex items-center gap-2">
+              <Newspaper className="h-4 w-4" />
+              شريط الأخبار
             </TabsTrigger>
           </TabsList>
 
@@ -417,6 +423,10 @@ const ClientDashboard = () => {
 
           <TabsContent value="timers">
             {accountId && <BreakTimerManager accountId={accountId} />}
+          </TabsContent>
+
+          <TabsContent value="news">
+            {accountId && <NewsTickerManager accountId={accountId} />}
           </TabsContent>
         </Tabs>
       </main>
