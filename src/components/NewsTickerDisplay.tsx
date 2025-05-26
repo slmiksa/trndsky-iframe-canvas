@@ -44,7 +44,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     fetchNews();
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة
+  // الاشتراك في التحديثات المباشرة مع معالجة أفضل للتحديثات
   useEffect(() => {
     const channel = supabase
       .channel(`news_ticker_${accountId}`)
@@ -57,8 +57,38 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           filter: `account_id=eq.${accountId}`
         },
         (payload) => {
-          console.log('📰 تحديث في الأخبار:', payload.eventType);
-          fetchNews();
+          console.log('📰 تحديث في الأخبار:', payload.eventType, payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newItem = payload.new as NewsItem;
+            if (newItem.is_active) {
+              setNewsItems(prev => [...prev, newItem].sort((a, b) => 
+                (a.display_order || 0) - (b.display_order || 0)
+              ));
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedItem = payload.new as NewsItem;
+            if (updatedItem.is_active) {
+              setNewsItems(prev => {
+                const exists = prev.find(item => item.id === updatedItem.id);
+                if (exists) {
+                  return prev.map(item => 
+                    item.id === updatedItem.id ? updatedItem : item
+                  ).sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+                } else {
+                  return [...prev, updatedItem].sort((a, b) => 
+                    (a.display_order || 0) - (b.display_order || 0)
+                  );
+                }
+              });
+            } else {
+              // إزالة الخبر فوراً عند إيقاف تنشيطه
+              setNewsItems(prev => prev.filter(item => item.id !== updatedItem.id));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedItem = payload.old as NewsItem;
+            setNewsItems(prev => prev.filter(item => item.id !== deletedItem.id));
+          }
         }
       )
       .subscribe();
