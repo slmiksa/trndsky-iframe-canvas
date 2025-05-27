@@ -122,7 +122,7 @@ const ClientDashboard = () => {
         account_id: accountId,
         website_url: newWebsite.url,
         website_title: newWebsite.title || null,
-        is_active: true
+        is_active: false // Changed from true to false - new websites are inactive by default
       });
       if (error) {
         console.error('❌ Error inserting website:', error);
