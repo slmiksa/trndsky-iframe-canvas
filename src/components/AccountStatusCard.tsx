@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, AlertTriangle, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface AccountStatusCardProps {
   activationStartDate: string | null;
@@ -17,8 +19,11 @@ const AccountStatusCard = ({
   status,
   accountName 
 }: AccountStatusCardProps) => {
+  const { t, language } = useLanguage();
+
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
+    const locale = language === 'ar' ? 'ar-SA' : 'en-GB';
+    return new Date(dateString).toLocaleDateString(locale, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -28,7 +33,7 @@ const AccountStatusCard = ({
   const getAccountStatus = () => {
     if (status === 'suspended') {
       return {
-        label: 'معلق',
+        label: t('suspended'),
         variant: 'destructive' as const,
         icon: <XCircle className="h-4 w-4" />,
         color: 'text-red-600'
@@ -37,7 +42,7 @@ const AccountStatusCard = ({
 
     if (status === 'pending') {
       return {
-        label: 'في انتظار التفعيل',
+        label: t('pending_activation'),
         variant: 'secondary' as const,
         icon: <AlertTriangle className="h-4 w-4" />,
         color: 'text-yellow-600'
@@ -46,7 +51,7 @@ const AccountStatusCard = ({
 
     if (!activationEndDate) {
       return {
-        label: 'نشط',
+        label: t('active'),
         variant: 'default' as const,
         icon: <CheckCircle className="h-4 w-4" />,
         color: 'text-green-600'
@@ -59,28 +64,30 @@ const AccountStatusCard = ({
 
     if (daysUntilExpiry <= 0) {
       return {
-        label: 'منتهي الصلاحية',
+        label: t('expired'),
         variant: 'destructive' as const,
         icon: <XCircle className="h-4 w-4" />,
         color: 'text-red-600'
       };
     } else if (daysUntilExpiry <= 7) {
+      const key = daysUntilExpiry === 1 ? 'expires_in_day' : 'expires_in_days';
       return {
-        label: `ينتهي خلال ${daysUntilExpiry} أيام`,
+        label: t(key).replace('{days}', daysUntilExpiry.toString()),
         variant: 'destructive' as const,
         icon: <AlertTriangle className="h-4 w-4" />,
         color: 'text-red-600'
       };
     } else if (daysUntilExpiry <= 30) {
+      const key = daysUntilExpiry === 1 ? 'expires_in_day' : 'expires_in_days';
       return {
-        label: `ينتهي خلال ${daysUntilExpiry} يوم`,
+        label: t(key).replace('{days}', daysUntilExpiry.toString()),
         variant: 'secondary' as const,
         icon: <AlertTriangle className="h-4 w-4" />,
         color: 'text-yellow-600'
       };
     } else {
       return {
-        label: 'نشط',
+        label: t('active'),
         variant: 'default' as const,
         icon: <CheckCircle className="h-4 w-4" />,
         color: 'text-green-600'
@@ -107,7 +114,7 @@ const AccountStatusCard = ({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            حالة الاشتراك
+            {t('subscription_status')}
           </CardTitle>
           <div className="flex items-center gap-2">
             {accountStatus.icon}
@@ -121,14 +128,14 @@ const AccountStatusCard = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {activationStartDate && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-600">تاريخ بداية الاشتراك</p>
+              <p className="text-sm font-medium text-gray-600">{t('subscription_start_date')}</p>
               <p className="text-lg font-semibold">{formatDate(activationStartDate)}</p>
             </div>
           )}
           
           {activationEndDate && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-600">تاريخ انتهاء الاشتراك</p>
+              <p className="text-sm font-medium text-gray-600">{t('subscription_end_date')}</p>
               <p className={`text-lg font-semibold ${accountStatus.color}`}>
                 {formatDate(activationEndDate)}
               </p>
@@ -141,13 +148,13 @@ const AccountStatusCard = ({
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-semibold text-yellow-800 mb-2">تنبيه: اشتراكك قارب على الانتهاء</h4>
+                <h4 className="font-semibold text-yellow-800 mb-2">{t('warning_expiring_soon')}</h4>
                 <p className="text-yellow-700 text-sm mb-3">
-                  لضمان استمرارية الخدمة، يرجى تجديد اشتراكك قبل انتهاء التاريخ المحدد.
+                  {t('warning_expiring_message')}
                 </p>
                 <Button onClick={handleRenewal} size="sm" className="bg-yellow-600 hover:bg-yellow-700">
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  تجديد الاشتراك الآن
+                  {t('renew_subscription')}
                 </Button>
               </div>
             </div>
@@ -159,13 +166,13 @@ const AccountStatusCard = ({
             <div className="flex items-start gap-3">
               <XCircle className="h-5 w-5 text-red-600 mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-semibold text-red-800 mb-2">حساب معلق</h4>
+                <h4 className="font-semibold text-red-800 mb-2">{t('account_suspended')}</h4>
                 <p className="text-red-700 text-sm mb-3">
-                  تم تعليق حسابك. يرجى التواصل معنا لتفعيل الحساب مرة أخرى.
+                  {t('account_suspended_message')}
                 </p>
                 <Button onClick={handleRenewal} size="sm" variant="destructive">
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  تواصل معنا
+                  {t('contact_us')}
                 </Button>
               </div>
             </div>
@@ -177,9 +184,9 @@ const AccountStatusCard = ({
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-gray-600 mt-0.5" />
               <div className="flex-1">
-                <h4 className="font-semibold text-gray-800 mb-2">في انتظار التفعيل</h4>
+                <h4 className="font-semibold text-gray-800 mb-2">{t('pending_activation_title')}</h4>
                 <p className="text-gray-700 text-sm mb-3">
-                  حسابك في انتظار التفعيل. سيتم تفعيله قريباً.
+                  {t('pending_activation_message')}
                 </p>
               </div>
             </div>
