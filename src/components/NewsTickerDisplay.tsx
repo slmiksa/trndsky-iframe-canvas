@@ -190,7 +190,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       <div className="bg-blue-600 text-white w-full">
         {/* شاشات كبيرة - عرض كامل */}
         <div className="hidden md:block px-8 py-4">
-          <div className="flex items-center justify-center space-x-4 rtl:space-x-reverse">
+          <div className="flex items-center justify-center space-x-2 rtl:space-x-reverse">
             <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold">
               أخبار
             </div>
@@ -221,7 +221,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
         {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
         <div className="block md:hidden px-4 py-3">
-          <div className="flex items-center space-x-3 rtl:space-x-reverse">
+          <div className="flex items-center space-x-2 rtl:space-x-reverse">
             <div className="flex-shrink-0 bg-white text-blue-600 px-2 py-1 rounded text-xs font-bold">
               أخبار
             </div>
@@ -253,7 +253,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         {/* شاشات صغيرة جداً - عرض مُبسَّط */}
         <div className="block sm:hidden">
           <div className="px-3 py-2">
-            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+            <div className="flex items-center space-x-1.5 rtl:space-x-reverse">
               <div className="flex-shrink-0 bg-white text-blue-600 px-1.5 py-0.5 rounded text-xs font-bold">
                 أخبار
               </div>
