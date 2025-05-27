@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +18,7 @@ const AccountStatusCard = ({
   accountName 
 }: AccountStatusCardProps) => {
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('ar-SA', {
+    return new Date(dateString).toLocaleDateString('en-GB', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
