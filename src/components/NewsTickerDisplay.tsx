@@ -39,18 +39,15 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة:', activeNews.length, activeNews);
       
       setNewsItems(prevNews => {
-        // إذا تغيرت الأخبار، نحتاج لإعادة ضبط الفهرس بذكاء
         if (JSON.stringify(prevNews) !== JSON.stringify(activeNews)) {
           console.log('🔄 [NewsTickerDisplay] تغيير في الأخبار - إعادة ضبط الفهرس');
           
-          // إذا لم تعد هناك أخبار نشطة
           if (activeNews.length === 0) {
             console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة');
             setCurrentIndex(0);
             return activeNews;
           }
           
-          // إذا كان الفهرس الحالي أكبر من عدد الأخبار الجديد
           setCurrentIndex(prev => {
             const newIndex = prev >= activeNews.length ? 0 : prev;
             console.log('📍 [NewsTickerDisplay] تحديث الفهرس من', prev, 'إلى', newIndex);
@@ -125,7 +122,6 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
     const interval = setInterval(() => {
       setCurrentIndex(prev => {
-        // التأكد من أن الفهرس صحيح
         if (prev >= newsItems.length) {
           console.log('⚠️ [NewsTickerDisplay] فهرس غير صحيح، إعادة تعيين إلى 0');
           setFade(true);
@@ -152,7 +148,6 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     if (currentIndex < newsItems.length) {
       setFade(true);
     } else if (newsItems.length > 0) {
-      // إذا كان الفهرس خارج النطاق، أعد تعيينه
       console.log('🔧 [NewsTickerDisplay] إصلاح فهرس خارج النطاق');
       setCurrentIndex(0);
     }
@@ -192,32 +187,88 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
-      <div className="bg-blue-600 text-white px-8 py-4 w-full">
-        <div className="flex items-center justify-center space-x-4 rtl:space-x-reverse">
-          <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold">
-            أخبار
+      <div className="bg-blue-600 text-white w-full">
+        {/* شاشات كبيرة - عرض كامل */}
+        <div className="hidden md:block px-8 py-4">
+          <div className="flex items-center justify-center space-x-4 rtl:space-x-reverse">
+            <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold">
+              أخبار
+            </div>
+            <div 
+              className={`text-lg font-semibold text-center transition-opacity duration-300 flex-1 ${
+                fade ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <div className="animate-marquee-continuous whitespace-nowrap">
+                {newsText}
+              </div>
+            </div>
           </div>
-          <div 
-            className={`text-lg font-semibold text-center transition-opacity duration-300 ${
-              fade ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            {newsText}
+          
+          {newsItems.length > 1 && (
+            <div className="flex justify-center mt-3 space-x-1 rtl:space-x-reverse">
+              {newsItems.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    index === safeCurrentIndex ? 'bg-white' : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
+        <div className="block md:hidden px-4 py-3">
+          <div className="flex items-center space-x-3 rtl:space-x-reverse">
+            <div className="flex-shrink-0 bg-white text-blue-600 px-2 py-1 rounded text-xs font-bold">
+              أخبار
+            </div>
+            <div 
+              className={`text-sm font-medium transition-opacity duration-300 flex-1 overflow-hidden ${
+                fade ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <div className="animate-marquee whitespace-nowrap">
+                {newsText}
+              </div>
+            </div>
+          </div>
+          
+          {newsItems.length > 1 && (
+            <div className="flex justify-center mt-2 space-x-1 rtl:space-x-reverse">
+              {newsItems.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                    index === safeCurrentIndex ? 'bg-white' : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* شاشات صغيرة جداً - عرض مُبسَّط */}
+        <div className="block sm:hidden">
+          <div className="px-3 py-2">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <div className="flex-shrink-0 bg-white text-blue-600 px-1.5 py-0.5 rounded text-xs font-bold">
+                أخبار
+              </div>
+              <div 
+                className={`text-xs font-medium transition-opacity duration-300 flex-1 overflow-hidden ${
+                  fade ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <div className="animate-marquee whitespace-nowrap">
+                  {currentNews.title}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        
-        {newsItems.length > 1 && (
-          <div className="flex justify-center mt-3 space-x-1 rtl:space-x-reverse">
-            {newsItems.map((_, index) => (
-              <div
-                key={index}
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === safeCurrentIndex ? 'bg-white' : 'bg-white/50'
-                }`}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

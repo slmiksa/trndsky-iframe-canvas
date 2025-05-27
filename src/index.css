@@ -74,7 +74,7 @@ body {
   }
 }
 
-/* News Ticker Animation - حركة مستمرة بدون انقطاع */
+/* News Ticker Animation - للشاشات الكبيرة */
 @keyframes marquee-continuous {
   0% { 
     transform: translateX(100%); 
@@ -86,7 +86,7 @@ body {
 
 .animate-marquee-continuous {
   display: inline-block;
-  animation: marquee-continuous 25s linear infinite;
+  animation: marquee-continuous 30s linear infinite;
   will-change: transform;
 }
 
@@ -94,7 +94,7 @@ body {
   animation-play-state: paused;
 }
 
-/* الحركة السابقة للتوافق مع المكونات الأخرى */
+/* حركة للشاشات المتوسطة والصغيرة */
 @keyframes marquee {
   0% { 
     transform: translateX(100%); 
@@ -106,7 +106,8 @@ body {
 
 .animate-marquee {
   display: inline-block;
-  animation: marquee 20s linear infinite;
+  animation: marquee 25s linear infinite;
+  will-change: transform;
 }
 
 .animate-marquee:hover {
@@ -114,12 +115,41 @@ body {
 }
 
 /* Responsive adjustments for news ticker */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .animate-marquee-continuous {
+    animation-duration: 25s;
+  }
+}
+
+@media (max-width: 768px) {
+  .animate-marquee {
     animation-duration: 20s;
   }
-  
+}
+
+@media (max-width: 640px) {
+  .animate-marquee {
+    animation-duration: 18s;
+  }
+}
+
+@media (max-width: 480px) {
   .animate-marquee {
     animation-duration: 15s;
   }
+}
+
+/* تحسينات إضافية للشاشات الصغيرة جداً */
+@media (max-width: 360px) {
+  .animate-marquee {
+    animation-duration: 12s;
+  }
+}
+
+/* تحسين الأداء */
+.animate-marquee,
+.animate-marquee-continuous {
+  backface-visibility: hidden;
+  perspective: 1000px;
+  transform: translate3d(0, 0, 0);
 }
