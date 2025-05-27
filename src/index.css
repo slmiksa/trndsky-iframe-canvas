@@ -74,82 +74,46 @@ body {
   }
 }
 
-/* News Ticker Animation - للشاشات الكبيرة */
-@keyframes marquee-continuous {
-  0% { 
-    transform: translateX(100%); 
-  }
-  100% { 
-    transform: translateX(-100%); 
-  }
+/* Static News Ticker Styles - النص ثابت في المنتصف */
+.news-ticker-static {
+  text-align: center;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  padding: 0 1rem;
 }
 
-.animate-marquee-continuous {
-  display: inline-block;
-  animation: marquee-continuous 30s linear infinite;
-  will-change: transform;
-}
-
-.animate-marquee-continuous:hover {
-  animation-play-state: paused;
-}
-
-/* حركة للشاشات المتوسطة والصغيرة */
-@keyframes marquee {
-  0% { 
-    transform: translateX(100%); 
-  }
-  100% { 
-    transform: translateX(-100%); 
-  }
-}
-
-.animate-marquee {
-  display: inline-block;
-  animation: marquee 25s linear infinite;
-  will-change: transform;
-}
-
-.animate-marquee:hover {
-  animation-play-state: paused;
-}
-
-/* Responsive adjustments for news ticker */
+/* تحسينات للشاشات المختلفة */
 @media (max-width: 1024px) {
-  .animate-marquee-continuous {
-    animation-duration: 25s;
+  .news-ticker-static {
+    padding: 0 0.75rem;
   }
 }
 
 @media (max-width: 768px) {
-  .animate-marquee {
-    animation-duration: 20s;
+  .news-ticker-static {
+    padding: 0 0.5rem;
+    font-size: 0.9rem;
   }
 }
 
 @media (max-width: 640px) {
-  .animate-marquee {
-    animation-duration: 18s;
+  .news-ticker-static {
+    padding: 0 0.25rem;
+    font-size: 0.85rem;
   }
 }
 
 @media (max-width: 480px) {
-  .animate-marquee {
-    animation-duration: 15s;
+  .news-ticker-static {
+    padding: 0 0.25rem;
+    font-size: 0.8rem;
   }
 }
 
-/* تحسينات إضافية للشاشات الصغيرة جداً */
 @media (max-width: 360px) {
-  .animate-marquee {
-    animation-duration: 12s;
+  .news-ticker-static {
+    padding: 0 0.25rem;
+    font-size: 0.75rem;
   }
-}
-
-/* تحسين الأداء */
-.animate-marquee,
-.animate-marquee-continuous {
-  backface-visibility: hidden;
-  perspective: 1000px;
-  transform: translate3d(0, 0, 0);
 }

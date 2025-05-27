@@ -195,11 +195,11 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               أخبار
             </div>
             <div 
-              className={`text-lg font-semibold text-center transition-opacity duration-300 flex-1 ${
+              className={`text-lg font-semibold transition-opacity duration-300 flex-1 ${
                 fade ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              <div className="animate-marquee-continuous whitespace-nowrap">
+              <div className="news-ticker-static">
                 {newsText}
               </div>
             </div>
@@ -226,11 +226,11 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               أخبار
             </div>
             <div 
-              className={`text-sm font-medium transition-opacity duration-300 flex-1 overflow-hidden ${
+              className={`text-sm font-medium transition-opacity duration-300 flex-1 ${
                 fade ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              <div className="animate-marquee whitespace-nowrap">
+              <div className="news-ticker-static">
                 {newsText}
               </div>
             </div>
@@ -258,11 +258,11 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
                 أخبار
               </div>
               <div 
-                className={`text-xs font-medium transition-opacity duration-300 flex-1 overflow-hidden ${
+                className={`text-xs font-medium transition-opacity duration-300 flex-1 ${
                   fade ? 'opacity-100' : 'opacity-0'
                 }`}
               >
-                <div className="animate-marquee whitespace-nowrap">
+                <div className="news-ticker-static">
                   {currentNews.title}
                 </div>
               </div>
