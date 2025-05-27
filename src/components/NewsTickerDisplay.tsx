@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -116,7 +115,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     };
   }, [accountId]);
 
-  // تبديل الأخبار تلقائياً مع التحقق من صحة الفهرس
+  // تبديل الأخبار تلقائياً مع التحقق من صحة الفهرس - تغيير المدة إلى 10 ثوان
   useEffect(() => {
     if (newsItems.length <= 1) return;
 
@@ -138,7 +137,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         console.log('🔄 [NewsTickerDisplay] الانتقال من الفهرس', prev, 'إلى', nextIndex);
         return nextIndex;
       });
-    }, 4000);
+    }, 10000); // تغيير من 4000 إلى 10000 (10 ثوان)
 
     return () => clearInterval(interval);
   }, [newsItems.length]);
@@ -190,16 +189,14 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       <div className="bg-blue-600 text-white w-full">
         {/* شاشات كبيرة - عرض كامل */}
         <div className="hidden md:block px-8 py-4">
-          <div className="flex items-center justify-center space-x-1 rtl:space-x-reverse">
-            <div className="flex-shrink-0 bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold">
-              أخبار
-            </div>
+          <div className="flex items-center justify-center">
             <div 
-              className={`text-lg font-semibold transition-opacity duration-300 flex-1 ${
+              className={`text-lg font-semibold transition-opacity duration-300 text-center ${
                 fade ? 'opacity-100' : 'opacity-0'
               }`}
             >
               <div className="news-ticker-static">
+                <span className="bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold ml-2">أخبار</span>
                 {newsText}
               </div>
             </div>
@@ -221,16 +218,14 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
         {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
         <div className="block md:hidden px-4 py-3">
-          <div className="flex items-center space-x-1 rtl:space-x-reverse">
-            <div className="flex-shrink-0 bg-white text-blue-600 px-2 py-1 rounded text-xs font-bold">
-              أخبار
-            </div>
+          <div className="flex items-center justify-center">
             <div 
-              className={`text-sm font-medium transition-opacity duration-300 flex-1 ${
+              className={`text-sm font-medium transition-opacity duration-300 text-center ${
                 fade ? 'opacity-100' : 'opacity-0'
               }`}
             >
               <div className="news-ticker-static">
+                <span className="bg-white text-blue-600 px-2 py-1 rounded text-xs font-bold ml-1">أخبار</span>
                 {newsText}
               </div>
             </div>
@@ -253,16 +248,14 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         {/* شاشات صغيرة جداً - عرض مُبسَّط */}
         <div className="block sm:hidden">
           <div className="px-3 py-2">
-            <div className="flex items-center space-x-1 rtl:space-x-reverse">
-              <div className="flex-shrink-0 bg-white text-blue-600 px-1.5 py-0.5 rounded text-xs font-bold">
-                أخبار
-              </div>
+            <div className="flex items-center justify-center">
               <div 
-                className={`text-xs font-medium transition-opacity duration-300 flex-1 ${
+                className={`text-xs font-medium transition-opacity duration-300 text-center ${
                   fade ? 'opacity-100' : 'opacity-0'
                 }`}
               >
                 <div className="news-ticker-static">
+                  <span className="bg-white text-blue-600 px-1.5 py-0.5 rounded text-xs font-bold ml-1">أخبار</span>
                   {currentNews.title}
                 </div>
               </div>
