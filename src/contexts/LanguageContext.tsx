@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Language = 'ar' | 'en';
@@ -25,7 +24,6 @@ const translations = {
     'subscription_end_date': 'تاريخ انتهاء الاشتراك',
     'suspended': 'معلق',
     'pending_activation': 'في انتظار التفعيل',
-    'active': 'نشط',
     'expired': 'منتهي الصلاحية',
     'expires_in_days': 'ينتهي خلال {days} أيام',
     'expires_in_day': 'ينتهي خلال {days} يوم',
@@ -51,7 +49,6 @@ const translations = {
     'website_name': 'اسم الموقع',
     'add': 'إضافة',
     'cancel': 'إلغاء',
-    'active': 'نشط',
     'stopped': 'متوقف',
     'no_title_website': 'موقع بدون عنوان',
     'no_websites_yet': 'لا توجد مواقع بعد',
@@ -93,7 +90,6 @@ const translations = {
     'subscription_end_date': 'Subscription End Date',
     'suspended': 'Suspended',
     'pending_activation': 'Pending Activation',
-    'active': 'Active',
     'expired': 'Expired',
     'expires_in_days': 'Expires in {days} days',
     'expires_in_day': 'Expires in {days} day',
@@ -119,7 +115,6 @@ const translations = {
     'website_name': 'Website Name',
     'add': 'Add',
     'cancel': 'Cancel',
-    'active': 'Active',
     'stopped': 'Stopped',
     'no_title_website': 'Untitled Website',
     'no_websites_yet': 'No websites yet',
