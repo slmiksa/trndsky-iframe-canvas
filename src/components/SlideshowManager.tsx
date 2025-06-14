@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,7 +42,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
       
-      // Use service role for custom auth system
       const { data, error } = await supabase
         .from('account_slideshows')
         .select('*')
@@ -75,23 +75,34 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     const uploadedUrls: string[] = [];
     
     for (const file of files) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${accountId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('slideshow-images')
-        .upload(fileName, file);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${accountId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        console.log('📤 Uploading file to slideshow-images bucket:', fileName);
+        
+        const { data, error } = await supabase.storage
+          .from('slideshow-images')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-      if (error) {
-        console.error('❌ Error uploading file:', error);
+        if (error) {
+          console.error('❌ Error uploading file:', error);
+          throw new Error(`فشل رفع الملف ${file.name}: ${error.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('slideshow-images')
+          .getPublicUrl(fileName);
+
+        console.log('✅ File uploaded successfully:', publicUrl);
+        uploadedUrls.push(publicUrl);
+      } catch (error) {
+        console.error('❌ Error in uploadImages:', error);
         throw error;
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('slideshow-images')
-        .getPublicUrl(fileName);
-
-      uploadedUrls.push(publicUrl);
     }
 
     return uploadedUrls;
@@ -110,41 +121,29 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
     setUploading(true);
     try {
-      console.log('📤 Uploading images and creating slideshow');
+      console.log('📤 Starting slideshow creation process');
       
+      // رفع الصور أولاً
       const imageUrls = await uploadImages(newSlideshow.images);
+      console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // Use direct database call via supabase.rpc with manual function call
+      // استخدام الدالة الخاصة لتجاوز RLS
       const { data, error } = await supabase
         .rpc('create_slideshow_bypass_rls', {
           p_account_id: accountId,
           p_title: newSlideshow.title,
           p_images: imageUrls,
           p_interval_seconds: newSlideshow.interval_seconds
-        } as any);
+        });
 
       if (error) {
         console.error('❌ Error creating slideshow via RPC:', error);
-        // Fallback to direct insert
-        const { error: insertError } = await supabase
-          .from('account_slideshows')
-          .insert({
-            account_id: accountId,
-            title: newSlideshow.title,
-            images: imageUrls,
-            interval_seconds: newSlideshow.interval_seconds,
-            is_active: false
-          });
-
-        if (insertError) {
-          console.error('❌ Error inserting slideshow:', insertError);
-          throw insertError;
-        }
+        throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
       }
 
-      console.log('✅ Slideshow added successfully');
+      console.log('✅ Slideshow created successfully:', data);
       toast({
-        title: t('slideshow_added_successfully'),
+        title: 'تم إضافة السلايدات بنجاح',
         description: newSlideshow.title
       });
 
@@ -154,8 +153,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     } catch (error: any) {
       console.error('❌ Error in addSlideshow:', error);
       toast({
-        title: t('error_adding_slideshow'),
-        description: error.message,
+        title: 'خطأ في إضافة السلايدات',
+        description: error.message || 'حدث خطأ غير متوقع',
         variant: "destructive"
       });
     } finally {
@@ -168,7 +167,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
 
       if (!currentStatus) {
-        // Stop all active slideshows first
+        // إيقاف جميع السلايدات النشطة أولاً
         const { error: deactivateError } = await supabase
           .from('account_slideshows')
           .update({ is_active: false })
@@ -191,7 +190,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         throw error;
       }
 
-      const statusMessage = !currentStatus ? t('slideshow_activated_others_stopped') : t('slideshow_stopped');
+      const statusMessage = !currentStatus ? 'تم تشغيل السلايدات وإيقاف الأخرى' : 'تم إيقاف السلايدات';
       toast({
         title: 'تم تحديث حالة السلايدات',
         description: statusMessage
@@ -201,7 +200,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
-        title: t('error_updating_slideshow'),
+        title: 'خطأ في تحديث السلايدات',
         description: error.message,
         variant: "destructive"
       });
@@ -214,13 +213,19 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       
       const slideshow = slideshows.find(s => s.id === slideshowId);
       if (slideshow && slideshow.images) {
-        // Delete images from storage
+        // حذف الصور من التخزين
         for (const imageUrl of slideshow.images) {
-          const fileName = imageUrl.split('/').pop();
-          if (fileName) {
+          try {
+            const urlParts = imageUrl.split('/');
+            const fileName = urlParts[urlParts.length - 1];
+            const folderName = urlParts[urlParts.length - 2];
+            const filePath = `${folderName}/${fileName}`;
+            
             await supabase.storage
               .from('slideshow-images')
-              .remove([`${accountId}/${fileName}`]);
+              .remove([filePath]);
+          } catch (storageError) {
+            console.warn('⚠️ Could not delete image from storage:', storageError);
           }
         }
       }
@@ -237,7 +242,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       console.log('✅ Slideshow deleted successfully');
       toast({
-        title: t('slideshow_deleted'),
+        title: 'تم حذف السلايدات',
         description: 'تم حذف السلايدات بنجاح'
       });
 
@@ -246,7 +251,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     } catch (error: any) {
       console.error('❌ Error in deleteSlideshow:', error);
       toast({
-        title: t('error_deleting_slideshow'),
+        title: 'خطأ في حذف السلايدات',
         description: error.message,
         variant: "destructive"
       });
@@ -268,11 +273,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>
-                {t('slideshows')} ({slideshows.length})
+                السلايدات ({slideshows.length})
               </CardTitle>
               <Button onClick={() => setShowAddForm(true)} size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                {t('add_slideshow')}
+                إضافة سلايدات
               </Button>
             </div>
           </CardHeader>
@@ -280,12 +285,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                <p className="mt-2 text-gray-600">{t('loading')}</p>
+                <p className="mt-2 text-gray-600">جاري التحميل...</p>
               </div>
             ) : slideshows.length === 0 ? (
               <div className="text-center py-8">
                 <Images className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-600">{t('no_slideshows_yet')}</p>
+                <p className="text-gray-600">لا توجد سلايدات حتى الآن</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -301,7 +306,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       <h3 className="font-semibold">{slideshow.title}</h3>
                       <div className="flex items-center gap-2">
                         <Badge variant={slideshow.is_active ? "default" : "secondary"}>
-                          {slideshow.is_active ? t('active') : t('stopped')}
+                          {slideshow.is_active ? 'نشط' : 'متوقف'}
                         </Badge>
                         <Button 
                           size="sm" 
@@ -326,8 +331,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>{t('images_count').replace('{count}', slideshow.images.length.toString())}</span>
-                      <span>{slideshow.interval_seconds}s</span>
+                      <span>{slideshow.images.length} صورة</span>
+                      <span>{slideshow.interval_seconds} ثانية</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
@@ -342,7 +347,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <div className="mt-6 border-t pt-6">
                 <form onSubmit={addSlideshow} className="space-y-4">
                   <div>
-                    <Label htmlFor="title">{t('slideshow_title')}</Label>
+                    <Label htmlFor="title">عنوان السلايدات</Label>
                     <Input 
                       id="title" 
                       type="text" 
@@ -353,7 +358,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="interval">{t('slideshow_interval')}</Label>
+                    <Label htmlFor="interval">المدة بين الصور (ثانية)</Label>
                     <Input 
                       id="interval" 
                       type="number" 
@@ -364,7 +369,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="images">{t('upload_images')}</Label>
+                    <Label htmlFor="images">رفع الصور</Label>
                     <Input 
                       id="images" 
                       type="file" 
@@ -382,7 +387,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                   <div className="flex gap-2">
                     <Button type="submit" disabled={uploading}>
                       {uploading ? <Upload className="h-4 w-4 mr-2 animate-spin" /> : null}
-                      {uploading ? 'جاري الرفع...' : t('add')}
+                      {uploading ? 'جاري الرفع...' : 'إضافة'}
                     </Button>
                     <Button 
                       type="button" 
@@ -392,7 +397,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                         setNewSlideshow({ title: '', interval_seconds: 5, images: [] });
                       }}
                     >
-                      {t('cancel')}
+                      إلغاء
                     </Button>
                   </div>
                 </form>
@@ -407,11 +412,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         <Card className="h-full">
           <CardHeader>
             <CardTitle>
-              {selectedSlideshow ? selectedSlideshow.title : t('slideshow_preview')}
+              {selectedSlideshow ? selectedSlideshow.title : 'معاينة السلايدات'}
             </CardTitle>
             {selectedSlideshow && (
               <p className="text-sm text-gray-600">
-                {t('images_count').replace('{count}', selectedSlideshow.images.length.toString())} - {selectedSlideshow.interval_seconds}s
+                {selectedSlideshow.images.length} صورة - {selectedSlideshow.interval_seconds} ثانية
               </p>
             )}
           </CardHeader>
@@ -422,7 +427,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
                 <div className="text-center text-gray-500">
                   <Images className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p>{t('select_slideshow_preview')}</p>
+                  <p>اختر سلايدات للمعاينة</p>
                 </div>
               </div>
             )}
