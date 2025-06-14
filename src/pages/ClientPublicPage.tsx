@@ -525,7 +525,9 @@ const ClientPublicPage = () => {
         .eq('is_active', true)
         .single();
 
-      setHasActiveSlideshow(!!data && !error);
+      const hasActive = !!data && !error;
+      setHasActiveSlideshow(hasActive);
+      console.log('🎬 Has active slideshow:', hasActive);
     } catch (error) {
       console.error('❌ Error checking active slideshow:', error);
       setHasActiveSlideshow(false);
@@ -785,8 +787,13 @@ const ClientPublicPage = () => {
               onError={handleIframeError}
             />
           ) : null}
+        </>
+      )}
 
-          {/* News Ticker Display - always show if not subscription expired */}
+      {/* Overlays - only show if no active slideshow */}
+      {!hasActiveSlideshow && (
+        <>
+          {/* News Ticker Display */}
           {account?.id && !subscriptionExpired && (
             <NewsTickerDisplay accountId={account.id} />
           )}
@@ -808,22 +815,22 @@ const ClientPublicPage = () => {
               onClose={() => handleTimerClose(timer.id)}
             />
           ))}
-
-          {/* Enhanced debug info */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
-              <div>🔄 النقل: كل 3 ثوان</div>
-              <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
-              <div>✅ المواقع النشطة: {websites.length}</div>
-              <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
-              <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
-              <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-              <div>🔄 المحاولات: {retryCount}/3</div>
-              <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
-              <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
-            </div>
-          )}
         </>
+      )}
+
+      {/* Enhanced debug info */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
+          <div>🔄 النقل: كل 3 ثوان</div>
+          <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
+          <div>✅ المواقع النشطة: {websites.length}</div>
+          <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
+          <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
+          <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
+          <div>🔄 المحاولات: {retryCount}/3</div>
+          <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
+          <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
+        </div>
       )}
     </div>
   );

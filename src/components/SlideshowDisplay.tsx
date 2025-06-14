@@ -87,23 +87,13 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     return () => clearInterval(interval);
   }, [activeSlideshow]);
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center z-50">
-        <div className="text-white text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <p>جاري تحميل السلايدات...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!activeSlideshow || activeSlideshow.images.length === 0) {
+  // لا تظهر أي شيء إذا لم توجد سلايدات نشطة
+  if (loading || !activeSlideshow || activeSlideshow.images.length === 0) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-40">
+    <div className="fixed inset-0 bg-black z-50">
       <div className="w-full h-full relative">
         <img 
           src={activeSlideshow.images[currentImageIndex]} 
