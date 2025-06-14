@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info, Newspaper } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info, Newspaper, Images } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
 import NewsTickerManager from '@/components/NewsTickerManager';
+import SlideshowManager from '@/components/SlideshowManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import LanguageToggle from '@/components/LanguageToggle';
 import Footer from '@/components/Footer';
@@ -275,10 +276,14 @@ const ClientDashboard = () => {
         )}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="websites" className="flex items-center gap-2">
               <Globe className="h-4 w-4" />
               {t('websites')}
+            </TabsTrigger>
+            <TabsTrigger value="slideshows" className="flex items-center gap-2">
+              <Images className="h-4 w-4" />
+              {t('slideshows')}
             </TabsTrigger>
             <TabsTrigger value="notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
@@ -455,6 +460,10 @@ const ClientDashboard = () => {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="slideshows">
+            {accountId && <SlideshowManager accountId={accountId} />}
           </TabsContent>
 
           <TabsContent value="notifications">

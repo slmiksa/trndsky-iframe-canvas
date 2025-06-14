@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import NotificationPopup from '@/components/NotificationPopup';
 import BreakTimerDisplay from '@/components/BreakTimerDisplay';
 import NewsTickerDisplay from '@/components/NewsTickerDisplay';
+import SlideshowDisplay from '@/components/SlideshowDisplay';
 
 interface Account {
   id: string;
@@ -509,6 +510,61 @@ const ClientPublicPage = () => {
     }
   }, [iframeError, retryCount, currentWebsiteIndex]);
 
+  // Add state for checking active slideshows
+  const [hasActiveSlideshow, setHasActiveSlideshow] = useState(false);
+
+  // Function to check for active slideshows
+  const checkActiveSlideshow = async () => {
+    if (!account?.id || subscriptionExpired) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('account_slideshows')
+        .select('id')
+        .eq('account_id', account.id)
+        .eq('is_active', true)
+        .single();
+
+      setHasActiveSlideshow(!!data && !error);
+    } catch (error) {
+      console.error('❌ Error checking active slideshow:', error);
+      setHasActiveSlideshow(false);
+    }
+  };
+
+  // Add slideshow check to existing effects
+  useEffect(() => {
+    if (account?.id && !subscriptionExpired) {
+      checkActiveSlideshow();
+    }
+  }, [account?.id, subscriptionExpired]);
+
+  // Add realtime listener for slideshows
+  useEffect(() => {
+    if (!account?.id || subscriptionExpired) return;
+
+    const slideshowChannel = supabase
+      .channel(`slideshow-status-${account.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'account_slideshows',
+          filter: `account_id=eq.${account.id}`
+        },
+        async (payload) => {
+          console.log('🎬 Slideshow status change:', payload.eventType);
+          await checkActiveSlideshow();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(slideshowChannel);
+    };
+  }, [account?.id, subscriptionExpired]);
+
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 Closing notification:', notificationId);
     setActiveNotifications(prev => prev.filter(n => n.id !== notificationId));
@@ -631,136 +687,143 @@ const ClientPublicPage = () => {
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Enhanced Loading indicator */}
-      {(iframeLoading && currentWebsite) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
-          <div className="text-center text-white">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-lg">
-              {retryCount > 0 ? `إعادة المحاولة ${retryCount}/3...` : 'جاري تحميل الموقع...'}
-            </p>
-            <p className="text-sm text-gray-300 mt-2">{currentWebsite.website_url}</p>
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced Error indicator */}
-      {(iframeError && currentWebsite) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-900 z-10">
-          <div className="text-center text-white max-w-md mx-4">
-            <div className="w-16 h-16 bg-red-800 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+      {/* Show slideshow if active, otherwise show websites */}
+      {hasActiveSlideshow ? (
+        <SlideshowDisplay accountId={account.id} />
+      ) : (
+        <>
+          {/* Enhanced Loading indicator */}
+          {(iframeLoading && currentWebsite) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
+              <div className="text-center text-white">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+                <p className="text-lg">
+                  {retryCount > 0 ? `إعادة المحاولة ${retryCount}/3...` : 'جاري تحميل الموقع...'}
+                </p>
+                <p className="text-sm text-gray-300 mt-2">{currentWebsite.website_url}</p>
+              </div>
             </div>
-            <p className="text-lg mb-2">
-              {currentErrorMessage || 'فشل في تحميل الموقع'}
-            </p>
-            <p className="text-sm text-gray-300 mb-4">{currentWebsite.website_url}</p>
-            
-            {retryCount < 3 ? (
-              <div className="space-y-2">
-                <p className="text-xs text-gray-400">
-                  جاري إعادة المحاولة ({retryCount}/3)...
-                </p>
-                <div className="w-full bg-red-800 rounded-full h-2">
-                  <div 
-                    className="bg-white h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${((retryCount + 1) / 3) * 100}%` }}
-                  ></div>
+          )}
+
+          {/* Enhanced Error indicator */}
+          {(iframeError && currentWebsite) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-red-900 z-10">
+              <div className="text-center text-white max-w-md mx-4">
+                <div className="w-16 h-16 bg-red-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-gray-400">
-                  تم تخطي هذا الموقع - الانتقال للموقع التالي...
+                <p className="text-lg mb-2">
+                  {currentErrorMessage || 'فشل في تحميل الموقع'}
                 </p>
-                <button 
-                  onClick={retryCurrentWebsite}
-                  className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors"
-                >
-                  إعادة المحاولة يدوياً
-                </button>
+                <p className="text-sm text-gray-300 mb-4">{currentWebsite.website_url}</p>
+                
+                {retryCount < 3 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400">
+                      جاري إعادة المحاولة ({retryCount}/3)...
+                    </p>
+                    <div className="w-full bg-red-800 rounded-full h-2">
+                      <div 
+                        className="bg-white h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${((retryCount + 1) / 3) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-400">
+                      تم تخطي هذا الموقع - الانتقال للموقع التالي...
+                    </p>
+                    <button 
+                      onClick={retryCurrentWebsite}
+                      className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors"
+                    >
+                      إعادة المحاولة يدوياً
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
 
-      {/* Main Content */}
-      {!hasActiveWebsites ? (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center text-white">
-            <h2 className="text-xl font-semibold mb-2">
-              مرحباً بك في {account?.name}
-            </h2>
-            <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
-            <p className="text-sm text-gray-400 mt-2">
-              ⚡ التحديث السريع مُفعّل (1 ثانية)
-            </p>
-          </div>
-        </div>
-      ) : currentWebsite ? (
-        <iframe
-          key={`${currentWebsiteIndex}-${retryCount}`}
-          src={currentWebsite.website_url}
-          title={currentWebsite.website_title || currentWebsite.website_url}
-          className="w-full h-full border-0"
-          style={{
-            margin: 0,
-            padding: 0,
-            width: '100vw',
-            height: '100vh',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            border: 'none'
-          }}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation allow-downloads allow-pointer-lock"
-          loading="eager"
-          referrerPolicy="no-referrer-when-downgrade"
-          allow="fullscreen; picture-in-picture; autoplay; encrypted-media; accelerometer; gyroscope; camera; microphone; geolocation; payment; display-capture"
-          onLoad={handleIframeLoad}
-          onError={handleIframeError}
-        />
-      ) : null}
+          {/* Main Content */}
+          {!hasActiveWebsites ? (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center text-white">
+                <h2 className="text-xl font-semibold mb-2">
+                  مرحباً بك في {account?.name}
+                </h2>
+                <p className="text-gray-300">لا توجد مواقع نشطة حالياً</p>
+                <p className="text-sm text-gray-400 mt-2">
+                  ⚡ التحديث السريع مُفعّل (1 ثانية)
+                </p>
+              </div>
+            </div>
+          ) : currentWebsite ? (
+            <iframe
+              key={`${currentWebsiteIndex}-${retryCount}`}
+              src={currentWebsite.website_url}
+              title={currentWebsite.website_title || currentWebsite.website_url}
+              className="w-full h-full border-0"
+              style={{
+                margin: 0,
+                padding: 0,
+                width: '100vw',
+                height: '100vh',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                border: 'none'
+              }}
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation allow-modals allow-top-navigation allow-downloads allow-pointer-lock"
+              loading="eager"
+              referrerPolicy="no-referrer-when-downgrade"
+              allow="fullscreen; picture-in-picture; autoplay; encrypted-media; accelerometer; gyroscope; camera; microphone; geolocation; payment; display-capture"
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+            />
+          ) : null}
 
-      {/* News Ticker Display */}
-      {account?.id && !subscriptionExpired && (
-        <NewsTickerDisplay accountId={account.id} />
-      )}
+          {/* News Ticker Display - always show if not subscription expired */}
+          {account?.id && !subscriptionExpired && (
+            <NewsTickerDisplay accountId={account.id} />
+          )}
 
-      {/* Active Notifications */}
-      {activeNotifications.map((notification) => (
-        <NotificationPopup
-          key={notification.id}
-          notification={notification}
-          onClose={() => handleNotificationClose(notification.id)}
-        />
-      ))}
+          {/* Active Notifications */}
+          {activeNotifications.map((notification) => (
+            <NotificationPopup
+              key={notification.id}
+              notification={notification}
+              onClose={() => handleNotificationClose(notification.id)}
+            />
+          ))}
 
-      {/* Active Timers */}
-      {activeTimers.map((timer) => (
-        <BreakTimerDisplay
-          key={timer.id}
-          timer={timer}
-          onClose={() => handleTimerClose(timer.id)}
-        />
-      ))}
+          {/* Active Timers */}
+          {activeTimers.map((timer) => (
+            <BreakTimerDisplay
+              key={timer.id}
+              timer={timer}
+              onClose={() => handleTimerClose(timer.id)}
+            />
+          ))}
 
-      {/* Enhanced debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
-          <div>🔄 النقل: كل 3 ثوان</div>
-          <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
-          <div>✅ المواقع النشطة: {websites.length}</div>
-          <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
-          <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
-          <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>🔄 المحاولات: {retryCount}/3</div>
-          <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
-          <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
-        </div>
+          {/* Enhanced debug info */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
+              <div>🔄 النقل: كل 3 ثوان</div>
+              <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
+              <div>✅ المواقع النشطة: {websites.length}</div>
+              <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
+              <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
+              <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
+              <div>🔄 المحاولات: {retryCount}/3</div>
+              <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
+              <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

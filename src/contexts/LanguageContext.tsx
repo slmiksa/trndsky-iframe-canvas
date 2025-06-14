@@ -43,6 +43,7 @@ const translations = {
     'notifications': 'الإشعارات',
     'timers': 'مؤقتات البريك',
     'news': 'شريط الأخبار',
+    'slideshows': 'السلايدات',
     
     // Websites
     'add_website': 'إضافة موقع',
@@ -57,6 +58,23 @@ const translations = {
     'website_preview': 'معاينة الموقع',
     'select_website_preview': 'اختر موقعاً لمعاينته',
     'loading': 'جاري التحميل...',
+    
+    // Slideshows
+    'add_slideshow': 'إضافة سلايدات',
+    'slideshow_title': 'عنوان السلايدات',
+    'upload_images': 'رفع الصور',
+    'slideshow_interval': 'مدة عرض كل صورة (ثواني)',
+    'no_slideshows_yet': 'لا توجد سلايدات بعد',
+    'slideshow_preview': 'معاينة السلايدات',
+    'select_slideshow_preview': 'اختر سلايدات لمعاينتها',
+    'slideshow_activated_others_stopped': 'تم تفعيل السلايدات وإيقاف السلايدات الأخرى تلقائياً',
+    'slideshow_stopped': 'تم إيقاف السلايدات',
+    'slideshow_deleted': 'تم حذف السلايدات',
+    'slideshow_added_successfully': 'تم إضافة السلايدات بنجاح',
+    'error_adding_slideshow': 'خطأ في إضافة السلايدات',
+    'error_updating_slideshow': 'خطأ في تحديث السلايدات',
+    'error_deleting_slideshow': 'خطأ في حذف السلايدات',
+    'images_count': 'عدد الصور: {count}',
     
     // Messages
     'website_added_successfully': 'تم إضافة الموقع بنجاح',
@@ -110,6 +128,7 @@ const translations = {
     'notifications': 'Notifications',
     'timers': 'Break Timers',
     'news': 'News Ticker',
+    'slideshows': 'Slideshows',
     
     // Websites
     'add_website': 'Add Website',
@@ -124,6 +143,23 @@ const translations = {
     'website_preview': 'Website Preview',
     'select_website_preview': 'Select a website to preview',
     'loading': 'Loading...',
+    
+    // Slideshows
+    'add_slideshow': 'Add Slideshow',
+    'slideshow_title': 'Slideshow Title',
+    'upload_images': 'Upload Images',
+    'slideshow_interval': 'Display Duration per Image (seconds)',
+    'no_slideshows_yet': 'No slideshows yet',
+    'slideshow_preview': 'Slideshow Preview',
+    'select_slideshow_preview': 'Select a slideshow to preview',
+    'slideshow_activated_others_stopped': 'Slideshow activated and other slideshows stopped automatically',
+    'slideshow_stopped': 'Slideshow stopped',
+    'slideshow_deleted': 'Slideshow deleted',
+    'slideshow_added_successfully': 'Slideshow added successfully',
+    'error_adding_slideshow': 'Error adding slideshow',
+    'error_updating_slideshow': 'Error updating slideshow',
+    'error_deleting_slideshow': 'Error deleting slideshow',
+    'images_count': 'Images count: {count}',
     
     // Messages
     'website_added_successfully': 'Website added successfully',
