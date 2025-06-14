@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Images, Eye, EyeOff, Trash2, Upload } from 'lucide-react';
+import { Plus, Images, Eye, EyeOff, Trash2, Upload, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface Slideshow {
@@ -50,9 +50,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error fetching slideshows:', error);
+        console.error('Error details:', error.message, error.code, error.details);
         toast({
-          title: t('error'),
-          description: 'خطأ في تحميل السلايدات',
+          title: 'خطأ في تحميل السلايدات',
+          description: `خطأ: ${error.message}`,
           variant: "destructive"
         });
         setSlideshows([]);
@@ -62,10 +63,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       console.log('✅ Slideshows fetched successfully:', data);
       setSlideshows(data || []);
     } catch (error) {
-      console.error('❌ Error in fetchSlideshows:', error);
+      console.error('❌ Exception in fetchSlideshows:', error);
       toast({
-        title: t('error'),
-        description: 'خطأ في تحميل السلايدات',
+        title: 'خطأ في تحميل السلايدات',
+        description: 'حدث خطأ غير متوقع',
         variant: "destructive"
       });
       setSlideshows([]);
@@ -76,6 +77,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
   useEffect(() => {
     if (accountId) {
+      console.log('🚀 SlideshowManager mounted for account:', accountId);
       fetchSlideshows();
     }
     
@@ -143,7 +145,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     e.preventDefault();
     if (newSlideshow.images.length === 0) {
       toast({
-        title: t('error'),
+        title: 'خطأ',
         description: 'يرجى اختيار صور للسلايدات',
         variant: "destructive"
       });
@@ -152,13 +154,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
     setUploading(true);
     try {
-      console.log('📤 Starting slideshow creation process');
+      console.log('📤 Starting slideshow creation process for account:', accountId);
       
       // رفع الصور أولاً
       const imageUrls = await uploadImages(newSlideshow.images);
       console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // إنشاء السلايدات مباشرة
+      // إنشاء السلايدات
       const { data, error } = await supabase
         .from('account_slideshows')
         .insert({
@@ -173,6 +175,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error creating slideshow:', error);
+        console.error('Insert error details:', error.message, error.code, error.details);
         throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
       }
 
@@ -305,6 +308,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   };
 
   const handleRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
     setLoading(true);
     await fetchSlideshows();
   };
@@ -320,7 +324,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                 السلايدات ({slideshows.length})
               </CardTitle>
               <div className="flex gap-2">
-                <Button onClick={handleRefresh} size="sm" variant="outline">
+                <Button onClick={handleRefresh} size="sm" variant="outline" disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                   تحديث
                 </Button>
                 <Button onClick={() => setShowAddForm(true)} size="sm">
@@ -340,6 +345,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <div className="text-center py-8">
                 <Images className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-gray-600">لا توجد سلايدات حتى الآن</p>
+                <p className="text-sm text-gray-500 mt-2">Account ID: {accountId}</p>
                 <Button 
                   onClick={handleRefresh} 
                   variant="outline" 
