@@ -50,7 +50,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error fetching slideshows:', error);
-        throw error;
+        toast({
+          title: t('error'),
+          description: 'خطأ في تحميل السلايدات',
+          variant: "destructive"
+        });
+        setSlideshows([]);
+        return;
       }
 
       console.log('✅ Slideshows fetched successfully:', data);
@@ -62,13 +68,16 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: 'خطأ في تحميل السلايدات',
         variant: "destructive"
       });
+      setSlideshows([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSlideshows();
+    if (accountId) {
+      fetchSlideshows();
+    }
     
     // إعداد مستمع للتحديثات المباشرة
     const channel = supabase
@@ -149,47 +158,25 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       const imageUrls = await uploadImages(newSlideshow.images);
       console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // محاولة استخدام الدالة المباشرة أولاً
-      let slideshowId;
-      try {
-        const { data, error } = await supabase
-          .rpc('create_slideshow_bypass_rls', {
-            p_account_id: accountId,
-            p_title: newSlideshow.title,
-            p_images: imageUrls,
-            p_interval_seconds: newSlideshow.interval_seconds
-          });
+      // إنشاء السلايدات مباشرة
+      const { data, error } = await supabase
+        .from('account_slideshows')
+        .insert({
+          account_id: accountId,
+          title: newSlideshow.title,
+          images: imageUrls,
+          interval_seconds: newSlideshow.interval_seconds,
+          is_active: false
+        })
+        .select()
+        .single();
 
-        if (error) {
-          console.error('❌ RPC failed, trying direct insert:', error);
-          throw error;
-        }
-        
-        slideshowId = data;
-        console.log('✅ Slideshow created via RPC:', slideshowId);
-      } catch (rpcError) {
-        // في حالة فشل RPC، جرب الإدراج المباشر
-        console.log('🔄 Attempting direct insert fallback');
-        const { data, error } = await supabase
-          .from('account_slideshows')
-          .insert({
-            account_id: accountId,
-            title: newSlideshow.title,
-            images: imageUrls,
-            interval_seconds: newSlideshow.interval_seconds,
-            is_active: false
-          })
-          .select()
-          .single();
-
-        if (error) {
-          console.error('❌ Direct insert also failed:', error);
-          throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
-        }
-        
-        slideshowId = data.id;
-        console.log('✅ Slideshow created via direct insert:', slideshowId);
+      if (error) {
+        console.error('❌ Error creating slideshow:', error);
+        throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
       }
+
+      console.log('✅ Slideshow created successfully:', data);
 
       toast({
         title: 'تم إضافة السلايدات بنجاح',
@@ -199,10 +186,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       setNewSlideshow({ title: '', interval_seconds: 5, images: [] });
       setShowAddForm(false);
       
-      // إجبار تحديث القائمة
-      setTimeout(() => {
-        fetchSlideshows();
-      }, 1000);
+      // تحديث القائمة فوراً
+      await fetchSlideshows();
       
     } catch (error: any) {
       console.error('❌ Error in addSlideshow:', error);
@@ -250,7 +235,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: statusMessage
       });
 
-      fetchSlideshows();
+      await fetchSlideshows();
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
@@ -301,7 +286,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       });
 
       setSelectedSlideshow(null);
-      fetchSlideshows();
+      await fetchSlideshows();
     } catch (error: any) {
       console.error('❌ Error in deleteSlideshow:', error);
       toast({
@@ -319,6 +304,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     }
   };
 
+  const handleRefresh = async () => {
+    setLoading(true);
+    await fetchSlideshows();
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* قائمة السلايدات */}
@@ -329,10 +319,15 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <CardTitle>
                 السلايدات ({slideshows.length})
               </CardTitle>
-              <Button onClick={() => setShowAddForm(true)} size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                إضافة سلايدات
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleRefresh} size="sm" variant="outline">
+                  تحديث
+                </Button>
+                <Button onClick={() => setShowAddForm(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  إضافة سلايدات
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -346,7 +341,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                 <Images className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-gray-600">لا توجد سلايدات حتى الآن</p>
                 <Button 
-                  onClick={fetchSlideshows} 
+                  onClick={handleRefresh} 
                   variant="outline" 
                   size="sm" 
                   className="mt-2"
