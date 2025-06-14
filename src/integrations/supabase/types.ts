@@ -376,6 +376,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_slideshow_bypass_rls: {
+        Args: {
+          p_account_id: string
+          p_title: string
+          p_images: string[]
+          p_interval_seconds?: number
+        }
+        Returns: string
+      }
       is_current_user_super_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

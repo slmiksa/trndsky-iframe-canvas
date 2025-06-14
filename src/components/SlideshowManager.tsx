@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -115,13 +114,14 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       
       const imageUrls = await uploadImages(newSlideshow.images);
       
-      // Use RPC call to bypass RLS since we're using custom auth
-      const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
-        p_account_id: accountId,
-        p_title: newSlideshow.title,
-        p_images: imageUrls,
-        p_interval_seconds: newSlideshow.interval_seconds
-      });
+      // Use direct database call via supabase.rpc with manual function call
+      const { data, error } = await supabase
+        .rpc('create_slideshow_bypass_rls', {
+          p_account_id: accountId,
+          p_title: newSlideshow.title,
+          p_images: imageUrls,
+          p_interval_seconds: newSlideshow.interval_seconds
+        } as any);
 
       if (error) {
         console.error('❌ Error creating slideshow via RPC:', error);
