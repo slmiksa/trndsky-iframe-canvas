@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +41,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
       
+      // استخدام استعلام مباشر بدون RLS للتأكد من الحصول على البيانات
       const { data, error } = await supabase
         .from('account_slideshows')
         .select('*')
@@ -50,7 +50,23 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error fetching slideshows:', error);
-        throw error;
+        // في حالة فشل الاستعلام العادي، جرب استخدام RPC
+        try {
+          const { data: rpcData, error: rpcError } = await supabase
+            .rpc('get_account_slideshows', { p_account_id: accountId });
+          
+          if (rpcError) {
+            console.error('❌ Error with RPC call:', rpcError);
+            throw rpcError;
+          }
+          
+          console.log('✅ Slideshows fetched via RPC:', rpcData);
+          setSlideshows(rpcData || []);
+          return;
+        } catch (rpcError) {
+          console.error('❌ Both methods failed:', rpcError);
+          throw error;
+        }
       }
 
       console.log('✅ Slideshows fetched successfully:', data);
@@ -69,6 +85,28 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
   useEffect(() => {
     fetchSlideshows();
+    
+    // إعداد مستمع للتحديثات المباشرة
+    const channel = supabase
+      .channel(`slideshows-${accountId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'account_slideshows',
+          filter: `account_id=eq.${accountId}`
+        },
+        async (payload) => {
+          console.log('🎬 Slideshow change detected:', payload);
+          await fetchSlideshows();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [accountId]);
 
   const uploadImages = async (files: File[]): Promise<string[]> => {
@@ -127,21 +165,48 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       const imageUrls = await uploadImages(newSlideshow.images);
       console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // استخدام الدالة الخاصة لتجاوز RLS
-      const { data, error } = await supabase
-        .rpc('create_slideshow_bypass_rls', {
-          p_account_id: accountId,
-          p_title: newSlideshow.title,
-          p_images: imageUrls,
-          p_interval_seconds: newSlideshow.interval_seconds
-        });
+      // محاولة استخدام الدالة المباشرة أولاً
+      let slideshowId;
+      try {
+        const { data, error } = await supabase
+          .rpc('create_slideshow_bypass_rls', {
+            p_account_id: accountId,
+            p_title: newSlideshow.title,
+            p_images: imageUrls,
+            p_interval_seconds: newSlideshow.interval_seconds
+          });
 
-      if (error) {
-        console.error('❌ Error creating slideshow via RPC:', error);
-        throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
+        if (error) {
+          console.error('❌ RPC failed, trying direct insert:', error);
+          throw error;
+        }
+        
+        slideshowId = data;
+        console.log('✅ Slideshow created via RPC:', slideshowId);
+      } catch (rpcError) {
+        // في حالة فشل RPC، جرب الإدراج المباشر
+        console.log('🔄 Attempting direct insert fallback');
+        const { data, error } = await supabase
+          .from('account_slideshows')
+          .insert({
+            account_id: accountId,
+            title: newSlideshow.title,
+            images: imageUrls,
+            interval_seconds: newSlideshow.interval_seconds,
+            is_active: false
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('❌ Direct insert also failed:', error);
+          throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
+        }
+        
+        slideshowId = data.id;
+        console.log('✅ Slideshow created via direct insert:', slideshowId);
       }
 
-      console.log('✅ Slideshow created successfully:', data);
       toast({
         title: 'تم إضافة السلايدات بنجاح',
         description: newSlideshow.title
@@ -149,7 +214,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       setNewSlideshow({ title: '', interval_seconds: 5, images: [] });
       setShowAddForm(false);
-      fetchSlideshows();
+      
+      // إجبار تحديث القائمة
+      setTimeout(() => {
+        fetchSlideshows();
+      }, 1000);
+      
     } catch (error: any) {
       console.error('❌ Error in addSlideshow:', error);
       toast({
@@ -291,6 +361,14 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <div className="text-center py-8">
                 <Images className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-gray-600">لا توجد سلايدات حتى الآن</p>
+                <Button 
+                  onClick={fetchSlideshows} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                >
+                  تحديث
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
