@@ -286,6 +286,9 @@ const ClientPublicPage = () => {
 
         setAccount(accountData);
         await fetchWebsites(accountData);
+        
+        // Check for active slideshows immediately after setting account
+        setTimeout(() => checkActiveSlideshow(), 100);
 
       } catch (error) {
         console.error('❌ Account fetch exception:', error);
@@ -354,14 +357,16 @@ const ClientPublicPage = () => {
       if (isWindowFocused) {
         console.log('🔄 Aggressive polling (1s interval)');
         fetchWebsites();
+        checkActiveSlideshow(); // إضافة فحص السلايدات في كل تحديث
       }
     }, 1000);
 
-    // Force refresh every 5 seconds as fallback
+    // Force refresh every 2 seconds as fallback
     const forceRefreshInterval = setInterval(() => {
-      console.log('💪 Force refresh (5s fallback)');
+      console.log('💪 Force refresh (2s fallback)');
       fetchWebsites();
-    }, 5000);
+      checkActiveSlideshow(); // إضافة فحص السلايدات في التحديث القسري
+    }, 2000);
 
     return () => {
       console.log('🧹 Cleaning up enhanced listeners');
@@ -518,16 +523,22 @@ const ClientPublicPage = () => {
     if (!account?.id || subscriptionExpired) return;
 
     try {
+      console.log('🎬 Checking for active slideshow:', account.id);
+      
       const { data, error } = await supabase
         .from('account_slideshows')
-        .select('id')
+        .select('id, is_active')
         .eq('account_id', account.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       const hasActive = !!data && !error;
-      setHasActiveSlideshow(hasActive);
-      console.log('🎬 Has active slideshow:', hasActive);
+      console.log('🎬 Active slideshow check result:', { hasActive, data, error });
+      
+      if (hasActiveSlideshow !== hasActive) {
+        setHasActiveSlideshow(hasActive);
+        console.log('🎬 Slideshow status changed to:', hasActive);
+      }
     } catch (error) {
       console.error('❌ Error checking active slideshow:', error);
       setHasActiveSlideshow(false);
@@ -545,8 +556,10 @@ const ClientPublicPage = () => {
   useEffect(() => {
     if (!account?.id || subscriptionExpired) return;
 
+    console.log('🎬 Setting up slideshow realtime listener for:', account.id);
+
     const slideshowChannel = supabase
-      .channel(`slideshow-status-${account.id}`)
+      .channel(`slideshow-realtime-${account.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -556,13 +569,30 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🎬 Slideshow status change:', payload.eventType);
+          console.log('🎬 Slideshow realtime change:', payload.eventType, payload);
+          
+          // فوري - بدون تأخير
           await checkActiveSlideshow();
+          
+          // تحديث إضافي بعد 100ms للتأكد
+          setTimeout(() => {
+            checkActiveSlideshow();
+          }, 100);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('🎬 Slideshow channel status:', status);
+      });
+
+    // Check slideshow status every 2 seconds
+    const slideshowCheckInterval = setInterval(() => {
+      console.log('🎬 Periodic slideshow check');
+      checkActiveSlideshow();
+    }, 2000);
 
     return () => {
+      console.log('🧹 Cleaning up slideshow listeners');
+      clearInterval(slideshowCheckInterval);
       supabase.removeChannel(slideshowChannel);
     };
   }, [account?.id, subscriptionExpired]);
@@ -830,6 +860,7 @@ const ClientPublicPage = () => {
           <div>🔄 المحاولات: {retryCount}/3</div>
           <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
           <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
+          <div>🎬 سلايدات نشطة: {hasActiveSlideshow ? 'نعم' : 'لا'}</div>
         </div>
       )}
     </div>
