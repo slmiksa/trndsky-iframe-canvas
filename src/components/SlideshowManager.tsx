@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,7 +42,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
       
-      // استخدام استعلام مباشر بدون RLS للتأكد من الحصول على البيانات
       const { data, error } = await supabase
         .from('account_slideshows')
         .select('*')
@@ -50,23 +50,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error fetching slideshows:', error);
-        // في حالة فشل الاستعلام العادي، جرب استخدام RPC
-        try {
-          const { data: rpcData, error: rpcError } = await supabase
-            .rpc('get_account_slideshows', { p_account_id: accountId });
-          
-          if (rpcError) {
-            console.error('❌ Error with RPC call:', rpcError);
-            throw rpcError;
-          }
-          
-          console.log('✅ Slideshows fetched via RPC:', rpcData);
-          setSlideshows(rpcData || []);
-          return;
-        } catch (rpcError) {
-          console.error('❌ Both methods failed:', rpcError);
-          throw error;
-        }
+        throw error;
       }
 
       console.log('✅ Slideshows fetched successfully:', data);
