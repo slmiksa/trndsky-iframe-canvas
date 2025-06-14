@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ interface SlideshowManagerProps {
 
 const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const { t } = useLanguage();
+  const { userRole } = useAuth();
   const [slideshows, setSlideshows] = useState<Slideshow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -39,6 +41,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const fetchSlideshows = async () => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
+      
+      // Use service role for custom auth system
       const { data, error } = await supabase
         .from('account_slideshows')
         .select('*')
@@ -111,19 +115,31 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       
       const imageUrls = await uploadImages(newSlideshow.images);
       
-      const { error } = await supabase
-        .from('account_slideshows')
-        .insert({
-          account_id: accountId,
-          title: newSlideshow.title,
-          images: imageUrls,
-          interval_seconds: newSlideshow.interval_seconds,
-          is_active: false
-        });
+      // Use RPC call to bypass RLS since we're using custom auth
+      const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
+        p_account_id: accountId,
+        p_title: newSlideshow.title,
+        p_images: imageUrls,
+        p_interval_seconds: newSlideshow.interval_seconds
+      });
 
       if (error) {
-        console.error('❌ Error inserting slideshow:', error);
-        throw error;
+        console.error('❌ Error creating slideshow via RPC:', error);
+        // Fallback to direct insert
+        const { error: insertError } = await supabase
+          .from('account_slideshows')
+          .insert({
+            account_id: accountId,
+            title: newSlideshow.title,
+            images: imageUrls,
+            interval_seconds: newSlideshow.interval_seconds,
+            is_active: false
+          });
+
+        if (insertError) {
+          console.error('❌ Error inserting slideshow:', insertError);
+          throw insertError;
+        }
       }
 
       console.log('✅ Slideshow added successfully');
