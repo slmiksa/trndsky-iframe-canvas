@@ -21,6 +21,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const [imagesLoaded, setImagesLoaded] = useState<boolean[]>([]);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const preloadedImages = useRef<HTMLImageElement[]>([]);
+  const [forceHide, setForceHide] = useState(false);
 
   // Preload all images
   const preloadImages = (imageUrls: string[]) => {
@@ -58,6 +59,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
       if (error && error.code !== 'PGRST116') {
         console.error('❌ Error fetching active slideshow:', error);
+        setActiveSlideshow(null);
+        setForceHide(true);
         return;
       }
 
@@ -66,15 +69,19 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         setActiveSlideshow(data);
         setCurrentImageIndex(0);
         setImagesLoaded([]);
+        setForceHide(false);
         
         // Start preloading images
         preloadImages(data.images);
       } else {
-        console.log('ℹ️ No active slideshow found');
+        console.log('ℹ️ No active slideshow found - hiding display');
         setActiveSlideshow(null);
+        setForceHide(true);
       }
     } catch (error) {
       console.error('❌ Exception fetching active slideshow:', error);
+      setActiveSlideshow(null);
+      setForceHide(true);
     } finally {
       setLoading(false);
     }
@@ -83,9 +90,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   useEffect(() => {
     fetchActiveSlideshow();
 
-    // Set up realtime listener for slideshow changes
-    const channel = supabase
-      .channel(`slideshows-${accountId}`)
+    // Enhanced realtime listener with multiple channels for redundancy
+    const mainChannel = supabase
+      .channel(`slideshows-main-${accountId}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -95,22 +102,84 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           filter: `account_id=eq.${accountId}`
         },
         async (payload) => {
-          console.log('🎬 Slideshow change detected:', payload.eventType);
+          console.log('🎬 Main channel - Slideshow change detected:', payload.eventType, payload);
+          
+          // فوري - بدون تأخير
+          await fetchActiveSlideshow();
+          
+          // إذا كان الحدث هو UPDATE أو DELETE، فرض الإخفاء
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+            const updatedData = payload.new as any;
+            if (updatedData && !updatedData.is_active) {
+              console.log('🚫 Slideshow deactivated - forcing hide');
+              setForceHide(true);
+              setActiveSlideshow(null);
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('🎬 Main channel status:', status);
+      });
+
+    // Backup channel للتأكد المضاعف
+    const backupChannel = supabase
+      .channel(`slideshows-backup-${accountId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'account_slideshows',
+          filter: `account_id=eq.${accountId}`
+        },
+        async (payload) => {
+          console.log('🔄 Backup channel - Update detected:', payload);
+          const updatedData = payload.new as any;
+          
+          if (updatedData && !updatedData.is_active) {
+            console.log('🚫 Backup channel - Slideshow deactivated');
+            setForceHide(true);
+            setActiveSlideshow(null);
+          }
+          
           await fetchActiveSlideshow();
         }
       )
       .subscribe();
 
+    // Aggressive polling للشاشات الكبيرة والتلفزيون - كل ثانية
+    const aggressiveInterval = setInterval(() => {
+      console.log('🔄 Aggressive polling check (1s)');
+      fetchActiveSlideshow();
+    }, 1000);
+
+    // Super aggressive polling للشاشات العنيدة - كل 500ms
+    const superAggressiveInterval = setInterval(() => {
+      console.log('⚡ Super aggressive polling check (500ms)');
+      fetchActiveSlideshow();
+    }, 500);
+
     return () => {
-      supabase.removeChannel(channel);
+      console.log('🧹 Cleaning up slideshow listeners');
+      clearInterval(aggressiveInterval);
+      clearInterval(superAggressiveInterval);
+      supabase.removeChannel(mainChannel);
+      supabase.removeChannel(backupChannel);
     };
   }, [accountId]);
 
   // Enhanced auto-advance with smooth transitions
   useEffect(() => {
-    if (!activeSlideshow || activeSlideshow.images.length <= 1) return;
+    if (!activeSlideshow || activeSlideshow.images.length <= 1 || forceHide) return;
 
     const interval = setInterval(() => {
+      // التحقق من الحالة النشطة قبل التقدم
+      if (forceHide || !activeSlideshow) {
+        console.log('🚫 Slideshow stopped, clearing interval');
+        return;
+      }
+
       // Only advance if current image is loaded
       if (imagesLoaded[currentImageIndex]) {
         setIsTransitioning(true);
@@ -122,17 +191,18 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
             return nextIndex;
           });
           setIsTransitioning(false);
-        }, 300); // Short transition delay
+        }, 300);
       } else {
         console.log('⏳ Waiting for image to load before advancing...');
       }
     }, activeSlideshow.interval_seconds * 1000);
 
     return () => clearInterval(interval);
-  }, [activeSlideshow, currentImageIndex, imagesLoaded]);
+  }, [activeSlideshow, currentImageIndex, imagesLoaded, forceHide]);
 
-  // لا تظهر أي شيء إذا لم توجد سلايدات نشطة
-  if (loading || !activeSlideshow || activeSlideshow.images.length === 0) {
+  // إخفاء السلايدات فوراً إذا لم توجد سلايدات نشطة أو إذا كان مُجبر على الإخفاء
+  if (loading || !activeSlideshow || activeSlideshow.images.length === 0 || forceHide) {
+    console.log('🙈 Hiding slideshow:', { loading, hasSlideshow: !!activeSlideshow, forceHide });
     return null;
   }
 
@@ -216,6 +286,15 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
             </div>
           </div>
         </div>
+
+        {/* Force hide indicator for debugging */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute bottom-16 right-8 bg-red-900/70 backdrop-blur-sm rounded-lg px-2 py-1">
+            <div className="text-white text-xs">
+              Force Hide: {forceHide ? 'نعم' : 'لا'}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

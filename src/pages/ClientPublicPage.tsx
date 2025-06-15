@@ -517,27 +517,45 @@ const ClientPublicPage = () => {
 
   // Add state for checking active slideshows
   const [hasActiveSlideshow, setHasActiveSlideshow] = useState(false);
+  const [slideshowCheckCount, setSlideshowCheckCount] = useState(0);
 
-  // Function to check for active slideshows
-  const checkActiveSlideshow = async () => {
+  // Enhanced function to check for active slideshows with force update
+  const checkActiveSlideshow = async (forceUpdate = false) => {
     if (!account?.id || subscriptionExpired) return;
 
     try {
-      console.log('🎬 Checking for active slideshow:', account.id);
+      console.log('🎬 Checking for active slideshow:', account.id, 'Force:', forceUpdate);
       
       const { data, error } = await supabase
         .from('account_slideshows')
-        .select('id, is_active')
+        .select('id, is_active, title')
         .eq('account_id', account.id)
         .eq('is_active', true)
         .maybeSingle();
 
       const hasActive = !!data && !error;
-      console.log('🎬 Active slideshow check result:', { hasActive, data, error });
+      console.log('🎬 Active slideshow check result:', { 
+        hasActive, 
+        data: data?.title || 'none', 
+        error,
+        previousState: hasActiveSlideshow,
+        checkCount: slideshowCheckCount + 1
+      });
       
-      if (hasActiveSlideshow !== hasActive) {
+      // Force update the count to trigger re-renders
+      setSlideshowCheckCount(prev => prev + 1);
+      
+      if (hasActiveSlideshow !== hasActive || forceUpdate) {
         setHasActiveSlideshow(hasActive);
         console.log('🎬 Slideshow status changed to:', hasActive);
+        
+        // Force a small delay and recheck for stubborn screens
+        if (!hasActive) {
+          setTimeout(() => {
+            console.log('🔄 Double-checking slideshow deactivation');
+            setHasActiveSlideshow(false);
+          }, 100);
+        }
       }
     } catch (error) {
       console.error('❌ Error checking active slideshow:', error);
@@ -545,21 +563,22 @@ const ClientPublicPage = () => {
     }
   };
 
-  // Add slideshow check to existing effects
+  // Add initial slideshow check
   useEffect(() => {
     if (account?.id && !subscriptionExpired) {
-      checkActiveSlideshow();
+      checkActiveSlideshow(true);
     }
   }, [account?.id, subscriptionExpired]);
 
-  // Add realtime listener for slideshows
+  // Enhanced realtime listener with aggressive updates for slideshows
   useEffect(() => {
     if (!account?.id || subscriptionExpired) return;
 
-    console.log('🎬 Setting up slideshow realtime listener for:', account.id);
+    console.log('🎬 Setting up enhanced slideshow realtime listener for:', account.id);
 
-    const slideshowChannel = supabase
-      .channel(`slideshow-realtime-${account.id}-${Date.now()}`)
+    // Multiple channels for redundancy
+    const slideshowChannel1 = supabase
+      .channel(`slideshow-realtime-1-${account.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -569,33 +588,75 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🎬 Slideshow realtime change:', payload.eventType, payload);
+          console.log('🎬 Channel 1 - Slideshow realtime change:', payload.eventType, payload);
           
-          // فوري - بدون تأخير
-          await checkActiveSlideshow();
+          // Immediate response for deactivation
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+            const updatedData = payload.new as any;
+            if (updatedData && !updatedData.is_active) {
+              console.log('🚫 Channel 1 - Immediate slideshow deactivation');
+              setHasActiveSlideshow(false);
+            }
+          }
           
-          // تحديث إضافي بعد 100ms للتأكد
-          setTimeout(() => {
-            checkActiveSlideshow();
-          }, 100);
+          await checkActiveSlideshow(true);
         }
       )
       .subscribe((status) => {
-        console.log('🎬 Slideshow channel status:', status);
+        console.log('🎬 Channel 1 status:', status);
       });
 
-    // Check slideshow status every 2 seconds
-    const slideshowCheckInterval = setInterval(() => {
-      console.log('🎬 Periodic slideshow check');
+    const slideshowChannel2 = supabase
+      .channel(`slideshow-realtime-2-${account.id}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'account_slideshows',
+          filter: `account_id=eq.${account.id}`
+        },
+        async (payload) => {
+          console.log('🎬 Channel 2 - Update detected:', payload);
+          const updatedData = payload.new as any;
+          
+          if (updatedData && !updatedData.is_active) {
+            console.log('🚫 Channel 2 - Slideshow deactivated, forcing hide');
+            setHasActiveSlideshow(false);
+          }
+          
+          await checkActiveSlideshow(true);
+        }
+      )
+      .subscribe();
+
+    // Ultra-aggressive checking for TV screens - every 500ms
+    const ultraAggressiveInterval = setInterval(() => {
+      console.log('⚡ Ultra-aggressive slideshow check (500ms)');
       checkActiveSlideshow();
+    }, 500);
+
+    // Regular aggressive checking - every 1 second
+    const aggressiveInterval = setInterval(() => {
+      console.log('🔄 Aggressive slideshow check (1s)');
+      checkActiveSlideshow();
+    }, 1000);
+
+    // Backup check - every 2 seconds
+    const backupInterval = setInterval(() => {
+      console.log('🛡️ Backup slideshow check (2s)');
+      checkActiveSlideshow(true);
     }, 2000);
 
     return () => {
-      console.log('🧹 Cleaning up slideshow listeners');
-      clearInterval(slideshowCheckInterval);
-      supabase.removeChannel(slideshowChannel);
+      console.log('🧹 Cleaning up enhanced slideshow listeners');
+      clearInterval(ultraAggressiveInterval);
+      clearInterval(aggressiveInterval);
+      clearInterval(backupInterval);
+      supabase.removeChannel(slideshowChannel1);
+      supabase.removeChannel(slideshowChannel2);
     };
-  }, [account?.id, subscriptionExpired]);
+  }, [account?.id, subscriptionExpired, hasActiveSlideshow]);
 
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 Closing notification:', notificationId);
@@ -861,6 +922,7 @@ const ClientPublicPage = () => {
           <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
           <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
           <div>🎬 سلايدات نشطة: {hasActiveSlideshow ? 'نعم' : 'لا'}</div>
+          <div>🔢 فحوصات السلايدات: {slideshowCheckCount}</div>
         </div>
       )}
     </div>
