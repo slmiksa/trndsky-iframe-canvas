@@ -230,7 +230,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: statusMessage
       });
       
-      console.log('✅ Slideshow status update sent. Realtime subscription will sync if needed.');
+      console.log('✅ Slideshow status update successful. Refetching to sync UI with DB.');
+      // Re-fetch data to ensure UI reflects the absolute source of truth from the database,
+      // which has been modified by the update and the trigger.
+      await fetchSlideshows();
       
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
