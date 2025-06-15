@@ -529,11 +529,9 @@ const ClientPublicPage = () => {
 
     try {
       // تم تغيير .maybeSingle() إلى استعلام عادي للتعامل مع سلايدات متعددة
-      const { data, error } = await supabase
-        .from('account_slideshows')
-        .select('id') // نحتاج فقط للتأكد من وجود سجل واحد على الأقل
-        .eq('account_id', account.id)
-        .eq('is_active', true);
+      const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
+        p_account_id: account.id
+      });
 
       if (error) {
         console.error('❌ Error checking active slideshows:', error);
@@ -544,10 +542,14 @@ const ClientPublicPage = () => {
         return;
       }
       
-      const hasActive = data && data.length > 0;
+      // تصفية السلايدات النشطة
+      const activeSlideshows = data?.filter(slide => slide.is_active) || [];
+      const hasActive = activeSlideshows.length > 0;
+      
       console.log('🎬 Slideshow check result:', { 
         hasActive, 
-        count: data.length, 
+        activeCount: activeSlideshows.length,
+        totalCount: data?.length || 0,
         previousState: hasActiveSlideshow,
         checkCount: slideshowCheckCount + 1,
         isLargeScreen
@@ -577,7 +579,7 @@ const ClientPublicPage = () => {
       if (hasActiveSlideshow !== hasActive || forceUpdate) {
         setHasActiveSlideshow(hasActive);
         setForceHideSlideshows(!hasActive);
-        console.log('🎬 Slideshow status changed to:', hasActive);
+        console.log('🎬 Slideshow status changed to:', hasActive, 'with', activeSlideshows.length, 'active slideshows');
       }
     } catch (error) {
       console.error('❌ Error checking active slideshow:', error);
@@ -954,7 +956,6 @@ const ClientPublicPage = () => {
           <div>🚫 إخفاء قسري: {forceHideSlideshows ? 'نعم' : 'لا'}</div>
           <div>🔢 فحوصات: {slideshowCheckCount}</div>
           <div>⚡ معدل الفحص: {isLargeScreen ? '200ms' : '500ms'}</div>
-          {/* ... keep existing code (other debug info) */}
         </div>
       )}
     </div>
