@@ -36,7 +36,33 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     images: [] as File[]
   });
   const [uploading, setUploading] = useState(false);
-  const [rotationInterval, setRotationInterval] = useState(30); // فترة التنقل بين السلايد شوز بالثواني
+  const [rotationInterval, setRotationInterval] = useState(30);
+  const [savingInterval, setSavingInterval] = useState(false);
+
+  // جلب إعدادات الحساب وفترة التنقل
+  const fetchAccountSettings = async () => {
+    try {
+      console.log('🔍 Fetching account settings for:', accountId);
+      
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('rotation_interval')
+        .eq('id', accountId)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching account settings:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('✅ Account settings fetched:', data);
+        setRotationInterval(data.rotation_interval || 30);
+      }
+    } catch (error) {
+      console.error('❌ Exception in fetchAccountSettings:', error);
+    }
+  };
 
   const fetchSlideshows = async () => {
     try {
@@ -50,7 +76,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error fetching slideshows:', error);
-        console.error('Error details:', error.message, error.code, error.details);
         toast({
           title: 'خطأ في تحميل السلايدات',
           description: `خطأ: ${error.message}`,
@@ -78,6 +103,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   useEffect(() => {
     if (accountId) {
       console.log('🚀 SlideshowManager mounted for account:', accountId);
+      fetchAccountSettings();
       fetchSlideshows();
     }
     
@@ -95,6 +121,19 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         async (payload) => {
           console.log('🎬 Slideshow change detected:', payload);
           await fetchSlideshows();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'accounts',
+          filter: `id=eq.${accountId}`
+        },
+        async (payload) => {
+          console.log('📡 Account settings change detected');
+          await fetchAccountSettings();
         }
       )
       .subscribe();
@@ -175,7 +214,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error creating slideshow:', error);
-        console.error('Insert error details:', error.message, error.code, error.details);
         throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
       }
 
@@ -189,7 +227,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       setNewSlideshow({ title: '', interval_seconds: 5, images: [] });
       setShowAddForm(false);
       
-      // تحديث القائمة فوراً
       await fetchSlideshows();
       
     } catch (error: any) {
@@ -208,7 +245,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
 
-      // تبديل حالة السلايد شو بدون إيقاف الآخرين
+      // تبديل حالة السلايد شو بدون التأثير على الآخرين
       const { error } = await supabase
         .from('account_slideshows')
         .update({ is_active: !currentStatus })
@@ -237,10 +274,19 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   };
 
   const updateRotationInterval = async () => {
+    if (rotationInterval < 5 || rotationInterval > 300) {
+      toast({
+        title: 'خطأ في القيمة',
+        description: 'يجب أن تكون فترة التنقل بين 5 و 300 ثانية',
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingInterval(true);
     try {
       console.log('🔄 Updating rotation interval to:', rotationInterval);
       
-      // حفظ فترة التنقل في الحساب
       const { error } = await supabase
         .from('accounts')
         .update({ rotation_interval: rotationInterval })
@@ -262,6 +308,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: error.message,
         variant: "destructive"
       });
+    } finally {
+      setSavingInterval(false);
     }
   };
 
@@ -373,8 +421,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                   onChange={(e) => setRotationInterval(parseInt(e.target.value) || 30)}
                   className="w-20"
                 />
-                <Button onClick={updateRotationInterval} size="sm" variant="outline">
-                  حفظ
+                <Button 
+                  onClick={updateRotationInterval} 
+                  size="sm" 
+                  variant="outline"
+                  disabled={savingInterval}
+                >
+                  {savingInterval ? 'جاري الحفظ...' : 'حفظ'}
                 </Button>
               </div>
               <p className="text-xs text-gray-600">
