@@ -35,39 +35,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     images: [] as File[]
   });
   const [uploading, setUploading] = useState(false);
-  const [rotationInterval, setRotationInterval] = useState(30);
-  const [savingInterval, setSavingInterval] = useState(false);
-
-  // جلب إعدادات الحساب وفترة التنقل
-  const fetchAccountSettings = async () => {
-    try {
-      console.log('🔍 Fetching account settings for:', accountId);
-      
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('rotation_interval')
-        .eq('id', accountId)
-        .single();
-
-      if (error) {
-        console.error('❌ Error fetching account settings:', error);
-        return;
-      }
-
-      if (data) {
-        console.log('✅ Account settings fetched:', data);
-        setRotationInterval(data.rotation_interval || 30);
-      }
-    } catch (error) {
-      console.error('❌ Exception in fetchAccountSettings:', error);
-    }
-  };
 
   const fetchSlideshows = async () => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
       
-      // استخدام الدالة الآمنة الجديدة للحصول على جميع السلايدات
       const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
         p_account_id: accountId
       });
@@ -101,11 +73,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   useEffect(() => {
     if (accountId) {
       console.log('🚀 SlideshowManager mounted for account:', accountId);
-      fetchAccountSettings();
       fetchSlideshows();
     }
     
-    // إعداد مستمع للتحديثات المباشرة
     const channel = supabase
       .channel(`slideshows-${accountId}`)
       .on(
@@ -119,19 +89,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         async (payload) => {
           console.log('🎬 Slideshow change detected:', payload);
           await fetchSlideshows();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'accounts',
-          filter: `id=eq.${accountId}`
-        },
-        async (payload) => {
-          console.log('📡 Account settings change detected');
-          await fetchAccountSettings();
         }
       )
       .subscribe();
@@ -237,35 +194,46 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const toggleSlideshowStatus = async (slideshowId: string, currentStatus: boolean) => {
     try {
       console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
+      const newStatus = !currentStatus;
 
-      // تحديث حالة السلايد شو مباشرة
+      // تحديث حالة السلايد شو في قاعدة البيانات.
+      // يوجد trigger في قاعدة البيانات يقوم بإلغاء تفعيل أي سلايد آخر.
       const { error } = await supabase
         .from('account_slideshows')
-        .update({ is_active: !currentStatus })
-        .eq('id', slideshowId)
-        .eq('account_id', accountId); // التأكد من أن السلايد شو ينتمي للحساب
+        .update({ is_active: newStatus })
+        .eq('id', slideshowId);
 
       if (error) {
         console.error('❌ Error updating slideshow status:', error);
-        throw error;
+        throw new Error(`فشل في تحديث السلايدات: ${error.message}`);
       }
 
-      const statusMessage = !currentStatus ? 'تم تشغيل السلايد شو' : 'تم إيقاف السلايد شو';
+      const statusMessage = newStatus ? 'تم تشغيل السلايد شو' : 'تم إيقاف السلايد شو';
       toast({
         title: 'تم تحديث حالة السلايد شو',
         description: statusMessage
       });
 
-      // تحديث القائمة المحلية فوراً
-      setSlideshows(prevSlideshows => 
-        prevSlideshows.map(slide => 
-          slide.id === slideshowId 
-            ? { ...slide, is_active: !currentStatus }
-            : slide
-        )
-      );
-
-      console.log('✅ Slideshow status updated successfully');
+      // تحديث واجهة المستخدم فوراً لتعكس القاعدة الجديدة (سلايد واحد نشط فقط)
+      if (newStatus) {
+        setSlideshows(prevSlideshows => 
+          prevSlideshows.map(slide => ({
+            ...slide,
+            is_active: slide.id === slideshowId
+          }))
+        );
+      } else {
+        // عند الإيقاف، فقط قم بتحديث السلايد المحدد
+        setSlideshows(prevSlideshows => 
+          prevSlideshows.map(slide => 
+            slide.id === slideshowId 
+              ? { ...slide, is_active: false }
+              : slide
+          )
+        );
+      }
+      
+      console.log('✅ Slideshow status update sent. Waiting for realtime update.');
       
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
@@ -274,46 +242,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: error.message,
         variant: "destructive"
       });
-    }
-  };
-
-  const updateRotationInterval = async () => {
-    if (rotationInterval < 5 || rotationInterval > 300) {
-      toast({
-        title: 'خطأ في القيمة',
-        description: 'يجب أن تكون فترة التنقل بين 5 و 300 ثانية',
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSavingInterval(true);
-    try {
-      console.log('🔄 Updating rotation interval to:', rotationInterval);
-      
-      const { error } = await supabase
-        .from('accounts')
-        .update({ rotation_interval: rotationInterval })
-        .eq('id', accountId);
-
-      if (error) {
-        console.error('❌ Error updating rotation interval:', error);
-        throw error;
-      }
-
-      toast({
-        title: 'تم تحديث فترة التنقل',
-        description: `تم تعديل فترة التنقل إلى ${rotationInterval} ثانية`
-      });
-    } catch (error: any) {
-      console.error('❌ Error in updateRotationInterval:', error);
-      toast({
-        title: 'خطأ في تحديث فترة التنقل',
-        description: error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setSavingInterval(false);
     }
   };
 
@@ -382,8 +310,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     await fetchSlideshows();
   };
 
-  const activeSlideshowsCount = slideshows.filter(s => s.is_active).length;
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* قائمة السلايد شوز */}
@@ -406,47 +332,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               </div>
             </div>
             
-            {/* إعدادات فترة التنقل */}
-            <div className="space-y-3 bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="rotationInterval" className="text-sm font-medium">
-                  فترة التنقل بين السلايد شوز (ثانية)
-                </Label>
-                <Badge variant="outline">
-                  {activeSlideshowsCount} نشط
-                </Badge>
-              </div>
-              <div className="flex gap-2">
-                <Input 
-                  id="rotationInterval"
-                  type="number" 
-                  min="5"
-                  max="300"
-                  value={rotationInterval} 
-                  onChange={(e) => setRotationInterval(parseInt(e.target.value) || 30)}
-                  className="w-20"
-                />
-                <Button 
-                  onClick={updateRotationInterval} 
-                  size="sm" 
-                  variant="outline"
-                  disabled={savingInterval}
-                >
-                  {savingInterval ? 'جاري الحفظ...' : 'حفظ'}
-                </Button>
-              </div>
-              <p className="text-xs text-gray-600">
-                النظام ينتقل تلقائياً بين السلايد شوز النشطة كل {rotationInterval} ثانية
-              </p>
-            </div>
-
-            <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+            <div className="mt-4 text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
               <p className="font-medium">النظام الحالي:</p>
-              <ul className="mt-2 space-y-1 text-xs">
-                <li>• يمكن تنشيط أي عدد من السلايد شوز في نفس الوقت</li>
-                <li>• التنقل التلقائي بين السلايد شوز النشطة حسب الفترة المحددة</li>
-                <li>• كل سلايد شو يعرض صوره بفترة 5 ثواني بين كل صورة</li>
-                <li>• استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو</li>
+              <ul className="mt-2 space-y-1 text-xs list-disc list-inside">
+                <li>يمكن تنشيط سلايد شو واحد فقط في كل مرة.</li>
+                <li>عند تنشيط سلايد شو، سيتم إيقاف أي سلايد شو آخر نشط تلقائياً.</li>
+                <li>كل سلايد شو يعرض صوره بفترة 5 ثواني بين كل صورة.</li>
+                <li>استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو.</li>
               </ul>
             </div>
           </CardHeader>
