@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -208,20 +207,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
 
-      if (!currentStatus) {
-        // إيقاف جميع السلايدات النشطة أولاً
-        const { error: deactivateError } = await supabase
-          .from('account_slideshows')
-          .update({ is_active: false })
-          .eq('account_id', accountId)
-          .eq('is_active', true);
-
-        if (deactivateError) {
-          console.error('❌ Error stopping active slideshows:', deactivateError);
-          throw deactivateError;
-        }
-      }
-
+      // إذا كنا نفعل سلايد شو، لا حاجة لإيقاف الآخرين - يمكن تشغيل عدة سلايد شوز
       const { error } = await supabase
         .from('account_slideshows')
         .update({ is_active: !currentStatus })
@@ -232,9 +218,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         throw error;
       }
 
-      const statusMessage = !currentStatus ? 'تم تشغيل السلايدات وإيقاف الأخرى' : 'تم إيقاف السلايدات';
+      const statusMessage = !currentStatus ? 'تم تشغيل السلايد شو' : 'تم إيقاف السلايد شو';
       toast({
-        title: 'تم تحديث حالة السلايدات',
+        title: 'تم تحديث حالة السلايد شو',
         description: statusMessage
       });
 
@@ -242,7 +228,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
-        title: 'خطأ في تحديث السلايدات',
+        title: 'خطأ في تحديث السلايد شو',
         description: error.message,
         variant: "destructive"
       });
@@ -315,13 +301,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* قائمة السلايدات */}
+      {/* قائمة السلايد شوز */}
       <div>
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>
-                السلايدات ({slideshows.length})
+                السلايد شوز ({slideshows.length})
               </CardTitle>
               <div className="flex gap-2">
                 <Button onClick={handleRefresh} size="sm" variant="outline" disabled={loading}>
@@ -330,9 +316,18 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                 </Button>
                 <Button onClick={() => setShowAddForm(true)} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  إضافة سلايدات
+                  إضافة سلايد شو
                 </Button>
               </div>
+            </div>
+            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+              <p className="font-medium">كيفية عمل النظام الجديد:</p>
+              <ul className="mt-2 space-y-1 text-xs">
+                <li>• كل سلايد شو يعرض صوره الخاصة به بشكل منفصل</li>
+                <li>• التنقل التلقائي بين السلايد شوز النشطة كل 30 ثانية</li>
+                <li>• يمكن تشغيل عدة سلايد شوز في نفس الوقت</li>
+                <li>• استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو</li>
+              </ul>
             </div>
           </CardHeader>
           <CardContent>
@@ -344,7 +339,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             ) : slideshows.length === 0 ? (
               <div className="text-center py-8">
                 <Images className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-600">لا توجد سلايدات حتى الآن</p>
+                <p className="text-gray-600">لا توجد سلايد شوز حتى الآن</p>
                 <p className="text-sm text-gray-500 mt-2">Account ID: {accountId}</p>
                 <Button 
                   onClick={handleRefresh} 
@@ -378,6 +373,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                             e.stopPropagation();
                             toggleSlideshowStatus(slideshow.id, slideshow.is_active);
                           }}
+                          title={slideshow.is_active ? 'إيقاف السلايد شو' : 'تشغيل السلايد شو'}
                         >
                           {slideshow.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
@@ -388,6 +384,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                             e.stopPropagation();
                             deleteSlideshow(slideshow.id);
                           }}
+                          title="حذف السلايد شو"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -405,18 +402,18 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               </div>
             )}
 
-            {/* نموذج إضافة سلايدات */}
+            {/* نموذج إضافة سلايد شو */}
             {showAddForm && (
               <div className="mt-6 border-t pt-6">
                 <form onSubmit={addSlideshow} className="space-y-4">
                   <div>
-                    <Label htmlFor="title">عنوان السلايدات</Label>
+                    <Label htmlFor="title">عنوان السلايد شو</Label>
                     <Input 
                       id="title" 
                       type="text" 
                       value={newSlideshow.title} 
                       onChange={(e) => setNewSlideshow({ ...newSlideshow, title: e.target.value })} 
-                      placeholder="اسم السلايدات" 
+                      placeholder="اسم السلايد شو" 
                       required 
                     />
                   </div>
@@ -470,12 +467,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         </Card>
       </div>
 
-      {/* معاينة السلايدات */}
+      {/* معاينة السلايد شو */}
       <div>
         <Card className="h-full">
           <CardHeader>
             <CardTitle>
-              {selectedSlideshow ? selectedSlideshow.title : 'معاينة السلايدات'}
+              {selectedSlideshow ? selectedSlideshow.title : 'معاينة السلايد شو'}
             </CardTitle>
             {selectedSlideshow && (
               <p className="text-sm text-gray-600">
@@ -490,7 +487,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
                 <div className="text-center text-gray-500">
                   <Images className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p>اختر سلايدات للمعاينة</p>
+                  <p>اختر سلايد شو للمعاينة</p>
                 </div>
               </div>
             )}

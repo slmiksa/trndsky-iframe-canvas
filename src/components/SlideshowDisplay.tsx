@@ -15,49 +15,52 @@ interface SlideshowDisplayProps {
 }
 
 const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
-  const [activeSlideshow, setActiveSlideshow] = useState<Slideshow | null>(null);
+  const [activeSlideshows, setActiveSlideshows] = useState<Slideshow[]>([]);
+  const [currentSlideshowIndex, setCurrentSlideshowIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const slideshowRotationRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
 
   // Detect if running on TV/large screen
   const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
 
-  const fetchActiveSlideshow = async () => {
+  const fetchActiveSlideshows = async () => {
     try {
-      console.log('🎬 Fetching active slideshow for:', accountId);
+      console.log('🎬 Fetching active slideshows for:', accountId);
       
       const { data, error } = await supabase
         .from('account_slideshows')
         .select('*')
         .eq('account_id', accountId)
         .eq('is_active', true)
-        .single();
+        .order('created_at', { ascending: true });
 
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
-      if (data) {
-        console.log('✅ Active slideshow found:', data.title, 'Images:', data.images.length);
-        setActiveSlideshow(data);
+      if (data && data.length > 0) {
+        console.log('✅ Active slideshows found:', data.length);
+        setActiveSlideshows(data);
+        setCurrentSlideshowIndex(0);
         setCurrentImageIndex(0);
         setConnectionError(false);
         setLoading(false);
       } else {
-        console.log('🚫 No active slideshow found');
-        setActiveSlideshow(null);
+        console.log('🚫 No active slideshows found');
+        setActiveSlideshows([]);
         setLoading(false);
       }
     } catch (error) {
-      console.error('❌ Error fetching slideshow:', error);
+      console.error('❌ Error fetching slideshows:', error);
       setConnectionError(true);
       setLoading(false);
       
       if (isLargeScreen) {
-        setActiveSlideshow(null);
+        setActiveSlideshows([]);
       }
     }
   };
@@ -80,20 +83,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         },
         async (payload) => {
           console.log('📡 Slideshow change detected:', payload.eventType);
-          
-          if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-            const updatedData = payload.new as any;
-            
-            if ((updatedData && !updatedData.is_active) || payload.eventType === 'DELETE') {
-              if (isLargeScreen) {
-                console.log('📺 Large screen - immediate exit');
-                setActiveSlideshow(null);
-                return;
-              }
-            }
-          }
-          
-          await fetchActiveSlideshow();
+          await fetchActiveSlideshows();
         }
       )
       .subscribe();
@@ -101,7 +91,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     channelRef.current = channel;
 
     const pollingInterval = setInterval(() => {
-      fetchActiveSlideshow();
+      fetchActiveSlideshows();
     }, 2000);
 
     return () => {
@@ -114,60 +104,75 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
   // Initial fetch
   useEffect(() => {
-    fetchActiveSlideshow();
+    fetchActiveSlideshows();
   }, [accountId]);
 
-  // إصلاح منطق التنقل بين الصور - COMPLETE FIX
+  // التنقل بين الصور داخل السلايد شو الحالي
   useEffect(() => {
-    // Clear any existing interval first
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
-    // Only start if we have slideshow with multiple images
-    if (!activeSlideshow || activeSlideshow.images.length <= 1 || loading) {
-      console.log('🚫 Not starting slideshow - missing conditions');
+    const currentSlideshow = activeSlideshows[currentSlideshowIndex];
+    if (!currentSlideshow || currentSlideshow.images.length <= 1 || loading) {
       return;
     }
 
-    console.log('🎬 Starting slideshow timer:', {
-      imagesCount: activeSlideshow.images.length,
-      intervalSeconds: activeSlideshow.interval_seconds,
-      currentIndex: currentImageIndex
+    console.log('🎬 Starting image rotation for slideshow:', {
+      title: currentSlideshow.title,
+      imagesCount: currentSlideshow.images.length,
+      intervalSeconds: currentSlideshow.interval_seconds
     });
 
-    // Start the interval - FIXED LOGIC
     intervalRef.current = setInterval(() => {
-      console.log('⏰ Timer fired - moving to next image');
-      
       setCurrentImageIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % activeSlideshow.images.length;
-        console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshow.images.length})`);
-        
-        // تأكد من أن القيمة صحيحة
-        if (nextIndex >= 0 && nextIndex < activeSlideshow.images.length) {
-          return nextIndex;
-        }
-        
-        // في حالة وجود خطأ، ارجع للصورة الأولى
-        console.warn('⚠️ Index out of bounds, resetting to 0');
-        return 0;
+        const nextIndex = (prevIndex + 1) % currentSlideshow.images.length;
+        console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${currentSlideshow.images.length})`);
+        return nextIndex;
       });
-    }, activeSlideshow.interval_seconds * 1000);
+    }, currentSlideshow.interval_seconds * 1000);
 
-    // Cleanup function
     return () => {
       if (intervalRef.current) {
-        console.log('🧹 Cleaning up slideshow interval');
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [activeSlideshow?.id, activeSlideshow?.images.length, activeSlideshow?.interval_seconds, loading]);
+  }, [currentSlideshowIndex, activeSlideshows, loading]);
+
+  // التنقل بين السلايد شوز كل 30 ثانية
+  useEffect(() => {
+    if (slideshowRotationRef.current) {
+      clearInterval(slideshowRotationRef.current);
+      slideshowRotationRef.current = null;
+    }
+
+    if (activeSlideshows.length <= 1) {
+      return;
+    }
+
+    console.log('🔄 Starting slideshow rotation with', activeSlideshows.length, 'slideshows');
+
+    slideshowRotationRef.current = setInterval(() => {
+      setCurrentSlideshowIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % activeSlideshows.length;
+        console.log(`🎭 Slideshow rotation: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
+        setCurrentImageIndex(0); // إعادة تعيين فهرس الصورة عند التنقل للسلايد شو التالي
+        return nextIndex;
+      });
+    }, 30000); // 30 ثانية لكل سلايد شو
+
+    return () => {
+      if (slideshowRotationRef.current) {
+        clearInterval(slideshowRotationRef.current);
+        slideshowRotationRef.current = null;
+      }
+    };
+  }, [activeSlideshows.length]);
 
   // Force exit conditions
-  if (!activeSlideshow || loading) {
+  if (!activeSlideshows.length || loading) {
     if (loading) {
       return (
         <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
@@ -184,13 +189,13 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     return null;
   }
 
-  if (activeSlideshow.images.length === 0) {
+  const currentSlideshow = activeSlideshows[currentSlideshowIndex];
+  if (!currentSlideshow || currentSlideshow.images.length === 0) {
     return null;
   }
 
-  // تأكد من أن الفهرس صحيح
-  const safeCurrentIndex = Math.max(0, Math.min(currentImageIndex, activeSlideshow.images.length - 1));
-  const currentImage = activeSlideshow.images[safeCurrentIndex];
+  const safeCurrentIndex = Math.max(0, Math.min(currentImageIndex, currentSlideshow.images.length - 1));
+  const currentImage = currentSlideshow.images[safeCurrentIndex];
 
   return (
     <div className="fixed inset-0 bg-black z-50">
@@ -198,9 +203,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         {/* Main image display */}
         <div className="w-full h-full">
           <img 
-            key={`${activeSlideshow.id}-${safeCurrentIndex}`}
+            key={`${currentSlideshow.id}-${safeCurrentIndex}`}
             src={currentImage}
-            alt={`${activeSlideshow.title} - Slide ${safeCurrentIndex + 1}`}
+            alt={`${currentSlideshow.title} - Slide ${safeCurrentIndex + 1}`}
             className="w-full h-full object-contain bg-black"
             style={{
               maxWidth: '100vw',
@@ -208,7 +213,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               objectFit: 'contain',
               objectPosition: 'center'
             }}
-            onLoad={() => console.log('✅ Image loaded:', safeCurrentIndex + 1, 'of', activeSlideshow.images.length, currentImage)}
+            onLoad={() => console.log('✅ Image loaded:', safeCurrentIndex + 1, 'of', currentSlideshow.images.length, currentImage)}
             onError={(e) => {
               console.error('❌ Image failed to load:', safeCurrentIndex + 1, currentImage);
               console.error('Error details:', e);
@@ -216,10 +221,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           />
         </div>
         
-        {/* Slide indicators */}
-        {activeSlideshow.images.length > 1 && (
+        {/* Slide indicators - للصور داخل السلايد شو الحالي */}
+        {currentSlideshow.images.length > 1 && (
           <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-3">
-            {activeSlideshow.images.map((_, index) => (
+            {currentSlideshow.images.map((_, index) => (
               <div 
                 key={index} 
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${
@@ -232,18 +237,35 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
         {/* Slideshow title overlay */}
         <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
-          <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
-          <p className="text-white/80 text-sm">
-            الصورة {safeCurrentIndex + 1} من {activeSlideshow.images.length}
-          </p>
+          <h2 className="text-white text-xl font-semibold">{currentSlideshow.title}</h2>
+          <div className="text-white/80 text-sm">
+            <p>الصورة {safeCurrentIndex + 1} من {currentSlideshow.images.length}</p>
+            {activeSlideshows.length > 1 && (
+              <p>السلايد شو {currentSlideshowIndex + 1} من {activeSlideshows.length}</p>
+            )}
+          </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Slideshow rotation indicators - للسلايد شوز */}
+        {activeSlideshows.length > 1 && (
+          <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex gap-2">
+            {activeSlideshows.map((_, index) => (
+              <div 
+                key={index} 
+                className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                  index === currentSlideshowIndex ? 'bg-blue-400 scale-125' : 'bg-blue-400/50'
+                }`} 
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Progress bar - للسلايد شو الحالي */}
         <div className="absolute bottom-0 left-0 w-full h-2 bg-white/20">
           <div 
             className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300 ease-linear"
             style={{
-              width: `${((safeCurrentIndex + 1) / activeSlideshow.images.length) * 100}%`
+              width: `${((safeCurrentIndex + 1) / currentSlideshow.images.length) * 100}%`
             }}
           />
         </div>
@@ -257,19 +279,20 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               {isLargeScreen && <span className="text-blue-300">📺</span>}
             </div>
             <div className="text-xs text-gray-300">
-              {activeSlideshow.images.length} صور | {activeSlideshow.interval_seconds}ث
+              {activeSlideshows.length} سلايد شو نشط | {currentSlideshow.interval_seconds}ث
             </div>
           </div>
         </div>
 
-        {/* Debug info - shows current state */}
+        {/* Debug info */}
         {process.env.NODE_ENV === 'development' && (
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
-            <div>Index: {safeCurrentIndex} (original: {currentImageIndex})</div>
-            <div>Total: {activeSlideshow.images.length}</div>
-            <div>Interval: {activeSlideshow.interval_seconds}s</div>
-            <div>Timer: {intervalRef.current ? 'Active' : 'Inactive'}</div>
-            <div>Image URL: {currentImage?.substring(0, 50)}...</div>
+            <div>Slideshow: {currentSlideshowIndex + 1}/{activeSlideshows.length}</div>
+            <div>Image: {safeCurrentIndex + 1}/{currentSlideshow.images.length}</div>
+            <div>Title: {currentSlideshow.title}</div>
+            <div>Interval: {currentSlideshow.interval_seconds}s</div>
+            <div>Image Timer: {intervalRef.current ? 'Active' : 'Inactive'}</div>
+            <div>Slideshow Timer: {slideshowRotationRef.current ? 'Active' : 'Inactive'}</div>
           </div>
         )}
       </div>
