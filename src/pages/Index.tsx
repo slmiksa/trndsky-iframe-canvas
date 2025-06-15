@@ -8,7 +8,6 @@ const Index = () => {
     window.open('https://trndsky.com/software', '_blank');
   };
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-slate-900 p-4">
-      <MobileDownloadButtons />
       <div className="text-center max-w-lg mx-auto">
         <div className="flex justify-center mb-6">
           <img src="/lovable-uploads/e3d01953-fe35-45d7-ac2b-e50bac917958.png" alt="TRNDSKY Logo" className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-contain" />
@@ -37,7 +36,13 @@ const Index = () => {
         <div className="mt-8 text-white text-base font-medium">
           <p>منصة موثوقة لخلق بيئة عمل ممتازة</p>
         </div>
+
+        <div className="mt-8">
+          <p className="text-white text-lg font-medium mb-4">تحميل التطبيق</p>
+          <MobileDownloadButtons />
+        </div>
       </div>
     </div>;
 };
 export default Index;
+

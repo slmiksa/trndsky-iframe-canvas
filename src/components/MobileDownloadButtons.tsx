@@ -21,23 +21,23 @@ const MobileDownloadButtons = () => {
 
   return (
     <>
-      <div className="absolute top-4 right-4 z-[70] flex flex-col gap-3">
+      <div className="flex justify-center gap-4">
         <Button 
           onClick={handleDownloadClick}
           variant="secondary" 
           size="icon" 
-          className="rounded-full shadow-lg h-12 w-12 bg-white/90 backdrop-blur-sm hover:bg-white"
+          className="rounded-full shadow-lg h-14 w-14 bg-white/90 backdrop-blur-sm hover:bg-white"
         >
-          <Apple className="h-6 w-6 text-gray-800" />
+          <Apple className="h-7 w-7 text-gray-800" />
           <span className="sr-only">Add to Home Screen</span>
         </Button>
         <Button 
           onClick={handleDownloadClick}
           variant="secondary" 
           size="icon" 
-          className="rounded-full shadow-lg h-12 w-12 bg-white/90 backdrop-blur-sm hover:bg-white"
+          className="rounded-full shadow-lg h-14 w-14 bg-white/90 backdrop-blur-sm hover:bg-white"
         >
-          <Smartphone className="h-6 w-6 text-gray-800" />
+          <Smartphone className="h-7 w-7 text-gray-800" />
           <span className="sr-only">Add to Home Screen</span>
         </Button>
       </div>
@@ -60,3 +60,4 @@ const MobileDownloadButtons = () => {
 };
 
 export default MobileDownloadButtons;
+
