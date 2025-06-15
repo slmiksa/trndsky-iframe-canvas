@@ -14,36 +14,66 @@ interface SlideshowDisplayProps {
   accountId: string;
 }
 
+// Global cache for preloaded images
+const imageCache = new Map<string, HTMLImageElement>();
+const slideshowCache = new Map<string, Slideshow>();
+
 const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const [activeSlideshow, setActiveSlideshow] = useState<Slideshow | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [imagesLoaded, setImagesLoaded] = useState<boolean[]>([]);
+  const [allImagesLoaded, setAllImagesLoaded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const preloadedImages = useRef<HTMLImageElement[]>([]);
-  const [forceHide, setForceHide] = useState(false);
+  const [shouldHide, setShouldHide] = useState(false);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<any>(null);
 
-  // Preload all images
-  const preloadImages = (imageUrls: string[]) => {
-    console.log('🖼️ Preloading images:', imageUrls.length);
-    const loadedFlags = new Array(imageUrls.length).fill(false);
-    preloadedImages.current = [];
+  // Preload images and cache them globally
+  const preloadImagesOptimized = async (imageUrls: string[], slideshowId: string) => {
+    console.log('🖼️ Starting optimized image preload for slideshow:', slideshowId);
+    
+    // Check if images are already cached
+    const cachedImages = imageUrls.filter(url => imageCache.has(url));
+    if (cachedImages.length === imageUrls.length) {
+      console.log('✅ All images already cached, using cache');
+      setAllImagesLoaded(true);
+      setLoading(false);
+      return;
+    }
 
-    imageUrls.forEach((url, index) => {
-      const img = new Image();
-      img.onload = () => {
-        console.log('✅ Image loaded:', index + 1, '/', imageUrls.length);
-        loadedFlags[index] = true;
-        setImagesLoaded([...loadedFlags]);
-      };
-      img.onerror = () => {
-        console.error('❌ Failed to load image:', url);
-        loadedFlags[index] = false;
-        setImagesLoaded([...loadedFlags]);
-      };
-      img.src = url;
-      preloadedImages.current[index] = img;
-    });
+    setLoading(true);
+    setAllImagesLoaded(false);
+
+    try {
+      const loadPromises = imageUrls.map((url, index) => {
+        if (imageCache.has(url)) {
+          return Promise.resolve(imageCache.get(url));
+        }
+
+        return new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            console.log(`✅ Image ${index + 1}/${imageUrls.length} loaded successfully`);
+            imageCache.set(url, img);
+            resolve(img);
+          };
+          img.onerror = () => {
+            console.error(`❌ Failed to load image ${index + 1}:`, url);
+            reject(new Error(`Failed to load image: ${url}`));
+          };
+          img.src = url;
+        });
+      });
+
+      await Promise.all(loadPromises);
+      console.log('🎉 All images preloaded and cached successfully');
+      setAllImagesLoaded(true);
+    } catch (error) {
+      console.error('❌ Error preloading images:', error);
+      setAllImagesLoaded(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchActiveSlideshow = async () => {
@@ -59,40 +89,73 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
       if (error && error.code !== 'PGRST116') {
         console.error('❌ Error fetching active slideshow:', error);
-        setActiveSlideshow(null);
-        setForceHide(true);
+        handleNoActiveSlideshow();
         return;
       }
 
       if (data) {
         console.log('✅ Active slideshow found:', data.title);
+        
+        // Check if this slideshow is already cached
+        const cacheKey = `${data.id}-${JSON.stringify(data.images)}`;
+        if (slideshowCache.has(cacheKey) && activeSlideshow?.id === data.id) {
+          console.log('📦 Using cached slideshow data');
+          return;
+        }
+
+        // Cache the slideshow
+        slideshowCache.set(cacheKey, data);
         setActiveSlideshow(data);
         setCurrentImageIndex(0);
-        setImagesLoaded([]);
-        setForceHide(false);
+        setShouldHide(false);
         
         // Start preloading images
-        preloadImages(data.images);
+        await preloadImagesOptimized(data.images, data.id);
       } else {
-        console.log('ℹ️ No active slideshow found - hiding display');
-        setActiveSlideshow(null);
-        setForceHide(true);
+        console.log('ℹ️ No active slideshow found');
+        handleNoActiveSlideshow();
       }
     } catch (error) {
       console.error('❌ Exception fetching active slideshow:', error);
-      setActiveSlideshow(null);
-      setForceHide(true);
-    } finally {
-      setLoading(false);
+      handleNoActiveSlideshow();
     }
+  };
+
+  const handleNoActiveSlideshow = () => {
+    console.log('🚫 Handling no active slideshow - immediate hide');
+    setShouldHide(true);
+    setActiveSlideshow(null);
+    setLoading(false);
+    
+    // Clear interval immediately
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const handleSlideshowDeactivation = () => {
+    console.log('🚫 Slideshow deactivated - immediate response');
+    setShouldHide(true);
+    setActiveSlideshow(null);
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    // Force re-render
+    setTimeout(() => {
+      setShouldHide(true);
+    }, 50);
   };
 
   useEffect(() => {
     fetchActiveSlideshow();
 
-    // Enhanced realtime listener with multiple channels for redundancy
-    const mainChannel = supabase
-      .channel(`slideshows-main-${accountId}-${Date.now()}`)
+    // Enhanced realtime listener with immediate response
+    channelRef.current = supabase
+      .channel(`slideshows-enhanced-${accountId}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -102,137 +165,127 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           filter: `account_id=eq.${accountId}`
         },
         async (payload) => {
-          console.log('🎬 Main channel - Slideshow change detected:', payload.eventType, payload);
+          console.log('🎬 Realtime change detected:', payload.eventType, payload);
           
-          // فوري - بدون تأخير
-          await fetchActiveSlideshow();
-          
-          // إذا كان الحدث هو UPDATE أو DELETE، فرض الإخفاء
           if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
             const updatedData = payload.new as any;
+            
+            // Immediate response to deactivation
             if (updatedData && !updatedData.is_active) {
-              console.log('🚫 Slideshow deactivated - forcing hide');
-              setForceHide(true);
-              setActiveSlideshow(null);
+              console.log('🚫 IMMEDIATE deactivation detected');
+              handleSlideshowDeactivation();
+              return;
+            }
+            
+            if (payload.eventType === 'DELETE') {
+              console.log('🗑️ IMMEDIATE deletion detected');
+              handleSlideshowDeactivation();
+              return;
             }
           }
+          
+          // Refresh slideshow data
+          await fetchActiveSlideshow();
         }
       )
       .subscribe((status) => {
-        console.log('🎬 Main channel status:', status);
+        console.log('🎬 Realtime status:', status);
       });
 
-    // Backup channel للتأكد المضاعف
-    const backupChannel = supabase
-      .channel(`slideshows-backup-${accountId}-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'account_slideshows',
-          filter: `account_id=eq.${accountId}`
-        },
-        async (payload) => {
-          console.log('🔄 Backup channel - Update detected:', payload);
-          const updatedData = payload.new as any;
-          
-          if (updatedData && !updatedData.is_active) {
-            console.log('🚫 Backup channel - Slideshow deactivated');
-            setForceHide(true);
-            setActiveSlideshow(null);
-          }
-          
-          await fetchActiveSlideshow();
-        }
-      )
-      .subscribe();
-
-    // Aggressive polling للشاشات الكبيرة والتلفزيون - كل ثانية
+    // Aggressive polling for TV screens - every 500ms
     const aggressiveInterval = setInterval(() => {
-      console.log('🔄 Aggressive polling check (1s)');
-      fetchActiveSlideshow();
-    }, 1000);
-
-    // Super aggressive polling للشاشات العنيدة - كل 500ms
-    const superAggressiveInterval = setInterval(() => {
-      console.log('⚡ Super aggressive polling check (500ms)');
+      console.log('⚡ Ultra-fast check (500ms)');
       fetchActiveSlideshow();
     }, 500);
 
     return () => {
       console.log('🧹 Cleaning up slideshow listeners');
       clearInterval(aggressiveInterval);
-      clearInterval(superAggressiveInterval);
-      supabase.removeChannel(mainChannel);
-      supabase.removeChannel(backupChannel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [accountId]);
 
-  // Enhanced auto-advance with smooth transitions
+  // Smooth auto-advance with cached images
   useEffect(() => {
-    if (!activeSlideshow || activeSlideshow.images.length <= 1 || forceHide) return;
+    // Clear any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
 
-    const interval = setInterval(() => {
-      // التحقق من الحالة النشطة قبل التقدم
-      if (forceHide || !activeSlideshow) {
+    if (!activeSlideshow || activeSlideshow.images.length <= 1 || shouldHide || !allImagesLoaded) {
+      return;
+    }
+
+    console.log('🎬 Starting smooth slideshow with interval:', activeSlideshow.interval_seconds);
+
+    intervalRef.current = setInterval(() => {
+      if (shouldHide || !activeSlideshow) {
         console.log('🚫 Slideshow stopped, clearing interval');
         return;
       }
 
-      // Only advance if current image is loaded
-      if (imagesLoaded[currentImageIndex]) {
-        setIsTransitioning(true);
-        
-        setTimeout(() => {
-          setCurrentImageIndex((prev) => {
-            const nextIndex = (prev + 1) % activeSlideshow.images.length;
-            console.log('🔄 Advancing to slide:', nextIndex + 1, '/', activeSlideshow.images.length);
-            return nextIndex;
-          });
-          setIsTransitioning(false);
-        }, 300);
-      } else {
-        console.log('⏳ Waiting for image to load before advancing...');
-      }
+      setIsTransitioning(true);
+      
+      setTimeout(() => {
+        setCurrentImageIndex((prev) => {
+          const nextIndex = (prev + 1) % activeSlideshow.images.length;
+          console.log('🔄 Smooth transition to slide:', nextIndex + 1, '/', activeSlideshow.images.length);
+          return nextIndex;
+        });
+        setIsTransitioning(false);
+      }, 200); // Faster transition
     }, activeSlideshow.interval_seconds * 1000);
 
-    return () => clearInterval(interval);
-  }, [activeSlideshow, currentImageIndex, imagesLoaded, forceHide]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [activeSlideshow, allImagesLoaded, shouldHide]);
 
-  // إخفاء السلايدات فوراً إذا لم توجد سلايدات نشطة أو إذا كان مُجبر على الإخفاء
-  if (loading || !activeSlideshow || activeSlideshow.images.length === 0 || forceHide) {
-    console.log('🙈 Hiding slideshow:', { loading, hasSlideshow: !!activeSlideshow, forceHide });
+  // Immediate hide conditions
+  if (shouldHide || loading || !activeSlideshow || activeSlideshow.images.length === 0) {
+    console.log('🙈 Hiding slideshow:', { shouldHide, loading, hasSlideshow: !!activeSlideshow });
     return null;
   }
 
+  // Don't show until all images are loaded
+  if (!allImagesLoaded) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-lg">جاري تحميل العرض التقديمي...</p>
+          <p className="text-sm text-gray-300 mt-2">
+            {activeSlideshow.images.length} صور
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const currentImage = activeSlideshow.images[currentImageIndex];
-  const isCurrentImageLoaded = imagesLoaded[currentImageIndex];
 
   return (
     <div className="fixed inset-0 bg-black z-50">
       <div className="w-full h-full relative overflow-hidden">
-        {/* Loading indicator for current image */}
-        {!isCurrentImageLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black">
-            <div className="text-center text-white">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-              <p className="text-lg">جاري تحميل الصورة...</p>
-              <p className="text-sm text-gray-300 mt-2">
-                {currentImageIndex + 1} من {activeSlideshow.images.length}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Main image display */}
+        {/* Main image display with cached images */}
         <div 
-          className={`w-full h-full transition-opacity duration-300 ${
-            isCurrentImageLoaded && !isTransitioning ? 'opacity-100' : 'opacity-0'
+          className={`w-full h-full transition-opacity duration-200 ${
+            !isTransitioning ? 'opacity-100' : 'opacity-0'
           }`}
         >
           <img 
-            src={currentImage} 
+            src={currentImage}
             alt={`${activeSlideshow.title} - Slide ${currentImageIndex + 1}`}
             className="w-full h-full object-contain bg-black"
             style={{
@@ -251,7 +304,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
             {activeSlideshow.images.map((_, index) => (
               <div 
                 key={index} 
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                className={`w-3 h-3 rounded-full transition-all duration-200 ${
                   index === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
                 }`} 
               />
@@ -264,7 +317,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
         </div>
 
-        {/* Enhanced progress bar */}
+        {/* Progress bar */}
         <div className="absolute bottom-0 left-0 w-full h-2 bg-white/20">
           <div 
             className="h-full bg-white transition-all duration-100 ease-linear"
@@ -274,27 +327,18 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           />
         </div>
 
-        {/* Loading status for all images */}
+        {/* Cache status indicator */}
         <div className="absolute top-8 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <div className="text-white text-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <div className={`w-2 h-2 rounded-full ${isCurrentImageLoaded ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
-              <span>الصورة الحالية: {isCurrentImageLoaded ? 'محملة' : 'جاري التحميل'}</span>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-400"></div>
+              <span>محمل بالكامل</span>
             </div>
             <div className="text-xs text-gray-300">
-              تم تحميل {imagesLoaded.filter(Boolean).length} من {activeSlideshow.images.length}
+              {activeSlideshow.images.length} صور محفوظة
             </div>
           </div>
         </div>
-
-        {/* Force hide indicator for debugging */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="absolute bottom-16 right-8 bg-red-900/70 backdrop-blur-sm rounded-lg px-2 py-1">
-            <div className="text-white text-xs">
-              Force Hide: {forceHide ? 'نعم' : 'لا'}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
