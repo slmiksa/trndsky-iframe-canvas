@@ -10,8 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import AppleLogo from './icons/AppleLogo';
-import GooglePlayLogo from './icons/GooglePlayLogo';
 
 const MobileDownloadButtons = () => {
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -26,20 +24,18 @@ const MobileDownloadButtons = () => {
         <Button 
           onClick={handleDownloadClick}
           variant="secondary" 
-          size="icon" 
-          className="rounded-full shadow-lg h-14 w-14 bg-white/90 backdrop-blur-sm hover:bg-white"
+          size="lg"
+          className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6"
         >
-          <AppleLogo className="h-7 w-7" />
-          <span className="sr-only">Add to Home Screen</span>
+          متجر آبل
         </Button>
         <Button 
           onClick={handleDownloadClick}
           variant="secondary" 
-          size="icon" 
-          className="rounded-full shadow-lg h-14 w-14 bg-white/90 backdrop-blur-sm hover:bg-white"
+          size="lg"
+          className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6"
         >
-          <GooglePlayLogo className="h-7 w-7" />
-          <span className="sr-only">Add to Home Screen</span>
+          قوقل بلاي
         </Button>
       </div>
 
