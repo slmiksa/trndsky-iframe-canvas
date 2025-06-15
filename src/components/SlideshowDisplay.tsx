@@ -42,8 +42,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
       if (data) {
         console.log('✅ Active slideshow found:', data.title, 'Images:', data.images.length);
-        
-        // Reset everything when new slideshow is found
         setActiveSlideshow(data);
         setCurrentImageIndex(0);
         setConnectionError(false);
@@ -83,7 +81,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         async (payload) => {
           console.log('📡 Slideshow change detected:', payload.eventType);
           
-          // Immediate response for deactivation on large screens
           if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
             const updatedData = payload.new as any;
             
@@ -103,7 +100,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     channelRef.current = channel;
 
-    // Polling as backup
     const pollingInterval = setInterval(() => {
       fetchActiveSlideshow();
     }, 2000);
@@ -121,38 +117,46 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     fetchActiveSlideshow();
   }, [accountId]);
 
-  // SIMPLIFIED Auto-advance slideshow - هذا هو التحسين الرئيسي
+  // إصلاح منطق التنقل بين الصور - SIMPLIFIED AND FIXED
   useEffect(() => {
-    // Clear any existing interval
+    // Clear any existing interval first
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
-    // Don't start slideshow if conditions not met
+    // Only start if we have slideshow with multiple images
     if (!activeSlideshow || activeSlideshow.images.length <= 1 || loading) {
-      console.log('🚫 Slideshow conditions not met');
+      console.log('🚫 Not starting slideshow - missing conditions');
       return;
     }
 
-    console.log('🎬 Starting slideshow with', activeSlideshow.images.length, 'images, interval:', activeSlideshow.interval_seconds, 'seconds');
+    console.log('🎬 Starting slideshow timer:', {
+      imagesCount: activeSlideshow.images.length,
+      intervalSeconds: activeSlideshow.interval_seconds,
+      currentIndex: currentImageIndex
+    });
 
-    // SIMPLIFIED interval logic
+    // Start the interval
     intervalRef.current = setInterval(() => {
+      console.log('⏰ Timer fired - moving to next image');
+      
       setCurrentImageIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % activeSlideshow.images.length;
-        console.log('🔄 Moving from slide', prevIndex + 1, 'to slide', nextIndex + 1);
+        console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshow.images.length})`);
         return nextIndex;
       });
     }, activeSlideshow.interval_seconds * 1000);
 
+    // Cleanup function
     return () => {
       if (intervalRef.current) {
+        console.log('🧹 Cleaning up slideshow interval');
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [activeSlideshow, loading]);
+  }, [activeSlideshow?.id, activeSlideshow?.images.length, activeSlideshow?.interval_seconds, loading]);
 
   // Force exit conditions
   if (!activeSlideshow || loading) {
@@ -181,10 +185,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   return (
     <div className="fixed inset-0 bg-black z-50">
       <div className="w-full h-full relative overflow-hidden">
-        {/* Main image display - SIMPLIFIED */}
+        {/* Main image display */}
         <div className="w-full h-full">
           <img 
-            key={`${currentImageIndex}-${activeSlideshow.id}`}
+            key={`${activeSlideshow.id}-${currentImageIndex}`}
             src={currentImage}
             alt={`${activeSlideshow.title} - Slide ${currentImageIndex + 1}`}
             className="w-full h-full object-contain bg-black"
@@ -194,8 +198,11 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               objectFit: 'contain',
               objectPosition: 'center'
             }}
-            onLoad={() => console.log('✅ Image loaded:', currentImageIndex + 1)}
-            onError={() => console.error('❌ Image failed:', currentImageIndex + 1)}
+            onLoad={() => console.log('✅ Image loaded:', currentImageIndex + 1, currentImage)}
+            onError={(e) => {
+              console.error('❌ Image failed to load:', currentImageIndex + 1, currentImage);
+              console.error('Error details:', e);
+            }}
           />
         </div>
         
@@ -244,6 +251,16 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
             </div>
           </div>
         </div>
+
+        {/* Debug info - shows current state */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
+            <div>Index: {currentImageIndex}</div>
+            <div>Total: {activeSlideshow.images.length}</div>
+            <div>Interval: {activeSlideshow.interval_seconds}s</div>
+            <div>Timer: {intervalRef.current ? 'Active' : 'Inactive'}</div>
+          </div>
+        )}
       </div>
     </div>
   );
