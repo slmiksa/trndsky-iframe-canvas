@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -50,12 +49,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     try {
       console.log('🎬 Fetching active slideshows for:', accountId);
       
-      const { data, error } = await supabase
-        .from('account_slideshows')
-        .select('*')
-        .eq('account_id', accountId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: true });
+      // استخدام الدالة الجديدة للحصول على السلايدات النشطة فقط
+      const { data, error } = await supabase.rpc('get_active_slideshows_for_account', {
+        p_account_id: accountId
+      });
 
       if (error && error.code !== 'PGRST116') {
         throw error;
