@@ -192,12 +192,26 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   };
 
   const toggleSlideshowStatus = async (slideshowId: string, currentStatus: boolean) => {
-    try {
-      console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
-      const newStatus = !currentStatus;
+    const newStatus = !currentStatus;
 
-      // تحديث حالة السلايد شو في قاعدة البيانات.
-      // يوجد trigger في قاعدة البيانات يقوم بإلغاء تفعيل أي سلايد آخر.
+    // Optimistic UI update for instant feedback
+    setSlideshows(prevSlideshows =>
+      prevSlideshows.map(slide => {
+        if (newStatus) {
+          // When activating, set this one to true and all others to false.
+          return { ...slide, is_active: slide.id === slideshowId };
+        } else {
+          // When deactivating, just set this one to false.
+          if (slide.id === slideshowId) {
+            return { ...slide, is_active: false };
+          }
+          return slide;
+        }
+      })
+    );
+
+    try {
+      console.log('🔄 Toggling slideshow status:', { slideshowId, newStatus });
       const { error } = await supabase
         .from('account_slideshows')
         .update({ is_active: newStatus })
@@ -205,6 +219,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
       if (error) {
         console.error('❌ Error updating slideshow status:', error);
+        // On error, revert the optimistic update by fetching from the source of truth
+        await fetchSlideshows();
         throw new Error(`فشل في تحديث السلايدات: ${error.message}`);
       }
 
@@ -214,11 +230,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: statusMessage
       });
       
-      // إعادة جلب البيانات مباشرة لضمان أن الواجهة تعكس الحالة الصحيحة من قاعدة البيانات
-      // والتي تم تعديلها بواسطة الـ trigger
-      await fetchSlideshows();
-      
-      console.log('✅ Slideshow status update sent. Refetched to guarantee correct state.');
+      console.log('✅ Slideshow status update sent. Realtime subscription will sync if needed.');
       
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
