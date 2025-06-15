@@ -1,0 +1,11 @@
+
+{
+  "appId": "app.lovable.546d302470354d3ebcd5eef8a634527d",
+  "appName": "trndsky-iframe-canvas",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://546d3024-7035-4d3e-bcd5-eef8a634527d.lovableproject.com?forceHideBadge=true",
+    "cleartext": true
+  }
+}

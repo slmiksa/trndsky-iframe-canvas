@@ -8,6 +8,7 @@ import NotificationPopup from '@/components/NotificationPopup';
 import BreakTimerDisplay from '@/components/BreakTimerDisplay';
 import NewsTickerDisplay from '@/components/NewsTickerDisplay';
 import SlideshowDisplay from '@/components/SlideshowDisplay';
+import MobileDownloadButtons from '@/components/MobileDownloadButtons';
 
 interface Account {
   id: string;
@@ -632,7 +633,15 @@ const ClientPublicPage = () => {
   const hasActiveWebsites = websites.length > 0;
 
   return (
-    <div className="w-full h-screen overflow-hidden bg-black relative">
+    <div 
+      className="w-full h-screen overflow-hidden bg-black relative"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       {/* SlideshowDisplay is now an overlay and manages its own visibility */}
       {account?.id && !subscriptionExpired && (
         <SlideshowDisplay accountId={account.id} onActivityChange={setIsSlideshowActive} />
@@ -763,6 +772,9 @@ const ClientPublicPage = () => {
             onClose={() => handleTimerClose(timer.id)}
           />
         ))}
+
+        {/* Mobile Download Buttons */}
+        {isMobile && !subscriptionExpired && account?.id && <MobileDownloadButtons />}
       </div>
 
 
