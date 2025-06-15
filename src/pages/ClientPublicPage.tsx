@@ -515,16 +515,20 @@ const ClientPublicPage = () => {
     }
   }, [iframeError, retryCount, currentWebsiteIndex]);
 
-  // Add state for checking active slideshows
+  // Add state for checking active slideshows with TV optimization
   const [hasActiveSlideshow, setHasActiveSlideshow] = useState(false);
   const [slideshowCheckCount, setSlideshowCheckCount] = useState(0);
+  const [forceHideSlideshows, setForceHideSlideshows] = useState(false);
 
-  // Enhanced function to check for active slideshows with force update
+  // Detect large screen for TV optimization
+  const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
+
+  // Enhanced function to check for active slideshows with IMMEDIATE TV response
   const checkActiveSlideshow = async (forceUpdate = false) => {
     if (!account?.id || subscriptionExpired) return;
 
     try {
-      console.log('🎬 Checking for active slideshow:', account.id, 'Force:', forceUpdate);
+      console.log('🎬 Checking slideshow for TV:', account.id, 'Force:', forceUpdate, 'Large screen:', isLargeScreen);
       
       const { data, error } = await supabase
         .from('account_slideshows')
@@ -534,32 +538,50 @@ const ClientPublicPage = () => {
         .maybeSingle();
 
       const hasActive = !!data && !error;
-      console.log('🎬 Active slideshow check result:', { 
+      console.log('🎬 Slideshow check result:', { 
         hasActive, 
         data: data?.title || 'none', 
         error,
         previousState: hasActiveSlideshow,
-        checkCount: slideshowCheckCount + 1
+        checkCount: slideshowCheckCount + 1,
+        isLargeScreen
       });
       
-      // Force update the count to trigger re-renders
       setSlideshowCheckCount(prev => prev + 1);
+      
+      // IMMEDIATE response for large screens when deactivated
+      if (!hasActive && hasActiveSlideshow && isLargeScreen) {
+        console.log('📺 TV DETECTED - IMMEDIATE SLIDESHOW HIDE');
+        setHasActiveSlideshow(false);
+        setForceHideSlideshows(true);
+        
+        // Force multiple updates for stubborn TVs
+        setTimeout(() => {
+          setHasActiveSlideshow(false);
+          setForceHideSlideshows(true);
+        }, 50);
+        
+        setTimeout(() => {
+          setHasActiveSlideshow(false);
+        }, 100);
+        
+        return;
+      }
       
       if (hasActiveSlideshow !== hasActive || forceUpdate) {
         setHasActiveSlideshow(hasActive);
+        setForceHideSlideshows(!hasActive);
         console.log('🎬 Slideshow status changed to:', hasActive);
-        
-        // Force a small delay and recheck for stubborn screens
-        if (!hasActive) {
-          setTimeout(() => {
-            console.log('🔄 Double-checking slideshow deactivation');
-            setHasActiveSlideshow(false);
-          }, 100);
-        }
       }
     } catch (error) {
       console.error('❌ Error checking active slideshow:', error);
-      setHasActiveSlideshow(false);
+      
+      // On error for large screens, force hide
+      if (isLargeScreen) {
+        console.log('📺 TV error - forcing slideshow hide');
+        setHasActiveSlideshow(false);
+        setForceHideSlideshows(true);
+      }
     }
   };
 
@@ -570,15 +592,15 @@ const ClientPublicPage = () => {
     }
   }, [account?.id, subscriptionExpired]);
 
-  // Enhanced realtime listener with aggressive updates for slideshows
+  // Enhanced realtime listener with AGGRESSIVE TV updates
   useEffect(() => {
     if (!account?.id || subscriptionExpired) return;
 
-    console.log('🎬 Setting up enhanced slideshow realtime listener for:', account.id);
+    console.log('🎬 Setting up TV-OPTIMIZED slideshow listener for:', account.id);
 
-    // Multiple channels for redundancy
+    // Multiple redundant channels for maximum reliability on TVs
     const slideshowChannel1 = supabase
-      .channel(`slideshow-realtime-1-${account.id}-${Date.now()}`)
+      .channel(`slideshow-tv-main-${account.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -588,26 +610,31 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🎬 Channel 1 - Slideshow realtime change:', payload.eventType, payload);
+          console.log('🎬 TV Channel 1 - Change detected:', payload.eventType, payload);
           
-          // Immediate response for deactivation
+          // IMMEDIATE response for TV deactivation
           if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
             const updatedData = payload.new as any;
-            if (updatedData && !updatedData.is_active) {
-              console.log('🚫 Channel 1 - Immediate slideshow deactivation');
-              setHasActiveSlideshow(false);
+            
+            if ((updatedData && !updatedData.is_active) || payload.eventType === 'DELETE') {
+              console.log('🚫 TV Channel 1 - IMMEDIATE DEACTIVATION');
+              
+              if (isLargeScreen) {
+                console.log('📺 TV IMMEDIATE HIDE TRIGGERED');
+                setHasActiveSlideshow(false);
+                setForceHideSlideshows(true);
+                return; // Don't fetch again, just exit
+              }
             }
           }
           
           await checkActiveSlideshow(true);
         }
       )
-      .subscribe((status) => {
-        console.log('🎬 Channel 1 status:', status);
-      });
+      .subscribe();
 
     const slideshowChannel2 = supabase
-      .channel(`slideshow-realtime-2-${account.id}-${Date.now()}`)
+      .channel(`slideshow-tv-backup-${account.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -617,12 +644,14 @@ const ClientPublicPage = () => {
           filter: `account_id=eq.${account.id}`
         },
         async (payload) => {
-          console.log('🎬 Channel 2 - Update detected:', payload);
+          console.log('🎬 TV Channel 2 - Update:', payload);
           const updatedData = payload.new as any;
           
-          if (updatedData && !updatedData.is_active) {
-            console.log('🚫 Channel 2 - Slideshow deactivated, forcing hide');
+          if (updatedData && !updatedData.is_active && isLargeScreen) {
+            console.log('📺 TV Channel 2 - FORCE HIDE');
             setHasActiveSlideshow(false);
+            setForceHideSlideshows(true);
+            return;
           }
           
           await checkActiveSlideshow(true);
@@ -630,33 +659,35 @@ const ClientPublicPage = () => {
       )
       .subscribe();
 
-    // Ultra-aggressive checking for TV screens - every 500ms
+    // ULTRA-AGGRESSIVE checking for TVs - every 200ms
     const ultraAggressiveInterval = setInterval(() => {
-      console.log('⚡ Ultra-aggressive slideshow check (500ms)');
+      if (isLargeScreen) {
+        console.log('⚡ ULTRA-AGGRESSIVE TV check (200ms)');
+        checkActiveSlideshow();
+      }
+    }, 200);
+
+    // Regular aggressive checking - every 500ms for all devices
+    const aggressiveInterval = setInterval(() => {
+      console.log('🔄 Aggressive slideshow check (500ms)');
       checkActiveSlideshow();
     }, 500);
 
-    // Regular aggressive checking - every 1 second
-    const aggressiveInterval = setInterval(() => {
-      console.log('🔄 Aggressive slideshow check (1s)');
-      checkActiveSlideshow();
+    // Backup check - every 1 second
+    const backupInterval = setInterval(() => {
+      console.log('🛡️ Backup slideshow check (1s)');
+      checkActiveSlideshow(true);
     }, 1000);
 
-    // Backup check - every 2 seconds
-    const backupInterval = setInterval(() => {
-      console.log('🛡️ Backup slideshow check (2s)');
-      checkActiveSlideshow(true);
-    }, 2000);
-
     return () => {
-      console.log('🧹 Cleaning up enhanced slideshow listeners');
+      console.log('🧹 Cleaning up TV-optimized slideshow listeners');
       clearInterval(ultraAggressiveInterval);
       clearInterval(aggressiveInterval);
       clearInterval(backupInterval);
       supabase.removeChannel(slideshowChannel1);
       supabase.removeChannel(slideshowChannel2);
     };
-  }, [account?.id, subscriptionExpired, hasActiveSlideshow]);
+  }, [account?.id, subscriptionExpired, hasActiveSlideshow, isLargeScreen]);
 
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 Closing notification:', notificationId);
@@ -780,8 +811,8 @@ const ClientPublicPage = () => {
 
   return (
     <div className="w-full h-screen overflow-hidden bg-black relative">
-      {/* Show slideshow if active, otherwise show websites */}
-      {hasActiveSlideshow ? (
+      {/* Show slideshow if active AND not force hidden, otherwise show websites */}
+      {(hasActiveSlideshow && !forceHideSlideshows) ? (
         <SlideshowDisplay accountId={account.id} />
       ) : (
         <>
@@ -881,8 +912,8 @@ const ClientPublicPage = () => {
         </>
       )}
 
-      {/* Overlays - only show if no active slideshow */}
-      {!hasActiveSlideshow && (
+      {/* Overlays - only show if no active slideshow OR force hidden */}
+      {(!hasActiveSlideshow || forceHideSlideshows) && (
         <>
           {/* News Ticker Display */}
           {account?.id && !subscriptionExpired && (
@@ -909,20 +940,15 @@ const ClientPublicPage = () => {
         </>
       )}
 
-      {/* Enhanced debug info */}
+      {/* Enhanced debug info with TV detection */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
-          <div>🔄 النقل: كل 3 ثوان</div>
-          <div>📱 الجهاز: {isMobile ? 'موبايل' : 'ديسكتوب'}</div>
-          <div>✅ المواقع النشطة: {websites.length}</div>
-          <div>📍 الموقع الحالي: {currentWebsiteIndex + 1}</div>
-          <div>⏳ حالة التحميل: {iframeLoading ? 'جاري التحميل' : 'مكتمل'}</div>
-          <div>❌ خطأ: {iframeError ? 'نعم' : 'لا'}</div>
-          <div>🔄 المحاولات: {retryCount}/3</div>
-          <div>🚫 المواقع الفاشلة: {failedWebsites.size}</div>
-          <div>👁️ النافذة: {isWindowFocused ? 'مُركزة' : 'غير مُركزة'}</div>
+          <div>📺 شاشة كبيرة: {isLargeScreen ? 'نعم' : 'لا'}</div>
           <div>🎬 سلايدات نشطة: {hasActiveSlideshow ? 'نعم' : 'لا'}</div>
-          <div>🔢 فحوصات السلايدات: {slideshowCheckCount}</div>
+          <div>🚫 إخفاء قسري: {forceHideSlideshows ? 'نعم' : 'لا'}</div>
+          <div>🔢 فحوصات: {slideshowCheckCount}</div>
+          <div>⚡ معدل الفحص: {isLargeScreen ? '200ms' : '500ms'}</div>
+          {/* ... keep existing code (other debug info) */}
         </div>
       )}
     </div>
