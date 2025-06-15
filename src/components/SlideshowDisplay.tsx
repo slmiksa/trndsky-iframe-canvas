@@ -153,9 +153,13 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     }
   };
 
-  // التنقل بين الصور داخل السلايد شو الحالي - مع تحكم دقيق في التوقيت
+  // التنقل بين الصور داخل السلايد شو الحالي
   useEffect(() => {
-    clearAllTimers();
+    // تنظيف أي مؤقت صور سابق
+    if (imageIntervalRef.current) {
+      clearInterval(imageIntervalRef.current);
+      imageIntervalRef.current = null;
+    }
 
     const currentSlideshow = activeSlideshows[currentSlideshowIndex];
     if (!currentSlideshow || currentSlideshow.images.length <= 1 || loading) {
@@ -165,17 +169,17 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     console.log('🎬 Starting image rotation for slideshow:', {
       title: currentSlideshow.title,
       imagesCount: currentSlideshow.images.length,
-      intervalSeconds: currentSlideshow.interval_seconds
+      intervalSeconds: 5
     });
 
-    // استخدام فترة ثابتة 5 ثوانٍ للصور (كما تم تحديدها في قاعدة البيانات)
+    // تنقل بين الصور كل 5 ثوانِ
     imageIntervalRef.current = setInterval(() => {
       setCurrentImageIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % currentSlideshow.images.length;
         console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${currentSlideshow.images.length})`);
         return nextIndex;
       });
-    }, 5000); // فترة ثابتة 5 ثوانٍ للصور
+    }, 5000);
 
     return () => {
       if (imageIntervalRef.current) {
@@ -185,8 +189,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     };
   }, [currentSlideshowIndex, activeSlideshows, loading]);
 
-  // التنقل بين السلايد شوز - مع ضمان عدم التداخل
+  // التنقل بين السلايد شوز - الالتزام الدقيق بالتوقيت المحدد
   useEffect(() => {
+    // تنظيف أي مؤقت سلايد شو سابق
     if (slideshowRotationRef.current) {
       clearInterval(slideshowRotationRef.current);
       slideshowRotationRef.current = null;
@@ -194,14 +199,15 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     // إذا كان هناك سلايد واحد فقط، لا نحتاج للتنقل
     if (activeSlideshows.length <= 1) {
+      console.log('⏸️ Only one or no slideshow active, rotation disabled');
       return;
     }
 
-    console.log('🔄 Starting slideshow rotation with', activeSlideshows.length, 'slideshows, interval:', rotationInterval, 'seconds');
+    console.log(`🔄 Setting up slideshow rotation with ${activeSlideshows.length} slideshows, strict interval: ${rotationInterval} seconds`);
 
-    // استخدام الفترة المحددة من قاعدة البيانات للتنقل بين السلايدات
+    // استخدام الفترة المحددة بدقة من قاعدة البيانات
     slideshowRotationRef.current = setInterval(() => {
-      console.log(`🎭 Slideshow rotation triggered after ${rotationInterval} seconds`);
+      console.log(`🎭 Slideshow rotation triggered after exactly ${rotationInterval} seconds`);
       
       setCurrentSlideshowIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % activeSlideshows.length;
@@ -211,8 +217,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       
       // إعادة تعيين فهرس الصورة عند التنقل للسلايد شو التالي
       setCurrentImageIndex(0);
+      console.log('🔄 Reset image index to 0 for new slideshow');
       
-    }, rotationInterval * 1000);
+    }, rotationInterval * 1000); // الالتزام الدقيق بالتوقيت المحدد
 
     return () => {
       if (slideshowRotationRef.current) {
