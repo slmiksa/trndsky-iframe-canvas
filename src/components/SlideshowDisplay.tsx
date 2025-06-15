@@ -32,6 +32,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const channelRef = useRef<any>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const forceCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const slideTransitionRef = useRef<NodeJS.Timeout | null>(null);
 
   // Detect if running on TV/large screen
   const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
@@ -43,8 +44,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     setShouldHide(true);
     setActiveSlideshow(null);
     setLoading(false);
+    setCurrentImageIndex(0);
     
-    // Clear all intervals immediately
+    // Clear all intervals and timeouts immediately
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -52,6 +54,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     if (forceCheckIntervalRef.current) {
       clearInterval(forceCheckIntervalRef.current);
       forceCheckIntervalRef.current = null;
+    }
+    if (slideTransitionRef.current) {
+      clearTimeout(slideTransitionRef.current);
+      slideTransitionRef.current = null;
     }
     
     // Force DOM update
@@ -61,8 +67,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     }, 10);
   };
 
-  // Enhanced fetch with automatic retry
-  const fetchWithRetry = async (operation: () => Promise<any>, maxRetries = 3, delay = 500) => {
+  // Enhanced fetch with automatic retry and better error handling
+  const fetchWithRetry = async (operation: () => Promise<any>, maxRetries = 2, delay = 1000) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         setConnectionError(false);
@@ -85,7 +91,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           throw error;
         }
         
-        // Shorter wait time for better responsiveness
+        // Progressive wait time
         const waitTime = delay * attempt;
         console.log(`⏳ Waiting ${waitTime}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -93,9 +99,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     }
   };
 
-  // Preload images once only
+  // IMPROVED IMAGE PRELOADING with better error handling
   const preloadImagesOptimized = async (imageUrls: string[], slideshowId: string) => {
-    console.log('🖼️ Starting ONE-TIME image preload for slideshow:', slideshowId);
+    console.log('🖼️ Starting IMPROVED image preload for slideshow:', slideshowId);
     
     // Check if images are already cached
     const cachedImages = imageUrls.filter(url => imageCache.has(url));
@@ -118,27 +124,40 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         return new Promise<HTMLImageElement>((resolve, reject) => {
           const img = new Image();
           
+          // Add crossorigin for better compatibility
+          img.crossOrigin = 'anonymous';
+          
           img.onload = () => {
-            console.log(`✅ Image ${index + 1}/${imageUrls.length} loaded and cached`);
+            console.log(`✅ Image ${index + 1}/${imageUrls.length} loaded successfully`);
             imageCache.set(url, img);
             resolve(img);
           };
           
           img.onerror = () => {
-            console.error(`❌ Failed to load image:`, url);
-            reject(new Error(`Failed to load image: ${url}`));
+            console.error(`❌ Failed to load image ${index + 1}:`, url);
+            // Don't reject, just continue with other images
+            resolve(img);
           };
+          
+          // Set timeout for loading
+          setTimeout(() => {
+            if (!img.complete) {
+              console.warn(`⏰ Image ${index + 1} loading timeout:`, url);
+              resolve(img);
+            }
+          }, 5000);
           
           img.src = url;
         });
       });
 
-      await Promise.all(loadPromises);
-      console.log('🎉 All images preloaded and cached - READY FOR DISPLAY');
+      await Promise.allSettled(loadPromises);
+      console.log('🎉 Image preloading completed - READY FOR DISPLAY');
       setAllImagesLoaded(true);
     } catch (error) {
-      console.error('❌ Error preloading images:', error);
-      setAllImagesLoaded(false);
+      console.error('❌ Error in image preloading:', error);
+      // Still allow slideshow to continue with available images
+      setAllImagesLoaded(true);
     } finally {
       setLoading(false);
     }
@@ -164,7 +183,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       });
 
       if (result) {
-        console.log('✅ Active slideshow found:', result.title);
+        console.log('✅ Active slideshow found:', result.title, 'Images:', result.images.length);
         
         // Check if this slideshow is already loaded
         if (activeSlideshow?.id === result.id) {
@@ -177,6 +196,12 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         setActiveSlideshow(result);
         setCurrentImageIndex(0);
         setShouldHide(false);
+        
+        // Clear any existing slide transition
+        if (slideTransitionRef.current) {
+          clearTimeout(slideTransitionRef.current);
+          slideTransitionRef.current = null;
+        }
         
         // Start preloading images ONCE
         await preloadImagesOptimized(result.images, result.id);
@@ -200,7 +225,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     console.log('📡 Setting up ENHANCED realtime for TVs:', accountId);
     
     const setupRealtimeConnection = () => {
-      // Multiple channels for maximum reliability
+      // Primary channel for immediate updates
       const channel1 = supabase
         .channel(`slideshow-tv-${accountId}-${Date.now()}-1`)
         .on(
@@ -224,7 +249,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
                 if (isLargeScreen) {
                   console.log('📺 Large screen - FORCE EXIT NOW');
                   forceExitSlideshow();
-                  return; // Exit immediately, don't fetch again
+                  return;
                 }
               }
             }
@@ -235,6 +260,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         )
         .subscribe();
 
+      // Backup channel for redundancy
       const channel2 = supabase
         .channel(`slideshow-tv-${accountId}-${Date.now()}-2`)
         .on(
@@ -269,23 +295,23 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     setupRealtimeConnection();
 
-    // AGGRESSIVE checking for large screens
-    const aggressiveInterval = setInterval(() => {
-      console.log('⚡ Aggressive check for TVs');
+    // Reduced polling frequency to prevent overload
+    const pollingInterval = setInterval(() => {
+      console.log('⚡ Polling check');
       fetchActiveSlideshow();
-    }, isLargeScreen ? 500 : 1000); // 500ms for TVs, 1s for others
+    }, 2000); // Every 2 seconds
 
-    // FORCE CHECK for large screens - extra safety
+    // FORCE CHECK for large screens - safety net
     if (isLargeScreen) {
       forceCheckIntervalRef.current = setInterval(() => {
         console.log('🔥 FORCE CHECK for TV screens');
         fetchActiveSlideshow();
-      }, 300); // Every 300ms for TVs
+      }, 1000); // Every 1 second for TVs
     }
 
     return () => {
       console.log('🧹 Cleaning up TV-optimized listeners');
-      clearInterval(aggressiveInterval);
+      clearInterval(pollingInterval);
       if (forceCheckIntervalRef.current) {
         clearInterval(forceCheckIntervalRef.current);
       }
@@ -301,19 +327,30 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     fetchActiveSlideshow();
   }, [accountId]);
 
-  // Auto-advance slideshow
+  // IMPROVED Auto-advance slideshow with better error handling
   useEffect(() => {
-    // Clear any existing interval
+    // Clear any existing interval and timeout
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (slideTransitionRef.current) {
+      clearTimeout(slideTransitionRef.current);
+      slideTransitionRef.current = null;
+    }
 
     if (!activeSlideshow || activeSlideshow.images.length <= 1 || shouldHide || forceHide || !allImagesLoaded) {
+      console.log('🚫 Slideshow conditions not met:', {
+        hasSlideshow: !!activeSlideshow,
+        imageCount: activeSlideshow?.images.length || 0,
+        shouldHide,
+        forceHide,
+        allImagesLoaded
+      });
       return;
     }
 
-    console.log('🎬 Starting slideshow rotation:', activeSlideshow.interval_seconds);
+    console.log('🎬 Starting IMPROVED slideshow rotation:', activeSlideshow.interval_seconds, 'seconds');
 
     intervalRef.current = setInterval(() => {
       if (shouldHide || forceHide || !activeSlideshow) {
@@ -321,22 +358,33 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         return;
       }
 
+      console.log('🔄 Starting slide transition...');
       setIsTransitioning(true);
       
-      setTimeout(() => {
+      // Clear any pending transition
+      if (slideTransitionRef.current) {
+        clearTimeout(slideTransitionRef.current);
+      }
+      
+      slideTransitionRef.current = setTimeout(() => {
         setCurrentImageIndex((prev) => {
           const nextIndex = (prev + 1) % activeSlideshow.images.length;
-          console.log('🔄 Next slide:', nextIndex + 1, '/', activeSlideshow.images.length);
+          console.log('🔄 Transitioning to slide:', nextIndex + 1, '/', activeSlideshow.images.length);
           return nextIndex;
         });
         setIsTransitioning(false);
-      }, 150);
+        console.log('✅ Slide transition completed');
+      }, 200); // Slightly longer transition for stability
     }, activeSlideshow.interval_seconds * 1000);
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
+      }
+      if (slideTransitionRef.current) {
+        clearTimeout(slideTransitionRef.current);
+        slideTransitionRef.current = null;
       }
     };
   }, [activeSlideshow, allImagesLoaded, shouldHide, forceHide]);
@@ -355,8 +403,13 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-lg">جاري تحميل العرض التقديمي...</p>
           <p className="text-sm text-gray-300 mt-2">
-            {activeSlideshow.images.length} صور - تحميل لمرة واحدة
+            {activeSlideshow.images.length} صور - تحميل محسن
           </p>
+          {connectionError && (
+            <p className="text-sm text-red-300 mt-2">
+              مشكلة في الاتصال - جاري إعادة المحاولة ({retryAttempts}/2)
+            </p>
+          )}
           {isLargeScreen && (
             <p className="text-xs text-blue-300 mt-1">
               📺 وضع الشاشة الكبيرة مُفعل
@@ -372,13 +425,14 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   return (
     <div className="fixed inset-0 bg-black z-50">
       <div className="w-full h-full relative overflow-hidden">
-        {/* Main image display with cached images */}
+        {/* Main image display with improved loading */}
         <div 
-          className={`w-full h-full transition-opacity duration-150 ${
+          className={`w-full h-full transition-opacity duration-200 ${
             !isTransitioning ? 'opacity-100' : 'opacity-0'
           }`}
         >
           <img 
+            key={`${currentImageIndex}-${activeSlideshow.id}`}
             src={currentImage}
             alt={`${activeSlideshow.title} - Slide ${currentImageIndex + 1}`}
             className="w-full h-full object-contain bg-black"
@@ -389,6 +443,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               objectPosition: 'center'
             }}
             loading="eager"
+            crossOrigin="anonymous"
+            onLoad={() => console.log('✅ Current image loaded:', currentImageIndex + 1)}
+            onError={() => console.error('❌ Current image failed:', currentImageIndex + 1)}
           />
         </div>
         
@@ -409,29 +466,37 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         {/* Slideshow title overlay */}
         <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
+          <p className="text-white/80 text-sm">
+            الصورة {currentImageIndex + 1} من {activeSlideshow.images.length}
+          </p>
         </div>
 
-        {/* Progress bar */}
+        {/* Enhanced progress bar */}
         <div className="absolute bottom-0 left-0 w-full h-2 bg-white/20">
           <div 
-            className="h-full bg-white transition-all duration-100 ease-linear"
+            className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300 ease-linear"
             style={{
               width: `${((currentImageIndex + 1) / activeSlideshow.images.length) * 100}%`
             }}
           />
         </div>
 
-        {/* TV Status indicator */}
+        {/* Enhanced status indicator */}
         <div className="absolute top-8 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <div className="text-white text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400"></div>
-              <span>محمل ومحفوظ</span>
+              <div className={`w-2 h-2 rounded-full ${connectionError ? 'bg-red-400' : 'bg-green-400'}`}></div>
+              <span>{connectionError ? 'مشكلة اتصال' : 'متصل'}</span>
               {isLargeScreen && <span className="text-blue-300">📺</span>}
             </div>
             <div className="text-xs text-gray-300">
-              {activeSlideshow.images.length} صور | فحص: {isLargeScreen ? '300ms' : '1s'}
+              {activeSlideshow.images.length} صور | {activeSlideshow.interval_seconds}ث
             </div>
+            {retryAttempts > 0 && (
+              <div className="text-xs text-yellow-300">
+                محاولة: {retryAttempts}/2
+              </div>
+            )}
           </div>
         </div>
       </div>
