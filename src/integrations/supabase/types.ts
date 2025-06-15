@@ -398,6 +398,19 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_all_slideshows_for_account: {
+        Args: { p_account_id: string }
+        Returns: {
+          account_id: string
+          created_at: string
+          id: string
+          images: string[]
+          interval_seconds: number
+          is_active: boolean
+          title: string
+          updated_at: string
+        }[]
+      }
       is_current_user_super_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

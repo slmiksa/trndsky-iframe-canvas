@@ -69,12 +69,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
       
-      // استخدام استعلام مباشر بدلاً من RLS للحصول على جميع السلايدات (للإدارة)
-      const { data, error } = await supabase
-        .from('account_slideshows')
-        .select('*')
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: false });
+      // استخدام الدالة الآمنة الجديدة للحصول على جميع السلايدات
+      const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
+        p_account_id: accountId
+      });
 
       if (error) {
         console.error('❌ Error fetching slideshows:', error);
@@ -242,11 +240,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
 
-      // تبديل حالة السلايد شو بدون التأثير على الآخرين
+      // تحديث حالة السلايد شو مباشرة
       const { error } = await supabase
         .from('account_slideshows')
         .update({ is_active: !currentStatus })
-        .eq('id', slideshowId);
+        .eq('id', slideshowId)
+        .eq('account_id', accountId); // التأكد من أن السلايد شو ينتمي للحساب
 
       if (error) {
         console.error('❌ Error updating slideshow status:', error);
@@ -259,7 +258,17 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: statusMessage
       });
 
-      await fetchSlideshows();
+      // تحديث القائمة المحلية فوراً
+      setSlideshows(prevSlideshows => 
+        prevSlideshows.map(slide => 
+          slide.id === slideshowId 
+            ? { ...slide, is_active: !currentStatus }
+            : slide
+        )
+      );
+
+      console.log('✅ Slideshow status updated successfully');
+      
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
@@ -336,7 +345,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       const { error } = await supabase
         .from('account_slideshows')
         .delete()
-        .eq('id', slideshowId);
+        .eq('id', slideshowId)
+        .eq('account_id', accountId); // التأكد من أن السلايد شو ينتمي للحساب
 
       if (error) {
         console.error('❌ Error deleting slideshow:', error);
