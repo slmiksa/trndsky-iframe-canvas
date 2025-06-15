@@ -194,7 +194,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const toggleSlideshowStatus = async (slideshowId: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
 
-    // Optimistic UI update for instant feedback
+    // Optimistic UI update for instant feedback. This makes the UI feel responsive.
     setSlideshows(prevSlideshows =>
       prevSlideshows.map(slide => {
         if (newStatus) {
@@ -202,39 +202,70 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
           return { ...slide, is_active: slide.id === slideshowId };
         } else {
           // When deactivating, just set this one to false.
-          if (slide.id === slideshowId) {
-            return { ...slide, is_active: false };
-          }
-          return slide;
+          return slide.id === slideshowId ? { ...slide, is_active: false } : slide;
         }
       })
     );
 
     try {
-      console.log('🔄 Toggling slideshow status:', { slideshowId, newStatus });
-      const { error } = await supabase
-        .from('account_slideshows')
-        .update({ is_active: newStatus })
-        .eq('id', slideshowId);
+      if (newStatus) {
+        // --- Activating a slideshow ---
+        // This logic replaces the faulty database trigger.
+        
+        // Step 1: Deactivate all slideshows for this account in the database.
+        console.log(`🔵 Deactivating all slideshows for account ${accountId}...`);
+        const { error: deactivateError } = await supabase
+          .from('account_slideshows')
+          .update({ is_active: false })
+          .eq('account_id', accountId);
 
-      if (error) {
-        console.error('❌ Error updating slideshow status:', error);
-        // On error, revert the optimistic update by fetching from the source of truth
-        await fetchSlideshows();
-        throw new Error(`فشل في تحديث السلايدات: ${error.message}`);
+        if (deactivateError) {
+          console.error('❌ Error deactivating slideshows:', deactivateError);
+          throw new Error(`فشل في إيقاف السلايدات الحالية: ${deactivateError.message}`);
+        }
+        console.log('🟢 All slideshows deactivated.');
+
+        // Step 2: Activate the selected slideshow.
+        console.log(`🔵 Activating slideshow ${slideshowId}...`);
+        const { error: activateError } = await supabase
+          .from('account_slideshows')
+          .update({ is_active: true })
+          .eq('id', slideshowId);
+
+        if (activateError) {
+          console.error('❌ Error activating slideshow:', activateError);
+          throw new Error(`فشل في تشغيل السلايد شو المحدد: ${activateError.message}`);
+        }
+        console.log('🟢 Slideshow activated.');
+
+        toast({
+          title: 'تم تشغيل السلايد شو بنجاح',
+        });
+
+      } else {
+        // --- Deactivating a slideshow ---
+        // This is simpler, we just update the specific slideshow.
+        console.log(`🔵 Deactivating slideshow ${slideshowId}...`);
+        const { error } = await supabase
+          .from('account_slideshows')
+          .update({ is_active: false })
+          .eq('id', slideshowId);
+
+        if (error) {
+          console.error('❌ Error deactivating slideshow:', error);
+          throw new Error(`فشل في إيقاف السلايد شو: ${error.message}`);
+        }
+        console.log('🟢 Slideshow deactivated.');
+
+        toast({
+          title: 'تم إيقاف السلايد شو',
+        });
       }
 
-      const statusMessage = newStatus ? 'تم تشغيل السلايد شو' : 'تم إيقاف السلايد شو';
-      toast({
-        title: 'تم تحديث حالة السلايد شو',
-        description: statusMessage
-      });
-      
-      console.log('✅ Slideshow status update successful. Refetching to sync UI with DB.');
-      // Re-fetch data to ensure UI reflects the absolute source of truth from the database,
-      // which has been modified by the update and the trigger.
+      // Finally, refetch everything to ensure the UI is in perfect sync with the database.
+      console.log('✅ Operation successful. Refetching to sync UI with DB.');
       await fetchSlideshows();
-      
+
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
@@ -242,6 +273,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: error.message,
         variant: "destructive"
       });
+      // On any error, fetch from DB to revert the optimistic UI changes.
+      await fetchSlideshows();
     }
   };
 
