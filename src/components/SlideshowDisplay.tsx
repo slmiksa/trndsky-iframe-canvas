@@ -20,12 +20,31 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
+  const [rotationInterval, setRotationInterval] = useState(30); // الفترة الافتراضية
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const slideshowRotationRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
 
   // Detect if running on TV/large screen
   const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
+
+  // جلب فترة التنقل من قاعدة البيانات
+  const fetchRotationInterval = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('rotation_interval')
+        .eq('id', accountId)
+        .single();
+
+      if (data && !error) {
+        setRotationInterval(data.rotation_interval || 30);
+        console.log('✅ Rotation interval fetched:', data.rotation_interval);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching rotation interval:', error);
+    }
+  };
 
   const fetchActiveSlideshows = async () => {
     try {
@@ -71,6 +90,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     console.log('📡 Setting up realtime listener for:', accountId);
     
+    // جلب فترة التنقل
+    fetchRotationInterval();
+    
     const channel = supabase
       .channel(`slideshow-${accountId}`)
       .on(
@@ -84,6 +106,19 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         async (payload) => {
           console.log('📡 Slideshow change detected:', payload.eventType);
           await fetchActiveSlideshows();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'accounts',
+          filter: `id=eq.${accountId}`
+        },
+        async (payload) => {
+          console.log('📡 Account settings change detected');
+          await fetchRotationInterval();
         }
       )
       .subscribe();
@@ -141,7 +176,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     };
   }, [currentSlideshowIndex, activeSlideshows, loading]);
 
-  // التنقل بين السلايد شوز كل 30 ثانية
+  // التنقل بين السلايد شوز باستخدام الفترة المحددة
   useEffect(() => {
     if (slideshowRotationRef.current) {
       clearInterval(slideshowRotationRef.current);
@@ -152,7 +187,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       return;
     }
 
-    console.log('🔄 Starting slideshow rotation with', activeSlideshows.length, 'slideshows');
+    console.log('🔄 Starting slideshow rotation with', activeSlideshows.length, 'slideshows, interval:', rotationInterval, 'seconds');
 
     slideshowRotationRef.current = setInterval(() => {
       setCurrentSlideshowIndex((prevIndex) => {
@@ -161,7 +196,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         setCurrentImageIndex(0); // إعادة تعيين فهرس الصورة عند التنقل للسلايد شو التالي
         return nextIndex;
       });
-    }, 30000); // 30 ثانية لكل سلايد شو
+    }, rotationInterval * 1000); // استخدام الفترة المحددة من قاعدة البيانات
 
     return () => {
       if (slideshowRotationRef.current) {
@@ -169,7 +204,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         slideshowRotationRef.current = null;
       }
     };
-  }, [activeSlideshows.length]);
+  }, [activeSlideshows.length, rotationInterval]);
 
   // Force exit conditions
   if (!activeSlideshows.length || loading) {
@@ -279,7 +314,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               {isLargeScreen && <span className="text-blue-300">📺</span>}
             </div>
             <div className="text-xs text-gray-300">
-              {activeSlideshows.length} سلايد شو نشط | {currentSlideshow.interval_seconds}ث
+              {activeSlideshows.length} سلايد شو نشط | تنقل كل {rotationInterval}ث
             </div>
           </div>
         </div>
@@ -290,7 +325,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
             <div>Slideshow: {currentSlideshowIndex + 1}/{activeSlideshows.length}</div>
             <div>Image: {safeCurrentIndex + 1}/{currentSlideshow.images.length}</div>
             <div>Title: {currentSlideshow.title}</div>
-            <div>Interval: {currentSlideshow.interval_seconds}s</div>
+            <div>Image Interval: {currentSlideshow.interval_seconds}s</div>
+            <div>Rotation Interval: {rotationInterval}s</div>
             <div>Image Timer: {intervalRef.current ? 'Active' : 'Inactive'}</div>
             <div>Slideshow Timer: {slideshowRotationRef.current ? 'Active' : 'Inactive'}</div>
           </div>

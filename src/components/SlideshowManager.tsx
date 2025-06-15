@@ -36,6 +36,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     images: [] as File[]
   });
   const [uploading, setUploading] = useState(false);
+  const [rotationInterval, setRotationInterval] = useState(30); // فترة التنقل بين السلايد شوز بالثواني
 
   const fetchSlideshows = async () => {
     try {
@@ -207,7 +208,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔄 Toggling slideshow status:', { slideshowId, currentStatus });
 
-      // إذا كنا نفعل سلايد شو، لا حاجة لإيقاف الآخرين - يمكن تشغيل عدة سلايد شوز
+      // تبديل حالة السلايد شو بدون إيقاف الآخرين
       const { error } = await supabase
         .from('account_slideshows')
         .update({ is_active: !currentStatus })
@@ -229,6 +230,35 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
         title: 'خطأ في تحديث السلايد شو',
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateRotationInterval = async () => {
+    try {
+      console.log('🔄 Updating rotation interval to:', rotationInterval);
+      
+      // حفظ فترة التنقل في الحساب
+      const { error } = await supabase
+        .from('accounts')
+        .update({ rotation_interval: rotationInterval })
+        .eq('id', accountId);
+
+      if (error) {
+        console.error('❌ Error updating rotation interval:', error);
+        throw error;
+      }
+
+      toast({
+        title: 'تم تحديث فترة التنقل',
+        description: `تم تعديل فترة التنقل إلى ${rotationInterval} ثانية`
+      });
+    } catch (error: any) {
+      console.error('❌ Error in updateRotationInterval:', error);
+      toast({
+        title: 'خطأ في تحديث فترة التنقل',
         description: error.message,
         variant: "destructive"
       });
@@ -299,6 +329,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     await fetchSlideshows();
   };
 
+  const activeSlideshowsCount = slideshows.filter(s => s.is_active).length;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* قائمة السلايد شوز */}
@@ -320,12 +352,42 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                 </Button>
               </div>
             </div>
-            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-              <p className="font-medium">كيفية عمل النظام الجديد:</p>
+            
+            {/* إعدادات فترة التنقل */}
+            <div className="space-y-3 bg-blue-50 p-4 rounded-lg">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="rotationInterval" className="text-sm font-medium">
+                  فترة التنقل بين السلايد شوز (ثانية)
+                </Label>
+                <Badge variant="outline">
+                  {activeSlideshowsCount} نشط
+                </Badge>
+              </div>
+              <div className="flex gap-2">
+                <Input 
+                  id="rotationInterval"
+                  type="number" 
+                  min="5"
+                  max="300"
+                  value={rotationInterval} 
+                  onChange={(e) => setRotationInterval(parseInt(e.target.value) || 30)}
+                  className="w-20"
+                />
+                <Button onClick={updateRotationInterval} size="sm" variant="outline">
+                  حفظ
+                </Button>
+              </div>
+              <p className="text-xs text-gray-600">
+                النظام ينتقل تلقائياً بين السلايد شوز النشطة كل {rotationInterval} ثانية
+              </p>
+            </div>
+
+            <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+              <p className="font-medium">النظام الحالي:</p>
               <ul className="mt-2 space-y-1 text-xs">
-                <li>• كل سلايد شو يعرض صوره الخاصة به بشكل منفصل</li>
-                <li>• التنقل التلقائي بين السلايد شوز النشطة كل 30 ثانية</li>
-                <li>• يمكن تشغيل عدة سلايد شوز في نفس الوقت</li>
+                <li>• يمكن تنشيط أي عدد من السلايد شوز في نفس الوقت</li>
+                <li>• التنقل التلقائي بين السلايد شوز النشطة حسب الفترة المحددة</li>
+                <li>• كل سلايد شو يعرض صوره الخاصة بالسرعة المحددة له</li>
                 <li>• استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو</li>
               </ul>
             </div>
@@ -392,7 +454,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>{slideshow.images.length} صورة</span>
-                      <span>{slideshow.interval_seconds} ثانية</span>
+                      <span>{slideshow.interval_seconds} ثانية لكل صورة</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
