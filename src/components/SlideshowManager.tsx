@@ -154,12 +154,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       const imageUrls = await uploadImages(newSlideshow.images);
       console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات مع قيمة افتراضية للفترة (5 ثواني)
+      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات مع قيمة افتراضية للفترة (15 ثواني)
       const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
         p_account_id: accountId,
         p_title: newSlideshow.title,
         p_images: imageUrls,
-        p_interval_seconds: 5 // قيمة افتراضية ثابتة
+        p_interval_seconds: 15 // قيمة افتراضية ثابتة
       });
 
       if (error) {
@@ -370,7 +370,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <ul className="mt-2 space-y-1 text-xs list-disc list-inside">
                 <li>يمكن تنشيط سلايد شو واحد فقط في كل مرة.</li>
                 <li>عند تنشيط سلايد شو، سيتم إيقاف أي سلايد شو آخر نشط تلقائياً.</li>
-                <li>كل سلايد شو يعرض صوره بفترة 5 ثواني بين كل صورة.</li>
+                <li>كل سلايد شو يعرض صوره بفترة 15 ثواني بين كل صورة.</li>
                 <li>استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو.</li>
               </ul>
             </div>
@@ -437,7 +437,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>{slideshow.images.length} صورة</span>
-                      <span>5 ثواني لكل صورة</span>
+                      <span>15 ثانية لكل صورة</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
@@ -478,7 +478,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       </p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      سيتم عرض كل صورة لمدة 5 ثواني افتراضياً
+                      سيتم عرض كل صورة لمدة 15 ثواني افتراضياً
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -513,7 +513,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             </CardTitle>
             {selectedSlideshow && (
               <p className="text-sm text-gray-600">
-                {selectedSlideshow.images.length} صورة - 5 ثواني لكل صورة
+                {selectedSlideshow.images.length} صورة - 15 ثواني لكل صورة
               </p>
             )}
           </CardHeader>
@@ -544,7 +544,7 @@ const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => 
 
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % slideshow.images.length);
-    }, 5000); // استخدام 5 ثواني ثابت
+    }, 15000); // استخدام 15 ثواني ثابت
 
     return () => clearInterval(interval);
   }, [slideshow.images.length]);
