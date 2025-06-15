@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,7 +32,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const [selectedSlideshow, setSelectedSlideshow] = useState<Slideshow | null>(null);
   const [newSlideshow, setNewSlideshow] = useState({
     title: '',
-    interval_seconds: 5,
     images: [] as File[]
   });
   const [uploading, setUploading] = useState(false);
@@ -199,12 +197,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       const imageUrls = await uploadImages(newSlideshow.images);
       console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات
+      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات مع قيمة افتراضية للفترة (5 ثواني)
       const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
         p_account_id: accountId,
         p_title: newSlideshow.title,
         p_images: imageUrls,
-        p_interval_seconds: newSlideshow.interval_seconds
+        p_interval_seconds: 5 // قيمة افتراضية ثابتة
       });
 
       if (error) {
@@ -219,7 +217,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: newSlideshow.title
       });
 
-      setNewSlideshow({ title: '', interval_seconds: 5, images: [] });
+      setNewSlideshow({ title: '', images: [] });
       setShowAddForm(false);
       
       await fetchSlideshows();
@@ -447,7 +445,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <ul className="mt-2 space-y-1 text-xs">
                 <li>• يمكن تنشيط أي عدد من السلايد شوز في نفس الوقت</li>
                 <li>• التنقل التلقائي بين السلايد شوز النشطة حسب الفترة المحددة</li>
-                <li>• كل سلايد شو يعرض صوره الخاصة بالسرعة المحددة له</li>
+                <li>• كل سلايد شو يعرض صوره بفترة 5 ثواني بين كل صورة</li>
                 <li>• استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو</li>
               </ul>
             </div>
@@ -514,7 +512,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>{slideshow.images.length} صورة</span>
-                      <span>{slideshow.interval_seconds} ثانية لكل صورة</span>
+                      <span>5 ثواني لكل صورة</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
@@ -524,7 +522,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               </div>
             )}
 
-            {/* نموذج إضافة سلايد شو */}
+            {/* نموذج إضافة سلايد شو المبسط */}
             {showAddForm && (
               <div className="mt-6 border-t pt-6">
                 <form onSubmit={addSlideshow} className="space-y-4">
@@ -537,17 +535,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       onChange={(e) => setNewSlideshow({ ...newSlideshow, title: e.target.value })} 
                       placeholder="اسم السلايد شو" 
                       required 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="interval">المدة بين الصور (ثانية)</Label>
-                    <Input 
-                      id="interval" 
-                      type="number" 
-                      min="1"
-                      max="60"
-                      value={newSlideshow.interval_seconds} 
-                      onChange={(e) => setNewSlideshow({ ...newSlideshow, interval_seconds: parseInt(e.target.value) || 5 })} 
                     />
                   </div>
                   <div>
@@ -565,6 +552,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                         تم اختيار {newSlideshow.images.length} صورة
                       </p>
                     )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      سيتم عرض كل صورة لمدة 5 ثواني افتراضياً
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <Button type="submit" disabled={uploading}>
@@ -576,7 +566,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       variant="outline" 
                       onClick={() => {
                         setShowAddForm(false);
-                        setNewSlideshow({ title: '', interval_seconds: 5, images: [] });
+                        setNewSlideshow({ title: '', images: [] });
                       }}
                     >
                       إلغاء
@@ -598,7 +588,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             </CardTitle>
             {selectedSlideshow && (
               <p className="text-sm text-gray-600">
-                {selectedSlideshow.images.length} صورة - {selectedSlideshow.interval_seconds} ثانية
+                {selectedSlideshow.images.length} صورة - 5 ثواني لكل صورة
               </p>
             )}
           </CardHeader>
@@ -629,10 +619,10 @@ const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => 
 
     const interval = setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % slideshow.images.length);
-    }, slideshow.interval_seconds * 1000);
+    }, 5000); // استخدام 5 ثواني ثابت
 
     return () => clearInterval(interval);
-  }, [slideshow.images.length, slideshow.interval_seconds]);
+  }, [slideshow.images.length]);
 
   if (slideshow.images.length === 0) {
     return (
