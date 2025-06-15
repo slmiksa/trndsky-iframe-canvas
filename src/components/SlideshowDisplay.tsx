@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -49,8 +50,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     try {
       console.log('🎬 Fetching active slideshows for:', accountId);
       
-      // استخدام الدالة الجديدة للحصول على السلايدات النشطة فقط
-      const { data, error } = await supabase.rpc('get_active_slideshows_for_account', {
+      // استخدام الدالة للحصول على جميع السلايدات وتصفية النشطة منها
+      const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
         p_account_id: accountId
       });
 
@@ -58,9 +59,12 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         throw error;
       }
 
-      if (data && data.length > 0) {
-        console.log('✅ Active slideshows found:', data.length);
-        setActiveSlideshows(data);
+      // تصفية السلايدات النشطة فقط
+      const activeSlides = data?.filter(slide => slide.is_active) || [];
+
+      if (activeSlides.length > 0) {
+        console.log('✅ Active slideshows found:', activeSlides.length);
+        setActiveSlideshows(activeSlides);
         setCurrentSlideshowIndex(0);
         setCurrentImageIndex(0);
         setConnectionError(false);
