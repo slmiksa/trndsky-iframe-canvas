@@ -15,8 +15,7 @@ interface SlideshowDisplayProps {
 
 const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const [activeSlideshows, setActiveSlideshows] = useState<Slideshow[]>([]);
-  const [currentSlideshowIndex, setCurrentSlideshowIndex] = useState(0);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [position, setPosition] = useState({ slideshow: 0, image: 0 });
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
@@ -84,8 +83,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         // If the list has changed, update it and reset the position to the start.
         // This ensures a stable and predictable state after any change.
         console.log('🔄 Slideshow list has changed, resetting to initial state.');
-        setCurrentSlideshowIndex(0);
-        setCurrentImageIndex(0);
+        setPosition({ slideshow: 0, image: 0 });
         return newActiveSlides;
       });
 
@@ -173,7 +171,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       imageIntervalRef.current = null;
     }
 
-    const currentSlideshow = activeSlideshows[currentSlideshowIndex];
+    const currentSlideshow = activeSlideshows[position.slideshow];
     if (!currentSlideshow || currentSlideshow.images.length <= 1 || loading) {
       return;
     }
@@ -186,10 +184,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     // تنقل بين الصور كل 5 ثوانٍ
     imageIntervalRef.current = setInterval(() => {
-      setCurrentImageIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % currentSlideshow.images.length;
-        console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${currentSlideshow.images.length})`);
-        return nextIndex;
+      setPosition((pos) => {
+        const nextIndex = (pos.image + 1) % currentSlideshow.images.length;
+        console.log(`🔄 Image transition: ${pos.image + 1} -> ${nextIndex + 1} (total: ${currentSlideshow.images.length})`);
+        return { ...pos, image: nextIndex };
       });
     }, 5000);
 
@@ -199,7 +197,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         imageIntervalRef.current = null;
       }
     };
-  }, [currentSlideshowIndex, activeSlideshows, loading]);
+  }, [position.slideshow, activeSlideshows, loading]);
 
   // التنقل بين السلايد شوز - تم إصلاح المشكلة
   useEffect(() => {
@@ -221,12 +219,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     slideshowRotationRef.current = setInterval(() => {
       console.log(`🎭 Slideshow rotation triggered after ${rotationInterval} seconds`);
       
-      // Reset image index for the new slideshow and then advance to it.
-      setCurrentImageIndex(0);
-      setCurrentSlideshowIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % activeSlideshows.length;
-        console.log(`🎭 Slideshow changing: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
-        return nextIndex;
+      setPosition((pos) => {
+        const nextIndex = (pos.slideshow + 1) % activeSlideshows.length;
+        console.log(`🎭 Slideshow changing: ${pos.slideshow + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
+        return { slideshow: nextIndex, image: 0 };
       });
       
     }, rotationInterval * 1000);
@@ -264,13 +260,13 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     return null;
   }
 
-  const currentSlideshow = activeSlideshows[currentSlideshowIndex];
+  const currentSlideshow = activeSlideshows[position.slideshow];
   if (!currentSlideshow || currentSlideshow.images.length === 0) {
     return null;
   }
 
-  const safeCurrentIndex = Math.max(0, Math.min(currentImageIndex, currentSlideshow.images.length - 1));
-  const currentImage = currentSlideshow.images[safeCurrentIndex];
+  const safeImageIndex = Math.max(0, Math.min(position.image, currentSlideshow.images.length - 1));
+  const currentImage = currentSlideshow.images[safeImageIndex];
 
   return (
     <div className="fixed inset-0 bg-black z-50">
@@ -278,9 +274,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         {/* Main image display */}
         <div className="w-full h-full">
           <img 
-            key={`${currentSlideshow.id}-${safeCurrentIndex}`}
+            key={`${currentSlideshow.id}-${safeImageIndex}`}
             src={currentImage}
-            alt={`${currentSlideshow.title} - Slide ${safeCurrentIndex + 1}`}
+            alt={`${currentSlideshow.title} - Slide ${safeImageIndex + 1}`}
             className="w-full h-full object-contain bg-black"
             style={{
               maxWidth: '100vw',
@@ -288,9 +284,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               objectFit: 'contain',
               objectPosition: 'center'
             }}
-            onLoad={() => console.log('✅ Image loaded:', safeCurrentIndex + 1, 'of', currentSlideshow.images.length, currentImage)}
+            onLoad={() => console.log('✅ Image loaded:', safeImageIndex + 1, 'of', currentSlideshow.images.length, currentImage)}
             onError={(e) => {
-              console.error('❌ Image failed to load:', safeCurrentIndex + 1, currentImage);
+              console.error('❌ Image failed to load:', safeImageIndex + 1, currentImage);
               console.error('Error details:', e);
             }}
           />
@@ -303,7 +299,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               <div 
                 key={index} 
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  index === safeCurrentIndex ? 'bg-white scale-125' : 'bg-white/50'
+                  index === safeImageIndex ? 'bg-white scale-125' : 'bg-white/50'
                 }`} 
               />
             ))}
@@ -314,9 +310,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <h2 className="text-white text-xl font-semibold">{currentSlideshow.title}</h2>
           <div className="text-white/80 text-sm">
-            <p>الصورة {safeCurrentIndex + 1} من {currentSlideshow.images.length}</p>
+            <p>الصورة {safeImageIndex + 1} من {currentSlideshow.images.length}</p>
             {activeSlideshows.length > 1 && (
-              <p>السلايد شو {currentSlideshowIndex + 1} من {activeSlideshows.length}</p>
+              <p>السلايد شو {position.slideshow + 1} من {activeSlideshows.length}</p>
             )}
           </div>
         </div>
@@ -328,7 +324,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               <div 
                 key={index} 
                 className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  index === currentSlideshowIndex ? 'bg-blue-400 scale-125' : 'bg-blue-400/50'
+                  index === position.slideshow ? 'bg-blue-400 scale-125' : 'bg-blue-400/50'
                 }`} 
               />
             ))}
@@ -340,7 +336,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           <div 
             className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300 ease-linear"
             style={{
-              width: `${((safeCurrentIndex + 1) / currentSlideshow.images.length) * 100}%`
+              width: `${((safeImageIndex + 1) / currentSlideshow.images.length) * 100}%`
             }}
           />
         </div>
@@ -362,8 +358,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         {/* Enhanced debug info */}
         {process.env.NODE_ENV === 'development' && (
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
-            <div>Slideshow: {currentSlideshowIndex + 1}/{activeSlideshows.length}</div>
-            <div>Image: {safeCurrentIndex + 1}/{currentSlideshow.images.length}</div>
+            <div>Slideshow: {position.slideshow + 1}/{activeSlideshows.length}</div>
+            <div>Image: {safeImageIndex + 1}/{currentSlideshow.images.length}</div>
             <div>Title: {currentSlideshow.title}</div>
             <div>صور كل: 5 ثوانٍ</div>
             <div>سلايدات كل: {rotationInterval} ثانية</div>
