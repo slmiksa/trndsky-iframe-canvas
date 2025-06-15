@@ -375,7 +375,7 @@ const ClientPublicPage = () => {
       clearInterval(forceRefreshInterval);
       supabase.removeChannel(channel);
     };
-  }, [account?.id, subscriptionExpired, isWindowFocused]);
+  }, [account?.id, subscriptionExpired]);
 
   // Enhanced realtime listener for notifications
   useEffect(() => {
@@ -528,20 +528,26 @@ const ClientPublicPage = () => {
     if (!account?.id || subscriptionExpired) return;
 
     try {
-      console.log('🎬 Checking slideshow for TV:', account.id, 'Force:', forceUpdate, 'Large screen:', isLargeScreen);
-      
+      // تم تغيير .maybeSingle() إلى استعلام عادي للتعامل مع سلايدات متعددة
       const { data, error } = await supabase
         .from('account_slideshows')
-        .select('id, is_active, title')
+        .select('id') // نحتاج فقط للتأكد من وجود سجل واحد على الأقل
         .eq('account_id', account.id)
-        .eq('is_active', true)
-        .maybeSingle();
+        .eq('is_active', true);
 
-      const hasActive = !!data && !error;
+      if (error) {
+        console.error('❌ Error checking active slideshows:', error);
+        if (isLargeScreen) {
+          setHasActiveSlideshow(false);
+          setForceHideSlideshows(true);
+        }
+        return;
+      }
+      
+      const hasActive = data && data.length > 0;
       console.log('🎬 Slideshow check result:', { 
         hasActive, 
-        data: data?.title || 'none', 
-        error,
+        count: data.length, 
         previousState: hasActiveSlideshow,
         checkCount: slideshowCheckCount + 1,
         isLargeScreen
