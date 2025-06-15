@@ -14,13 +14,8 @@ import {
 
 const MobileDownloadButtons = () => {
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [dialogContent, setDialogContent] = React.useState({ title: '', description: '' });
 
-  const handleDownloadClick = (platform: 'iOS' | 'Android') => {
-    setDialogContent({
-      title: `تثبيت التطبيق على ${platform}`,
-      description: `لتحويل هذا الموقع إلى تطبيق على جهازك، يجب عليك بناء التطبيق يدوياً. لقد قمتُ بإعداد المشروع لذلك. يرجى اتباع التعليمات التي سأذكرها لك في المحادثة.`,
-    });
+  const handleDownloadClick = () => {
     setDialogOpen(true);
   };
 
@@ -28,31 +23,31 @@ const MobileDownloadButtons = () => {
     <>
       <div className="absolute top-4 right-4 z-[70] flex flex-col gap-3">
         <Button 
-          onClick={() => handleDownloadClick('iOS')} 
+          onClick={handleDownloadClick}
           variant="secondary" 
           size="icon" 
           className="rounded-full shadow-lg h-12 w-12 bg-white/90 backdrop-blur-sm hover:bg-white"
         >
           <Apple className="h-6 w-6 text-gray-800" />
-          <span className="sr-only">Download for iOS</span>
+          <span className="sr-only">Add to Home Screen</span>
         </Button>
         <Button 
-          onClick={() => handleDownloadClick('Android')} 
+          onClick={handleDownloadClick}
           variant="secondary" 
           size="icon" 
           className="rounded-full shadow-lg h-12 w-12 bg-white/90 backdrop-blur-sm hover:bg-white"
         >
           <Smartphone className="h-6 w-6 text-gray-800" />
-          <span className="sr-only">Download for Android</span>
+          <span className="sr-only">Add to Home Screen</span>
         </Button>
       </div>
 
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{dialogContent.title}</AlertDialogTitle>
+            <AlertDialogTitle>إضافة إلى الشاشة الرئيسية</AlertDialogTitle>
             <AlertDialogDescription>
-              {dialogContent.description}
+              لإضافة هذا الموقع إلى شاشتك الرئيسية كتطبيق، اتبع الخطوات الخاصة بمتصفحك. على أجهزة آيفون، اضغط على زر المشاركة ثم 'إضافة إلى الشاشة الرئيسية'. على أجهزة أندرويد، اضغط على قائمة الخيارات (ثلاث نقاط) ثم 'تثبيت التطبيق' أو 'إضافة إلى الشاشة الرئيسية'.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

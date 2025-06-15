@@ -1,0 +1,21 @@
+
+{
+  "short_name": "TRNDSKY",
+  "name": "TRNDSKY",
+  "icons": [
+    {
+      "src": "/lovable-uploads/c0204c82-6099-43ef-b219-a34342d5c0df.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/lovable-uploads/e3d01953-fe35-45d7-ac2b-e50bac917958.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1e40af",
+  "background_color": "#ffffff"
+}
