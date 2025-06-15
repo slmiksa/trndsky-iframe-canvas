@@ -608,7 +608,7 @@ const ClientPublicPage = () => {
 
     // Multiple redundant channels for maximum reliability on TVs
     const slideshowChannel1 = supabase
-      .channel(`slideshow-tv-main-${account.id}-${Date.now()}`)
+      .channel(`slideshow-tv-main-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -642,7 +642,7 @@ const ClientPublicPage = () => {
       .subscribe();
 
     const slideshowChannel2 = supabase
-      .channel(`slideshow-tv-backup-${account.id}-${Date.now()}`)
+      .channel(`slideshow-tv-backup-${account.id}`)
       .on(
         'postgres_changes',
         {
@@ -695,7 +695,7 @@ const ClientPublicPage = () => {
       supabase.removeChannel(slideshowChannel1);
       supabase.removeChannel(slideshowChannel2);
     };
-  }, [account?.id, subscriptionExpired, hasActiveSlideshow, isLargeScreen]);
+  }, [account?.id, subscriptionExpired]);
 
   const handleNotificationClose = (notificationId: string) => {
     console.log('👋 Closing notification:', notificationId);
