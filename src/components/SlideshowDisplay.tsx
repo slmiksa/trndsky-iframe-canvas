@@ -57,33 +57,35 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         throw error;
       }
 
-      // تصفية السلايدات النشطة فقط
       const newActiveSlides = data?.filter(slide => slide.is_active) || [];
 
       setActiveSlideshows(prevSlideshows => {
-        const currentSlideshowId = prevSlideshows[currentSlideshowIndex]?.id;
-        
-        // If the new list is empty, reset everything.
-        if (newActiveSlides.length === 0) {
-          console.log('🚫 No active slideshows found, resetting.');
-          setCurrentSlideshowIndex(0);
-          setCurrentImageIndex(0);
-          return [];
+        // Create sets of IDs for efficient and order-independent comparison.
+        const newSlideIds = new Set(newActiveSlides.map(s => s.id));
+        const prevSlideIds = new Set(prevSlideshows.map(s => s.id));
+
+        // Check if the sets of IDs are identical.
+        let areIdentical = newSlideIds.size === prevSlideIds.size;
+        if (areIdentical && newSlideIds.size > 0) {
+          for (const id of newSlideIds) {
+            if (!prevSlideIds.has(id)) {
+              areIdentical = false;
+              break;
+            }
+          }
         }
 
-        // Try to find the currently playing slideshow in the new list.
-        const newIndexOfCurrent = newActiveSlides.findIndex(s => s.id === currentSlideshowId);
-
-        if (newIndexOfCurrent !== -1) {
-          // The current slideshow is still active. Update its index just in case the order changed.
-          setCurrentSlideshowIndex(newIndexOfCurrent);
-        } else {
-          // The current slideshow is gone, or this is the initial load. Reset to the beginning.
-          setCurrentSlideshowIndex(0);
-          setCurrentImageIndex(0);
+        // If the list of active slideshows is the same, don't update the state.
+        // This prevents resetting the timers and the user's view for no reason.
+        if (areIdentical) {
+          return prevSlideshows;
         }
         
-        console.log('✅ Active slideshows updated:', newActiveSlides.length);
+        // If the list has changed, update it and reset the position to the start.
+        // This ensures a stable and predictable state after any change.
+        console.log('🔄 Slideshow list has changed, resetting to initial state.');
+        setCurrentSlideshowIndex(0);
+        setCurrentImageIndex(0);
         return newActiveSlides;
       });
 
