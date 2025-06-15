@@ -20,8 +20,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
-  const [rotationInterval, setRotationInterval] = useState(30); // الفترة الافتراضية
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [rotationInterval, setRotationInterval] = useState(30);
+  const imageIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const slideshowRotationRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
 
@@ -50,7 +50,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     try {
       console.log('🎬 Fetching active slideshows for:', accountId);
       
-      // استخدام الدالة للحصول على جميع السلايدات وتصفية النشطة منها
       const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
         p_account_id: accountId
       });
@@ -91,7 +90,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     console.log('📡 Setting up realtime listener for:', accountId);
     
-    // جلب فترة التنقل
     fetchRotationInterval();
     
     const channel = supabase
@@ -143,12 +141,21 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     fetchActiveSlideshows();
   }, [accountId]);
 
-  // التنقل بين الصور داخل السلايد شو الحالي
-  useEffect(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  // تنظيف جميع المؤقتات عند تغيير السلايد شو أو تحديث البيانات
+  const clearAllTimers = () => {
+    if (imageIntervalRef.current) {
+      clearInterval(imageIntervalRef.current);
+      imageIntervalRef.current = null;
     }
+    if (slideshowRotationRef.current) {
+      clearInterval(slideshowRotationRef.current);
+      slideshowRotationRef.current = null;
+    }
+  };
+
+  // التنقل بين الصور داخل السلايد شو الحالي - مع تحكم دقيق في التوقيت
+  useEffect(() => {
+    clearAllTimers();
 
     const currentSlideshow = activeSlideshows[currentSlideshowIndex];
     if (!currentSlideshow || currentSlideshow.images.length <= 1 || loading) {
@@ -161,43 +168,51 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       intervalSeconds: currentSlideshow.interval_seconds
     });
 
-    intervalRef.current = setInterval(() => {
+    // استخدام فترة ثابتة 5 ثوانٍ للصور (كما تم تحديدها في قاعدة البيانات)
+    imageIntervalRef.current = setInterval(() => {
       setCurrentImageIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % currentSlideshow.images.length;
         console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${currentSlideshow.images.length})`);
         return nextIndex;
       });
-    }, currentSlideshow.interval_seconds * 1000);
+    }, 5000); // فترة ثابتة 5 ثوانٍ للصور
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      if (imageIntervalRef.current) {
+        clearInterval(imageIntervalRef.current);
+        imageIntervalRef.current = null;
       }
     };
   }, [currentSlideshowIndex, activeSlideshows, loading]);
 
-  // التنقل بين السلايد شوز باستخدام الفترة المحددة
+  // التنقل بين السلايد شوز - مع ضمان عدم التداخل
   useEffect(() => {
     if (slideshowRotationRef.current) {
       clearInterval(slideshowRotationRef.current);
       slideshowRotationRef.current = null;
     }
 
+    // إذا كان هناك سلايد واحد فقط، لا نحتاج للتنقل
     if (activeSlideshows.length <= 1) {
       return;
     }
 
     console.log('🔄 Starting slideshow rotation with', activeSlideshows.length, 'slideshows, interval:', rotationInterval, 'seconds');
 
+    // استخدام الفترة المحددة من قاعدة البيانات للتنقل بين السلايدات
     slideshowRotationRef.current = setInterval(() => {
+      console.log(`🎭 Slideshow rotation triggered after ${rotationInterval} seconds`);
+      
       setCurrentSlideshowIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % activeSlideshows.length;
         console.log(`🎭 Slideshow rotation: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
-        setCurrentImageIndex(0); // إعادة تعيين فهرس الصورة عند التنقل للسلايد شو التالي
         return nextIndex;
       });
-    }, rotationInterval * 1000); // استخدام الفترة المحددة من قاعدة البيانات
+      
+      // إعادة تعيين فهرس الصورة عند التنقل للسلايد شو التالي
+      setCurrentImageIndex(0);
+      
+    }, rotationInterval * 1000);
 
     return () => {
       if (slideshowRotationRef.current) {
@@ -206,6 +221,13 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       }
     };
   }, [activeSlideshows.length, rotationInterval]);
+
+  // تنظيف المؤقتات عند إلغاء تحميل المكون
+  useEffect(() => {
+    return () => {
+      clearAllTimers();
+    };
+  }, []);
 
   // Force exit conditions
   if (!activeSlideshows.length || loading) {
@@ -320,16 +342,17 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           </div>
         </div>
 
-        {/* Debug info */}
+        {/* Enhanced debug info */}
         {process.env.NODE_ENV === 'development' && (
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
             <div>Slideshow: {currentSlideshowIndex + 1}/{activeSlideshows.length}</div>
             <div>Image: {safeCurrentIndex + 1}/{currentSlideshow.images.length}</div>
             <div>Title: {currentSlideshow.title}</div>
-            <div>Image Interval: {currentSlideshow.interval_seconds}s</div>
-            <div>Rotation Interval: {rotationInterval}s</div>
-            <div>Image Timer: {intervalRef.current ? 'Active' : 'Inactive'}</div>
-            <div>Slideshow Timer: {slideshowRotationRef.current ? 'Active' : 'Inactive'}</div>
+            <div>صور كل: 5 ثوانٍ</div>
+            <div>سلايدات كل: {rotationInterval} ثانية</div>
+            <div>Image Timer: {imageIntervalRef.current ? 'نشط' : 'متوقف'}</div>
+            <div>Slideshow Timer: {slideshowRotationRef.current ? 'نشط' : 'متوقف'}</div>
+            <div>Active Slideshows: {activeSlideshows.length}</div>
           </div>
         )}
       </div>
