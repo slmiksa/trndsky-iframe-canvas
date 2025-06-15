@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -59,28 +58,44 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       }
 
       // تصفية السلايدات النشطة فقط
-      const activeSlides = data?.filter(slide => slide.is_active) || [];
+      const newActiveSlides = data?.filter(slide => slide.is_active) || [];
 
-      if (activeSlides.length > 0) {
-        console.log('✅ Active slideshows found:', activeSlides.length);
-        setActiveSlideshows(activeSlides);
-        setCurrentSlideshowIndex(0);
-        setCurrentImageIndex(0);
-        setConnectionError(false);
-        setLoading(false);
-      } else {
-        console.log('🚫 No active slideshows found');
-        setActiveSlideshows([]);
-        setLoading(false);
-      }
+      setActiveSlideshows(prevSlideshows => {
+        const currentSlideshowId = prevSlideshows[currentSlideshowIndex]?.id;
+        
+        // If the new list is empty, reset everything.
+        if (newActiveSlides.length === 0) {
+          console.log('🚫 No active slideshows found, resetting.');
+          setCurrentSlideshowIndex(0);
+          setCurrentImageIndex(0);
+          return [];
+        }
+
+        // Try to find the currently playing slideshow in the new list.
+        const newIndexOfCurrent = newActiveSlides.findIndex(s => s.id === currentSlideshowId);
+
+        if (newIndexOfCurrent !== -1) {
+          // The current slideshow is still active. Update its index just in case the order changed.
+          setCurrentSlideshowIndex(newIndexOfCurrent);
+        } else {
+          // The current slideshow is gone, or this is the initial load. Reset to the beginning.
+          setCurrentSlideshowIndex(0);
+          setCurrentImageIndex(0);
+        }
+        
+        console.log('✅ Active slideshows updated:', newActiveSlides.length);
+        return newActiveSlides;
+      });
+
+      setConnectionError(false);
     } catch (error) {
       console.error('❌ Error fetching slideshows:', error);
       setConnectionError(true);
-      setLoading(false);
-      
       if (isLargeScreen) {
         setActiveSlideshows([]);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,12 +139,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     channelRef.current = channel;
 
-    const pollingInterval = setInterval(() => {
-      fetchActiveSlideshows();
-    }, 2000);
-
     return () => {
-      clearInterval(pollingInterval);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
@@ -209,14 +219,11 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     slideshowRotationRef.current = setInterval(() => {
       console.log(`🎭 Slideshow rotation triggered after ${rotationInterval} seconds`);
       
+      // Reset image index for the new slideshow and then advance to it.
+      setCurrentImageIndex(0);
       setCurrentSlideshowIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % activeSlideshows.length;
         console.log(`🎭 Slideshow changing: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
-        
-        // إعادة تعيين فهرس الصورة للسلايد الجديد
-        setCurrentImageIndex(0);
-        console.log('🔄 Reset image index to 0 for new slideshow');
-        
         return nextIndex;
       });
       
