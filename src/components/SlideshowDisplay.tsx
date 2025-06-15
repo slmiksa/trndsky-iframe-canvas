@@ -25,10 +25,38 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
   const [allImagesLoaded, setAllImagesLoaded] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [shouldHide, setShouldHide] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Preload images and cache them globally
+  // Enhanced fetch with automatic retry
+  const fetchWithRetry = async (operation: () => Promise<any>, maxRetries = 3, delay = 1000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        setConnectionError(false);
+        const result = await operation();
+        setRetryAttempts(0);
+        return result;
+      } catch (error: any) {
+        console.error(`❌ Attempt ${attempt}/${maxRetries} failed:`, error);
+        setRetryAttempts(attempt);
+        
+        if (attempt === maxRetries) {
+          setConnectionError(true);
+          throw error;
+        }
+        
+        // Exponential backoff
+        const waitTime = delay * Math.pow(2, attempt - 1);
+        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  };
+
+  // Preload images with retry mechanism
   const preloadImagesOptimized = async (imageUrls: string[], slideshowId: string) => {
     console.log('🖼️ Starting optimized image preload for slideshow:', slideshowId);
     
@@ -52,16 +80,31 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
         return new Promise<HTMLImageElement>((resolve, reject) => {
           const img = new Image();
-          img.onload = () => {
-            console.log(`✅ Image ${index + 1}/${imageUrls.length} loaded successfully`);
-            imageCache.set(url, img);
-            resolve(img);
+          let attempts = 0;
+          const maxAttempts = 3;
+
+          const tryLoad = () => {
+            attempts++;
+            img.onload = () => {
+              console.log(`✅ Image ${index + 1}/${imageUrls.length} loaded successfully`);
+              imageCache.set(url, img);
+              resolve(img);
+            };
+            
+            img.onerror = () => {
+              if (attempts < maxAttempts) {
+                console.log(`🔄 Retrying image load ${attempts}/${maxAttempts}:`, url);
+                setTimeout(tryLoad, 1000 * attempts);
+              } else {
+                console.error(`❌ Failed to load image after ${maxAttempts} attempts:`, url);
+                reject(new Error(`Failed to load image: ${url}`));
+              }
+            };
+            
+            img.src = url;
           };
-          img.onerror = () => {
-            console.error(`❌ Failed to load image ${index + 1}:`, url);
-            reject(new Error(`Failed to load image: ${url}`));
-          };
-          img.src = url;
+
+          tryLoad();
         });
       });
 
@@ -80,44 +123,48 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     try {
       console.log('🎬 Fetching active slideshow for:', accountId);
       
-      const { data, error } = await supabase
-        .from('account_slideshows')
-        .select('*')
-        .eq('account_id', accountId)
-        .eq('is_active', true)
-        .single();
+      const result = await fetchWithRetry(async () => {
+        const { data, error } = await supabase
+          .from('account_slideshows')
+          .select('*')
+          .eq('account_id', accountId)
+          .eq('is_active', true)
+          .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('❌ Error fetching active slideshow:', error);
-        handleNoActiveSlideshow();
-        return;
-      }
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
 
-      if (data) {
-        console.log('✅ Active slideshow found:', data.title);
+        return data;
+      });
+
+      if (result) {
+        console.log('✅ Active slideshow found:', result.title);
         
         // Check if this slideshow is already cached
-        const cacheKey = `${data.id}-${JSON.stringify(data.images)}`;
-        if (slideshowCache.has(cacheKey) && activeSlideshow?.id === data.id) {
+        const cacheKey = `${result.id}-${JSON.stringify(result.images)}`;
+        if (slideshowCache.has(cacheKey) && activeSlideshow?.id === result.id) {
           console.log('📦 Using cached slideshow data');
           return;
         }
 
         // Cache the slideshow
-        slideshowCache.set(cacheKey, data);
-        setActiveSlideshow(data);
+        slideshowCache.set(cacheKey, result);
+        setActiveSlideshow(result);
         setCurrentImageIndex(0);
         setShouldHide(false);
         
         // Start preloading images
-        await preloadImagesOptimized(data.images, data.id);
+        await preloadImagesOptimized(result.images, result.id);
       } else {
         console.log('ℹ️ No active slideshow found');
         handleNoActiveSlideshow();
       }
     } catch (error) {
       console.error('❌ Exception fetching active slideshow:', error);
-      handleNoActiveSlideshow();
+      if (!connectionError) {
+        handleNoActiveSlideshow();
+      }
     }
   };
 
@@ -150,57 +197,91 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     }, 50);
   };
 
+  // Auto-retry connection on error
+  useEffect(() => {
+    if (connectionError && retryAttempts < 5) {
+      console.log('🔄 Auto-retrying connection in 5 seconds...');
+      retryTimeoutRef.current = setTimeout(() => {
+        fetchActiveSlideshow();
+      }, 5000);
+    }
+
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, [connectionError, retryAttempts, accountId]);
+
   useEffect(() => {
     fetchActiveSlideshow();
 
-    // Enhanced realtime listener with immediate response
-    channelRef.current = supabase
-      .channel(`slideshows-enhanced-${accountId}-${Date.now()}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'account_slideshows',
-          filter: `account_id=eq.${accountId}`
-        },
-        async (payload) => {
-          console.log('🎬 Realtime change detected:', payload.eventType, payload);
-          
-          if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-            const updatedData = payload.new as any;
+    // Enhanced realtime listener with connection recovery
+    const setupRealtimeConnection = () => {
+      channelRef.current = supabase
+        .channel(`slideshows-enhanced-${accountId}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'account_slideshows',
+            filter: `account_id=eq.${accountId}`
+          },
+          async (payload) => {
+            console.log('🎬 Realtime change detected:', payload.eventType, payload);
             
-            // Immediate response to deactivation
-            if (updatedData && !updatedData.is_active) {
-              console.log('🚫 IMMEDIATE deactivation detected');
-              handleSlideshowDeactivation();
-              return;
+            if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+              const updatedData = payload.new as any;
+              
+              // Immediate response to deactivation
+              if (updatedData && !updatedData.is_active) {
+                console.log('🚫 IMMEDIATE deactivation detected');
+                handleSlideshowDeactivation();
+                return;
+              }
+              
+              if (payload.eventType === 'DELETE') {
+                console.log('🗑️ IMMEDIATE deletion detected');
+                handleSlideshowDeactivation();
+                return;
+              }
             }
             
-            if (payload.eventType === 'DELETE') {
-              console.log('🗑️ IMMEDIATE deletion detected');
-              handleSlideshowDeactivation();
-              return;
+            // Refresh slideshow data with retry
+            try {
+              await fetchActiveSlideshow();
+            } catch (error) {
+              console.error('❌ Error refreshing slideshow after realtime update:', error);
             }
           }
+        )
+        .subscribe((status) => {
+          console.log('🎬 Realtime status:', status);
           
-          // Refresh slideshow data
-          await fetchActiveSlideshow();
-        }
-      )
-      .subscribe((status) => {
-        console.log('🎬 Realtime status:', status);
-      });
+          if (status === 'CHANNEL_ERROR') {
+            console.log('🔄 Realtime connection failed, retrying in 3 seconds...');
+            setTimeout(setupRealtimeConnection, 3000);
+          } else if (status === 'CLOSED') {
+            console.log('🔄 Realtime connection closed, attempting reconnect...');
+            setTimeout(setupRealtimeConnection, 1000);
+          }
+        });
+    };
 
-    // Aggressive polling for TV screens - every 500ms
-    const aggressiveInterval = setInterval(() => {
-      console.log('⚡ Ultra-fast check (500ms)');
-      fetchActiveSlideshow();
-    }, 500);
+    setupRealtimeConnection();
+
+    // Reduced polling for better performance - every 2 seconds instead of 500ms
+    const pollingInterval = setInterval(() => {
+      if (!connectionError) {
+        console.log('⚡ Periodic check (2s)');
+        fetchActiveSlideshow();
+      }
+    }, 2000);
 
     return () => {
       console.log('🧹 Cleaning up slideshow listeners');
-      clearInterval(aggressiveInterval);
+      clearInterval(pollingInterval);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
@@ -208,6 +289,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
       }
     };
   }, [accountId]);
@@ -241,7 +326,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           return nextIndex;
         });
         setIsTransitioning(false);
-      }, 200); // Faster transition
+      }, 200);
     }, activeSlideshow.interval_seconds * 1000);
 
     return () => {
@@ -251,6 +336,30 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       }
     };
   }, [activeSlideshow, allImagesLoaded, shouldHide]);
+
+  // Show connection error
+  if (connectionError && retryAttempts >= 3) {
+    return (
+      <div className="fixed inset-0 bg-red-900 z-50 flex items-center justify-center">
+        <div className="text-center text-white max-w-md mx-4">
+          <div className="w-16 h-16 bg-red-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold mb-2">خطأ في الاتصال</h3>
+          <p className="text-sm text-gray-300 mb-4">
+            فشل في تحميل البيانات - جاري إعادة المحاولة تلقائياً...
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Immediate hide conditions
   if (shouldHide || loading || !activeSlideshow || activeSlideshow.images.length === 0) {
@@ -268,6 +377,11 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           <p className="text-sm text-gray-300 mt-2">
             {activeSlideshow.images.length} صور
           </p>
+          {retryAttempts > 0 && (
+            <p className="text-xs text-yellow-300 mt-1">
+              إعادة المحاولة {retryAttempts}/3...
+            </p>
+          )}
         </div>
       </div>
     );
@@ -327,16 +441,21 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           />
         </div>
 
-        {/* Cache status indicator */}
+        {/* Enhanced status indicator */}
         <div className="absolute top-8 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <div className="text-white text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-400"></div>
-              <span>محمل بالكامل</span>
+              <div className={`w-2 h-2 rounded-full ${connectionError ? 'bg-red-400' : 'bg-green-400'}`}></div>
+              <span>{connectionError ? 'اتصال ضعيف' : 'محمل بالكامل'}</span>
             </div>
             <div className="text-xs text-gray-300">
               {activeSlideshow.images.length} صور محفوظة
             </div>
+            {retryAttempts > 0 && (
+              <div className="text-xs text-yellow-300">
+                إعادة محاولة: {retryAttempts}
+              </div>
+            )}
           </div>
         </div>
       </div>
