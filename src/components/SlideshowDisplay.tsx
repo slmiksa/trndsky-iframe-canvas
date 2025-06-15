@@ -141,7 +141,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     fetchActiveSlideshows();
   }, [accountId]);
 
-  // تنظيف جميع المؤقتات عند تغيير السلايد شو أو تحديث البيانات
+  // تنظيف جميع المؤقتات
   const clearAllTimers = () => {
     if (imageIntervalRef.current) {
       clearInterval(imageIntervalRef.current);
@@ -155,7 +155,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
   // التنقل بين الصور داخل السلايد شو الحالي
   useEffect(() => {
-    // تنظيف أي مؤقت صور سابق
+    // تنظيف مؤقت الصور السابق
     if (imageIntervalRef.current) {
       clearInterval(imageIntervalRef.current);
       imageIntervalRef.current = null;
@@ -172,7 +172,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       intervalSeconds: 5
     });
 
-    // تنقل بين الصور كل 5 ثوانِ
+    // تنقل بين الصور كل 5 ثوانٍ
     imageIntervalRef.current = setInterval(() => {
       setCurrentImageIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % currentSlideshow.images.length;
@@ -189,9 +189,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     };
   }, [currentSlideshowIndex, activeSlideshows, loading]);
 
-  // التنقل بين السلايد شوز - الالتزام الدقيق بالتوقيت المحدد
+  // التنقل بين السلايد شوز - تم إصلاح المشكلة
   useEffect(() => {
-    // تنظيف أي مؤقت سلايد شو سابق
+    // تنظيف مؤقت السلايد شو السابق أولاً
     if (slideshowRotationRef.current) {
       clearInterval(slideshowRotationRef.current);
       slideshowRotationRef.current = null;
@@ -203,23 +203,24 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       return;
     }
 
-    console.log(`🔄 Setting up slideshow rotation with ${activeSlideshows.length} slideshows, strict interval: ${rotationInterval} seconds`);
+    console.log(`🔄 Setting up slideshow rotation with ${activeSlideshows.length} slideshows, interval: ${rotationInterval} seconds`);
 
-    // استخدام الفترة المحددة بدقة من قاعدة البيانات
+    // بدء مؤقت جديد للتنقل بين السلايدات
     slideshowRotationRef.current = setInterval(() => {
-      console.log(`🎭 Slideshow rotation triggered after exactly ${rotationInterval} seconds`);
+      console.log(`🎭 Slideshow rotation triggered after ${rotationInterval} seconds`);
       
       setCurrentSlideshowIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % activeSlideshows.length;
-        console.log(`🎭 Slideshow rotation: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
+        console.log(`🎭 Slideshow changing: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshows.length})`);
+        
+        // إعادة تعيين فهرس الصورة للسلايد الجديد
+        setCurrentImageIndex(0);
+        console.log('🔄 Reset image index to 0 for new slideshow');
+        
         return nextIndex;
       });
       
-      // إعادة تعيين فهرس الصورة عند التنقل للسلايد شو التالي
-      setCurrentImageIndex(0);
-      console.log('🔄 Reset image index to 0 for new slideshow');
-      
-    }, rotationInterval * 1000); // الالتزام الدقيق بالتوقيت المحدد
+    }, rotationInterval * 1000);
 
     return () => {
       if (slideshowRotationRef.current) {
