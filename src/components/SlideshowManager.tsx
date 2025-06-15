@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -321,7 +322,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             const urlParts = imageUrl.split('/');
             const fileName = urlParts[urlParts.length - 1];
             const folderName = urlParts[urlParts.length - 2];
-            const filePath = `${folderName}/${fileName`;
+            const filePath = `${folderName}/${fileName}`;
             
             await supabase.storage
               .from('slideshow-images')
