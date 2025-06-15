@@ -117,7 +117,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     fetchActiveSlideshow();
   }, [accountId]);
 
-  // إصلاح منطق التنقل بين الصور - SIMPLIFIED AND FIXED
+  // إصلاح منطق التنقل بين الصور - COMPLETE FIX
   useEffect(() => {
     // Clear any existing interval first
     if (intervalRef.current) {
@@ -137,14 +137,22 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       currentIndex: currentImageIndex
     });
 
-    // Start the interval
+    // Start the interval - FIXED LOGIC
     intervalRef.current = setInterval(() => {
       console.log('⏰ Timer fired - moving to next image');
       
       setCurrentImageIndex((prevIndex) => {
         const nextIndex = (prevIndex + 1) % activeSlideshow.images.length;
         console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${activeSlideshow.images.length})`);
-        return nextIndex;
+        
+        // تأكد من أن القيمة صحيحة
+        if (nextIndex >= 0 && nextIndex < activeSlideshow.images.length) {
+          return nextIndex;
+        }
+        
+        // في حالة وجود خطأ، ارجع للصورة الأولى
+        console.warn('⚠️ Index out of bounds, resetting to 0');
+        return 0;
       });
     }, activeSlideshow.interval_seconds * 1000);
 
@@ -180,7 +188,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     return null;
   }
 
-  const currentImage = activeSlideshow.images[currentImageIndex];
+  // تأكد من أن الفهرس صحيح
+  const safeCurrentIndex = Math.max(0, Math.min(currentImageIndex, activeSlideshow.images.length - 1));
+  const currentImage = activeSlideshow.images[safeCurrentIndex];
 
   return (
     <div className="fixed inset-0 bg-black z-50">
@@ -188,9 +198,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         {/* Main image display */}
         <div className="w-full h-full">
           <img 
-            key={`${activeSlideshow.id}-${currentImageIndex}`}
+            key={`${activeSlideshow.id}-${safeCurrentIndex}`}
             src={currentImage}
-            alt={`${activeSlideshow.title} - Slide ${currentImageIndex + 1}`}
+            alt={`${activeSlideshow.title} - Slide ${safeCurrentIndex + 1}`}
             className="w-full h-full object-contain bg-black"
             style={{
               maxWidth: '100vw',
@@ -198,9 +208,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               objectFit: 'contain',
               objectPosition: 'center'
             }}
-            onLoad={() => console.log('✅ Image loaded:', currentImageIndex + 1, currentImage)}
+            onLoad={() => console.log('✅ Image loaded:', safeCurrentIndex + 1, 'of', activeSlideshow.images.length, currentImage)}
             onError={(e) => {
-              console.error('❌ Image failed to load:', currentImageIndex + 1, currentImage);
+              console.error('❌ Image failed to load:', safeCurrentIndex + 1, currentImage);
               console.error('Error details:', e);
             }}
           />
@@ -213,7 +223,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
               <div 
                 key={index} 
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  index === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'
+                  index === safeCurrentIndex ? 'bg-white scale-125' : 'bg-white/50'
                 }`} 
               />
             ))}
@@ -224,7 +234,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
           <p className="text-white/80 text-sm">
-            الصورة {currentImageIndex + 1} من {activeSlideshow.images.length}
+            الصورة {safeCurrentIndex + 1} من {activeSlideshow.images.length}
           </p>
         </div>
 
@@ -233,7 +243,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
           <div 
             className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300 ease-linear"
             style={{
-              width: `${((currentImageIndex + 1) / activeSlideshow.images.length) * 100}%`
+              width: `${((safeCurrentIndex + 1) / activeSlideshow.images.length) * 100}%`
             }}
           />
         </div>
@@ -255,10 +265,11 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
         {/* Debug info - shows current state */}
         {process.env.NODE_ENV === 'development' && (
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
-            <div>Index: {currentImageIndex}</div>
+            <div>Index: {safeCurrentIndex} (original: {currentImageIndex})</div>
             <div>Total: {activeSlideshow.images.length}</div>
             <div>Interval: {activeSlideshow.interval_seconds}s</div>
             <div>Timer: {intervalRef.current ? 'Active' : 'Inactive'}</div>
+            <div>Image URL: {currentImage?.substring(0, 50)}...</div>
           </div>
         )}
       </div>
