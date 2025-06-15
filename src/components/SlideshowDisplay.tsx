@@ -68,31 +68,24 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         console.log(`🎬 Slideshow activity state changed to: ${hasActive}`);
       }
 
+      const getSlideshowsSignature = (slides: Slideshow[]) => {
+        if (!slides || slides.length === 0) return 'no-active-slides';
+        return slides
+          .map(s => `${s.id}:${s.images.join(',')}`) // Signature includes image list
+          .sort() // Sort for order-independent comparison
+          .join(';');
+      };
+
       setActiveSlideshows(prevSlideshows => {
-        // Create sets of IDs for efficient and order-independent comparison.
-        const newSlideIds = new Set(newActiveSlides.map(s => s.id));
-        const prevSlideIds = new Set(prevSlideshows.map(s => s.id));
+        const prevSignature = getSlideshowsSignature(prevSlideshows);
+        const newSignature = getSlideshowsSignature(newActiveSlides);
 
-        // Check if the sets of IDs are identical.
-        let areIdentical = newSlideIds.size === prevSlideIds.size;
-        if (areIdentical && newSlideIds.size > 0) {
-          for (const id of newSlideIds) {
-            if (!prevSlideIds.has(id)) {
-              areIdentical = false;
-              break;
-            }
-          }
-        }
-
-        // If the list of active slideshows is the same, don't update the state.
-        // This prevents resetting the timers and the user's view for no reason.
-        if (areIdentical) {
+        if (prevSignature === newSignature) {
+          console.log('✅ Slideshow content is identical, no update needed.');
           return prevSlideshows;
         }
         
-        // If the list has changed, update it and reset the position to the start.
-        // This ensures a stable and predictable state after any change.
-        console.log('🔄 Slideshow list has changed, resetting to initial state.');
+        console.log('🔄 Slideshow list or content has changed, resetting to initial state.');
         setPosition({ slideshow: 0, image: 0 });
         return newActiveSlides;
       });
@@ -251,6 +244,45 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
       }
     };
   }, [activeSlideshows.length, rotationInterval]);
+
+  // Preload next image for smooth transition
+  useEffect(() => {
+    if (!activeSlideshows.length || loading) return;
+
+    try {
+      const currentSlideshow = activeSlideshows[position.slideshow];
+      if (!currentSlideshow) return;
+
+      // Preload next image in the current slideshow
+      if (currentSlideshow.images.length > 1) {
+        const nextImageIndex = (position.image + 1) % currentSlideshow.images.length;
+        const nextImageUrl = currentSlideshow.images[nextImageIndex];
+        if (nextImageUrl) {
+          const img = new Image();
+          img.src = nextImageUrl;
+          console.log(`🖼️ Preloading next image in slideshow: ${nextImageUrl}`);
+        }
+      }
+
+      // If on the last image, preload the first image of the next slideshow
+      const isLastImage = position.image === currentSlideshow.images.length - 1;
+      if (isLastImage && activeSlideshows.length > 1) {
+        const nextSlideshowIndex = (position.slideshow + 1) % activeSlideshows.length;
+        const nextSlideshow = activeSlideshows[nextSlideshowIndex];
+        if (nextSlideshow?.images?.length > 0) {
+          const nextSlideshowFirstImageUrl = nextSlideshow.images[0];
+          if (nextSlideshowFirstImageUrl) {
+            const img = new Image();
+            img.src = nextSlideshowFirstImageUrl;
+            console.log(`🖼️ Preloading first image of next slideshow: ${nextSlideshowFirstImageUrl}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("🔥 Error during image preloading:", error);
+    }
+  }, [activeSlideshows, position, loading]);
+
 
   // تنظيف المؤقتات عند إلغاء تحميل المكون
   useEffect(() => {
