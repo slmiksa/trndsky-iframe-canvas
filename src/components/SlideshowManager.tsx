@@ -213,27 +213,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         title: 'تم تحديث حالة السلايد شو',
         description: statusMessage
       });
-
-      // تحديث واجهة المستخدم فوراً لتعكس القاعدة الجديدة (سلايد واحد نشط فقط)
-      if (newStatus) {
-        setSlideshows(prevSlideshows => 
-          prevSlideshows.map(slide => ({
-            ...slide,
-            is_active: slide.id === slideshowId
-          }))
-        );
-      } else {
-        // عند الإيقاف، فقط قم بتحديث السلايد المحدد
-        setSlideshows(prevSlideshows => 
-          prevSlideshows.map(slide => 
-            slide.id === slideshowId 
-              ? { ...slide, is_active: false }
-              : slide
-          )
-        );
-      }
       
-      console.log('✅ Slideshow status update sent. Waiting for realtime update.');
+      // إعادة جلب البيانات مباشرة لضمان أن الواجهة تعكس الحالة الصحيحة من قاعدة البيانات
+      // والتي تم تعديلها بواسطة الـ trigger
+      await fetchSlideshows();
+      
+      console.log('✅ Slideshow status update sent. Refetched to guarantee correct state.');
       
     } catch (error: any) {
       console.error('❌ Error in toggleSlideshowStatus:', error);
