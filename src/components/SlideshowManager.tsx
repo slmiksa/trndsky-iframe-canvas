@@ -68,6 +68,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('🔍 Fetching slideshows for account:', accountId);
       
+      // استخدام استعلام مباشر بدلاً من RLS للحصول على جميع السلايدات (للإدارة)
       const { data, error } = await supabase
         .from('account_slideshows')
         .select('*')
@@ -199,25 +200,20 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       const imageUrls = await uploadImages(newSlideshow.images);
       console.log('✅ Images uploaded successfully:', imageUrls);
       
-      // إنشاء السلايدات
-      const { data, error } = await supabase
-        .from('account_slideshows')
-        .insert({
-          account_id: accountId,
-          title: newSlideshow.title,
-          images: imageUrls,
-          interval_seconds: newSlideshow.interval_seconds,
-          is_active: false
-        })
-        .select()
-        .single();
+      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات
+      const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
+        p_account_id: accountId,
+        p_title: newSlideshow.title,
+        p_images: imageUrls,
+        p_interval_seconds: newSlideshow.interval_seconds
+      });
 
       if (error) {
         console.error('❌ Error creating slideshow:', error);
         throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
       }
 
-      console.log('✅ Slideshow created successfully:', data);
+      console.log('✅ Slideshow created successfully with ID:', data);
 
       toast({
         title: 'تم إضافة السلايدات بنجاح',
@@ -325,7 +321,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             const urlParts = imageUrl.split('/');
             const fileName = urlParts[urlParts.length - 1];
             const folderName = urlParts[urlParts.length - 2];
-            const filePath = `${folderName}/${fileName}`;
+            const filePath = `${folderName}/${fileName`;
             
             await supabase.storage
               .from('slideshow-images')
