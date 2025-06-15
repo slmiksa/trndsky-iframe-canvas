@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -736,11 +737,6 @@ const ClientPublicPage = () => {
           ) : null}
           
           {/* Overlays */}
-          {/* News Ticker Display */}
-          {account?.id && !subscriptionExpired && (
-            <NewsTickerDisplay accountId={account.id} />
-          )}
-
           {/* Active Notifications */}
           {activeNotifications.map((notification) => (
             <NotificationPopup
@@ -750,16 +746,24 @@ const ClientPublicPage = () => {
             />
           ))}
 
-          {/* Active Timers */}
-          {activeTimers.map((timer) => (
-            <BreakTimerDisplay
-              key={timer.id}
-              timer={timer}
-              onClose={() => handleTimerClose(timer.id)}
-            />
-          ))}
         </>
       )}
+
+      {/* Overlays that appear with or without slideshow */}
+      {/* News Ticker Display */}
+      {account?.id && !subscriptionExpired && (
+        <NewsTickerDisplay accountId={account.id} />
+      )}
+
+      {/* Active Timers */}
+      {activeTimers.map((timer) => (
+        <BreakTimerDisplay
+          key={timer.id}
+          timer={timer}
+          onClose={() => handleTimerClose(timer.id)}
+        />
+      ))}
+
 
       {/* Enhanced debug info with TV detection */}
       {process.env.NODE_ENV === 'development' && (
