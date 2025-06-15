@@ -179,17 +179,20 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     console.log('🎬 Starting image rotation for slideshow:', {
       title: currentSlideshow.title,
       imagesCount: currentSlideshow.images.length,
-      intervalSeconds: 5
+      intervalSeconds: 15
     });
 
-    // تنقل بين الصور كل 5 ثوانٍ
+    // تنقل بين الصور كل 15 ثوانٍ
     imageIntervalRef.current = setInterval(() => {
-      setPosition((pos) => {
-        const nextIndex = (pos.image + 1) % currentSlideshow.images.length;
-        console.log(`🔄 Image transition: ${pos.image + 1} -> ${nextIndex + 1} (total: ${currentSlideshow.images.length})`);
-        return { ...pos, image: nextIndex };
+      setPosition((prev) => {
+        if (!activeSlideshows[prev.slideshow]) return prev;
+        const nextImageIndex = (prev.image + 1) % activeSlideshows[prev.slideshow].images.length;
+        
+        console.log(`🔄 Image transition: ${prev.image + 1} -> ${nextImageIndex + 1} (total: ${activeSlideshows[prev.slideshow].images.length}) in slideshow ${activeSlideshows[prev.slideshow].title}`);
+        
+        return { ...prev, image: nextImageIndex };
       });
-    }, 5000);
+    }, 15000);
 
     return () => {
       if (imageIntervalRef.current) {
@@ -361,7 +364,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
             <div>Slideshow: {position.slideshow + 1}/{activeSlideshows.length}</div>
             <div>Image: {safeImageIndex + 1}/{currentSlideshow.images.length}</div>
             <div>Title: {currentSlideshow.title}</div>
-            <div>صور كل: 5 ثوانٍ</div>
+            <div>صور كل: 15 ثوانٍ</div>
             <div>سلايدات كل: {rotationInterval} ثانية</div>
             <div>Image Timer: {imageIntervalRef.current ? 'نشط' : 'متوقف'}</div>
             <div>Slideshow Timer: {slideshowRotationRef.current ? 'نشط' : 'متوقف'}</div>
