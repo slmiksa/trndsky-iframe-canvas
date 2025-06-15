@@ -11,17 +11,19 @@ interface Slideshow {
 
 interface SlideshowDisplayProps {
   accountId: string;
+  onActivityChange: (isActive: boolean) => void;
 }
 
-const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
+const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivityChange }) => {
   const [activeSlideshows, setActiveSlideshows] = useState<Slideshow[]>([]);
   const [position, setPosition] = useState({ slideshow: 0, image: 0 });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Represents initial load only
   const [connectionError, setConnectionError] = useState(false);
   const [rotationInterval, setRotationInterval] = useState(30);
   const imageIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const slideshowRotationRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
+  const isActiveRef = useRef(false);
 
   // Detect if running on TV/large screen
   const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
@@ -57,6 +59,14 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
       }
 
       const newActiveSlides = data?.filter(slide => slide.is_active) || [];
+      const hasActive = newActiveSlides.length > 0;
+
+      // Only call back if activity status has changed to prevent unnecessary re-renders
+      if (isActiveRef.current !== hasActive) {
+        onActivityChange(hasActive);
+        isActiveRef.current = hasActive;
+        console.log(`🎬 Slideshow activity state changed to: ${hasActive}`);
+      }
 
       setActiveSlideshows(prevSlideshows => {
         // Create sets of IDs for efficient and order-independent comparison.
@@ -91,24 +101,31 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     } catch (error) {
       console.error('❌ Error fetching slideshows:', error);
       setConnectionError(true);
-      if (isLargeScreen) {
-        setActiveSlideshows([]);
+      // On error, ensure we report as inactive
+      if (isActiveRef.current) {
+        onActivityChange(false);
+        isActiveRef.current = false;
       }
+      setActiveSlideshows([]);
     } finally {
-      setLoading(false);
+      // Only change loading state on the very first fetch
+      if (loading) {
+        setLoading(false);
+      }
     }
   };
 
-  // Realtime listener
+  // Realtime listener and polling
   useEffect(() => {
     if (!accountId) return;
 
-    console.log('📡 Setting up realtime listener for:', accountId);
+    console.log('📡 SlideshowDisplay: Setting up internal listeners for:', accountId);
     
     fetchRotationInterval();
+    fetchActiveSlideshows(); // Initial fetch
     
     const channel = supabase
-      .channel(`slideshow-${accountId}`)
+      .channel(`slideshow-display-${accountId}`) // Unique channel name
       .on(
         'postgres_changes',
         {
@@ -139,17 +156,16 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
     channelRef.current = channel;
 
+    // Add a backup polling interval for resilience
+    const backupInterval = setInterval(fetchActiveSlideshows, 10000); // Poll every 10s
+
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
+      clearInterval(backupInterval);
     };
-  }, [accountId, isLargeScreen]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchActiveSlideshows();
-  }, [accountId]);
+  }, [accountId, onActivityChange]);
 
   // تنظيف جميع المؤقتات
   const clearAllTimers = () => {
@@ -165,7 +181,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
   // التنقل بين الصور داخل السلايد شو الحالي
   useEffect(() => {
-    // تنظيف مؤقت الصور السابق
     if (imageIntervalRef.current) {
       clearInterval(imageIntervalRef.current);
       imageIntervalRef.current = null;
@@ -204,7 +219,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
 
   // التنقل بين السلايد شوز - تم إصلاح المشكلة
   useEffect(() => {
-    // تنظيف مؤقت السلايد شو السابق أولاً
     if (slideshowRotationRef.current) {
       clearInterval(slideshowRotationRef.current);
       slideshowRotationRef.current = null;
@@ -245,21 +259,23 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId }) => {
     };
   }, []);
 
-  // Force exit conditions
-  if (!activeSlideshows.length || loading) {
-    if (loading) {
-      return (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
-          <div className="text-center text-white">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-            <p className="text-lg">جاري تحميل العرض التقديمي...</p>
-            {connectionError && (
-              <p className="text-sm text-red-300 mt-2">مشكلة في الاتصال - جاري إعادة المحاولة</p>
-            )}
-          </div>
+  // Show loading screen only on the very first load
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-lg">جاري تحميل العرض التقديمي...</p>
+          {connectionError && (
+            <p className="text-sm text-red-300 mt-2">مشكلة في الاتصال - جاري إعادة المحاولة</p>
+          )}
         </div>
-      );
-    }
+      </div>
+    );
+  }
+
+  // After initial load, if no active slideshows, render nothing.
+  if (!activeSlideshows.length) {
     return null;
   }
 
