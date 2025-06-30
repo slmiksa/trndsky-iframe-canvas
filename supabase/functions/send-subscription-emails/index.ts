@@ -33,47 +33,72 @@ const handler = async (req: Request): Promise<Response> => {
       to: [email],
       subject: "تم استلام طلب الاشتراك - TRNDSKY",
       html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #1e40af; font-size: 24px; margin-bottom: 10px;">TRNDSKY</h1>
-            <div style="width: 50px; height: 3px; background: linear-gradient(to right, #3b82f6, #8b5cf6); margin: 0 auto;"></div>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;" dir="rtl">
+          <!-- Header with gradient -->
+          <div style="background: linear-gradient(135deg, #1e40af 0%, #7c3aed 100%); padding: 30px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; font-size: 28px; margin: 0; font-weight: bold;">TRNDSKY</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">منصة إدارة الشاشات والمواقع</p>
           </div>
           
-          <h2 style="color: #1f2937; margin-bottom: 20px;">مرحباً ${fullName}،</h2>
-          
-          <p style="color: #4b5563; line-height: 1.6; margin-bottom: 20px;">
-            شكراً لك لاهتمامك بمنصة TRNDSKY لإدارة الشاشات والمواقع.
-          </p>
-          
-          <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #1f2937; margin-bottom: 15px;">تفاصيل طلبك:</h3>
-            <ul style="color: #4b5563; line-height: 1.8;">
-              <li><strong>الاسم:</strong> ${fullName}</li>
-              <li><strong>الشركة:</strong> ${companyName}</li>
-              <li><strong>البريد الإلكتروني:</strong> ${email}</li>
-              <li><strong>رقم التواصل:</strong> ${phone}</li>
-            </ul>
-          </div>
-          
-          <p style="color: #4b5563; line-height: 1.6; margin: 20px 0;">
-            <strong>طلبك قيد المراجعة</strong> وسيقوم فريقنا بالتواصل معك خلال 24 ساعة لمناقشة احتياجاتك وتقديم العرض المناسب.
-          </p>
-          
-          <div style="background: #dbeafe; border-right: 4px solid #3b82f6; padding: 15px; margin: 20px 0;">
-            <p style="color: #1e40af; margin: 0; font-weight: 500;">
-              💡 في الأثناء، يمكنك زيارة موقعنا للتعرف على المزيد من مميزات TRNDSKY
+          <!-- Main content -->
+          <div style="background: white; padding: 40px 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h2 style="color: #1f2937; margin-bottom: 20px; font-size: 24px;">مرحباً ${fullName}،</h2>
+            
+            <p style="color: #4b5563; line-height: 1.8; margin-bottom: 25px; font-size: 16px;">
+              شكراً لك لاهتمامك بمنصة TRNDSKY. تم استلام طلب الاشتراك الخاص بك بنجاح.
             </p>
+            
+            <!-- Request details card -->
+            <div style="background: #f9fafb; padding: 25px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #3b82f6;">
+              <h3 style="color: #1f2937; margin-bottom: 20px; font-size: 18px;">📋 تفاصيل طلبك:</h3>
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #374151; width: 35%;">الاسم الكامل:</td>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${fullName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #374151;">اسم الشركة:</td>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${companyName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #374151;">البريد الإلكتروني:</td>
+                  <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; color: #1f2937;">${email}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px 0; font-weight: 600; color: #374151;">رقم التواصل:</td>
+                  <td style="padding: 12px 0; color: #1f2937;">${phone}</td>
+                </tr>
+              </table>
+            </div>
+            
+            <!-- Next steps -->
+            <div style="background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%); padding: 20px; border-radius: 8px; margin: 25px 0;">
+              <h3 style="color: #1e40af; margin-bottom: 15px; font-size: 18px;">📞 الخطوات التالية:</h3>
+              <p style="color: #1e40af; margin: 0; line-height: 1.6; font-size: 15px;">
+                سيقوم فريقنا المتخصص بالتواصل معك خلال <strong>24 ساعة</strong> لمناقشة احتياجاتك وتقديم العرض المناسب لشركتك.
+              </p>
+            </div>
+            
+            <!-- Features highlight -->
+            <div style="text-align: center; margin: 30px 0;">
+              <p style="color: #6b7280; font-size: 14px; margin-bottom: 15px;">استمتع بمميزات TRNDSKY:</p>
+              <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px;">
+                <span style="background: #f3f4f6; padding: 8px 16px; border-radius: 20px; color: #374151; font-size: 13px;">🖥️ إدارة الشاشات</span>
+                <span style="background: #f3f4f6; padding: 8px 16px; border-radius: 20px; color: #374151; font-size: 13px;">🌐 توحيد المواقع</span>
+                <span style="background: #f3f4f6; padding: 8px 16px; border-radius: 20px; color: #374151; font-size: 13px;">📊 تحليلات متقدمة</span>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px;">
+              <p style="color: #4b5563; font-size: 16px; margin-bottom: 10px;">مع تحيات فريق</p>
+              <p style="color: #1e40af; font-size: 20px; font-weight: bold; margin: 0;">TRNDSKY</p>
+            </div>
           </div>
           
-          <p style="color: #4b5563; line-height: 1.6;">
-            مع تحيات فريق TRNDSKY<br>
-            <strong>منصة إدارة وتوحيد الشاشات والمواقع</strong>
-          </p>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e7eb; text-align: center;">
-            <p style="color: #9ca3af; font-size: 12px;">
-              هذا الإيميل تم إرساله تلقائياً، يرجى عدم الرد عليه
-            </p>
+          <!-- Footer -->
+          <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+            <p style="margin: 0;">هذا الإيميل تم إرساله تلقائياً من نظام TRNDSKY</p>
+            <p style="margin: 5px 0 0 0;">يرجى عدم الرد على هذا الإيميل</p>
           </div>
         </div>
       `,
@@ -85,54 +110,74 @@ const handler = async (req: Request): Promise<Response> => {
     const adminEmailResponse = await resend.emails.send({
       from: "TRNDSKY System <onboarding@resend.dev>",
       to: ["info@trndsky.com"],
-      subject: "طلب اشتراك جديد - TRNDSKY",
+      subject: "🚨 طلب اشتراك جديد - TRNDSKY",
       html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #dc2626; font-size: 24px; margin-bottom: 10px;">🚨 طلب اشتراك جديد</h1>
-            <div style="width: 50px; height: 3px; background: linear-gradient(to right, #dc2626, #f59e0b); margin: 0 auto;"></div>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc;" dir="rtl">
+          <!-- Alert Header -->
+          <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 25px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; font-size: 24px; margin: 0 0 5px 0; font-weight: bold;">🚨 طلب اشتراك جديد</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 14px;">TRNDSKY Admin System</p>
           </div>
           
-          <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h2 style="color: #dc2626; margin-bottom: 20px;">تفاصيل طلب الاشتراك</h2>
-            
-            <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0;">
-              <h3 style="color: #374151; margin-bottom: 10px;">معلومات العميل:</h3>
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px; background: #f9fafb; font-weight: bold; color: #374151; width: 30%;">الاسم الكامل:</td>
-                  <td style="padding: 8px; color: #1f2937;">${fullName}</td>
+          <!-- Main content -->
+          <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <!-- Customer info card -->
+            <div style="background: #fef2f2; border: 2px solid #fecaca; border-radius: 8px; padding: 25px; margin-bottom: 25px;">
+              <h2 style="color: #dc2626; margin-bottom: 20px; font-size: 20px;">👤 معلومات العميل الجديد</h2>
+              
+              <table style="width: 100%; border-collapse: collapse; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <tr style="background: #f9fafb;">
+                  <td style="padding: 15px; font-weight: bold; color: #374151; border-bottom: 1px solid #e5e7eb; width: 35%;">الاسم الكامل:</td>
+                  <td style="padding: 15px; color: #1f2937; border-bottom: 1px solid #e5e7eb;">${fullName}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 8px; background: #f9fafb; font-weight: bold; color: #374151;">اسم الشركة:</td>
-                  <td style="padding: 8px; color: #1f2937;">${companyName}</td>
+                  <td style="padding: 15px; font-weight: bold; color: #374151; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">اسم الشركة:</td>
+                  <td style="padding: 15px; color: #1f2937; border-bottom: 1px solid #e5e7eb;">${companyName}</td>
+                </tr>
+                <tr style="background: #f9fafb;">
+                  <td style="padding: 15px; font-weight: bold; color: #374151; border-bottom: 1px solid #e5e7eb;">البريد الإلكتروني:</td>
+                  <td style="padding: 15px; color: #1f2937; border-bottom: 1px solid #e5e7eb;"><a href="mailto:${email}" style="color: #2563eb; text-decoration: none;">${email}</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 8px; background: #f9fafb; font-weight: bold; color: #374151;">البريد الإلكتروني:</td>
-                  <td style="padding: 8px; color: #1f2937;">${email}</td>
+                  <td style="padding: 15px; font-weight: bold; color: #374151; background: #f9fafb; border-bottom: 1px solid #e5e7eb;">رقم التواصل:</td>
+                  <td style="padding: 15px; color: #1f2937; border-bottom: 1px solid #e5e7eb;"><a href="tel:${phone}" style="color: #2563eb; text-decoration: none;">${phone}</a></td>
                 </tr>
-                <tr>
-                  <td style="padding: 8px; background: #f9fafb; font-weight: bold; color: #374151;">رقم التواصل:</td>
-                  <td style="padding: 8px; color: #1f2937;">${phone}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px; background: #f9fafb; font-weight: bold; color: #374151;">وقت الطلب:</td>
-                  <td style="padding: 8px; color: #1f2937;">${new Date().toLocaleString('ar-SA')}</td>
+                <tr style="background: #f9fafb;">
+                  <td style="padding: 15px; font-weight: bold; color: #374151;">وقت الطلب:</td>
+                  <td style="padding: 15px; color: #1f2937;">${new Date().toLocaleString('ar-SA', { 
+                    timeZone: 'Asia/Riyadh',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</td>
                 </tr>
               </table>
             </div>
+            
+            <!-- Action required alert -->
+            <div style="background: #fef3c7; border-right: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 6px;">
+              <h3 style="color: #92400e; margin-bottom: 10px; font-size: 16px;">⚡ إجراء مطلوب:</h3>
+              <p style="color: #92400e; margin: 0; line-height: 1.6; font-size: 14px;">
+                يرجى التواصل مع العميل خلال <strong>24 ساعة</strong> لمتابعة طلب الاشتراك وتقديم العرض المناسب.
+              </p>
+            </div>
+            
+            <!-- Quick actions -->
+            <div style="text-align: center; margin: 30px 0; padding: 20px; background: #f8fafc; border-radius: 8px;">
+              <h3 style="color: #374151; margin-bottom: 15px; font-size: 16px;">🎯 إجراءات سريعة:</h3>
+              <div style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                <a href="mailto:${email}" style="background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 14px; display: inline-block;">📧 إرسال إيميل</a>
+                <a href="tel:${phone}" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 14px; display: inline-block;">📞 اتصال مباشر</a>
+              </div>
+            </div>
           </div>
           
-          <div style="background: #fef3c7; border-right: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
-            <p style="color: #92400e; margin: 0; font-weight: 500;">
-              ⚡ يرجى التواصل مع العميل خلال 24 ساعة لمتابعة الطلب
-            </p>
-          </div>
-          
-          <div style="text-align: center; margin-top: 30px;">
-            <p style="color: #6b7280; font-size: 14px;">
-              تم إرسال هذا الإيميل تلقائياً من نظام TRNDSKY
-            </p>
+          <!-- Footer -->
+          <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+            <p style="margin: 0;">تم إرسال هذا الإشعار تلقائياً من نظام إدارة TRNDSKY</p>
+            <p style="margin: 5px 0 0 0;">تاريخ الإرسال: ${new Date().toLocaleString('ar-SA')}</p>
           </div>
         </div>
       `,
