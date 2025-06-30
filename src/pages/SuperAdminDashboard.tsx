@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle } from 'lucide-react';
+import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { hashPassword } from '@/utils/authUtils';
 import NotificationManager from '@/components/NotificationManager';
@@ -25,13 +25,25 @@ interface Account {
   is_subscription_active: boolean | null;
 }
 
+interface SubscriptionRequest {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  company_name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const SuperAdminDashboard = () => {
   const { signOut, userRole } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers' | 'subscription-requests'>('accounts');
   const [editingActivation, setEditingActivation] = useState<string | null>(null);
   const [newAccount, setNewAccount] = useState({
     name: '',
@@ -89,16 +101,80 @@ const SuperAdminDashboard = () => {
       });
       
       setAccounts([]);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchSubscriptionRequests = async () => {
+    try {
+      console.log('🔍 جاري تحميل طلبات الاشتراك...');
+      
+      const { data, error } = await supabase
+        .from('subscription_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ خطأ في تحميل طلبات الاشتراك:', error);
+        throw error;
+      }
+      
+      console.log('✅ تم تحميل طلبات الاشتراك بنجاح:', data);
+      setSubscriptionRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching subscription requests:', error);
+      toast({
+        title: "خطأ في تحميل طلبات الاشتراك",
+        description: "سيتم المحاولة مرة أخرى...",
+        variant: "destructive",
+      });
+      
+      setSubscriptionRequests([]);
     }
   };
 
   useEffect(() => {
     if (userRole === 'super_admin') {
-      fetchAccounts();
+      const loadData = async () => {
+        setLoading(true);
+        await Promise.all([fetchAccounts(), fetchSubscriptionRequests()]);
+        setLoading(false);
+      };
+      
+      loadData();
     }
   }, [userRole]);
+
+  const updateSubscriptionRequestStatus = async (requestId: string, status: string) => {
+    try {
+      console.log(`🔄 جاري تحديث حالة طلب الاشتراك ${requestId} إلى ${status}`);
+      
+      const { error } = await supabase
+        .from('subscription_requests')
+        .update({ status })
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('❌ خطأ في تحديث حالة طلب الاشتراك:', error);
+        throw error;
+      }
+
+      console.log('✅ تم تحديث حالة طلب الاشتراك بنجاح');
+      
+      toast({
+        title: "تم تحديث حالة الطلب",
+        description: `تم تحديث حالة الطلب إلى ${status === 'approved' ? 'موافق عليه' : status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}`,
+      });
+
+      await fetchSubscriptionRequests();
+    } catch (error: any) {
+      console.error('❌ خطأ في تحديث طلب الاشتراك:', error);
+      toast({
+        title: "خطأ في تحديث الطلب",
+        description: error.message || 'حدث خطأ غير متوقع',
+        variant: "destructive",
+      });
+    }
+  };
 
   const createAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +227,7 @@ const SuperAdminDashboard = () => {
           body: {
             name: newAccount.name,
             email: newAccount.email,
-            password: newAccount.password, // إرسال كلمة المرور الأصلية في الإيميل
+            password: newAccount.password,
             database_name: newAccount.database_name,
             activation_start_date: newAccount.activation_start_date,
             activation_end_date: newAccount.activation_end_date,
@@ -171,7 +247,6 @@ const SuperAdminDashboard = () => {
         }
       } catch (emailError) {
         console.error('❌ خطأ في إرسال الإيميل:', emailError);
-        // لا نقوم بإيقاف العملية إذا فشل الإيميل
       }
 
       toast({
@@ -310,9 +385,24 @@ const SuperAdminDashboard = () => {
     return <Badge variant="outline">غير محدد</Badge>;
   };
 
+  const getRequestStatusBadge = (status: string) => {
+    const statusConfig = {
+      pending: { label: 'قيد المراجعة', variant: 'secondary' as const },
+      approved: { label: 'موافق عليه', variant: 'default' as const },
+      rejected: { label: 'مرفوض', variant: 'destructive' as const },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || { label: status, variant: 'outline' as const };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'غير محدد';
     return new Date(dateString).toLocaleDateString('ar-SA');
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ar-SA');
   };
 
   // Show loading while checking user role
@@ -354,7 +444,7 @@ const SuperAdminDashboard = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -408,6 +498,18 @@ const SuperAdminDashboard = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <FileText className="h-8 w-8 text-purple-600" />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">طلبات الاشتراك</p>
+                  <p className="text-2xl font-bold text-gray-900">{subscriptionRequests.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Navigation Tabs */}
@@ -423,6 +525,17 @@ const SuperAdminDashboard = () => {
             >
               <Users className="h-4 w-4 inline mr-2" />
               الحسابات
+            </button>
+            <button
+              onClick={() => setActiveTab('subscription-requests')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'subscription-requests'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <FileText className="h-4 w-4 inline mr-2" />
+              طلبات الاشتراك
             </button>
             <button
               onClick={() => setActiveTab('notifications')}
@@ -683,6 +796,94 @@ const SuperAdminDashboard = () => {
                           </div>
                         </div>
                       )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'subscription-requests' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>طلبات الاشتراك</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {loading ? (
+                  <div className="text-center py-4">
+                    <p className="text-gray-600">جاري التحميل...</p>
+                  </div>
+                ) : subscriptionRequests.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">لا توجد طلبات اشتراك</p>
+                  </div>
+                ) : (
+                  subscriptionRequests.map((request) => (
+                    <div key={request.id} className="border rounded-lg p-6 bg-white">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-3">
+                            <h3 className="font-semibold text-lg">{request.full_name}</h3>
+                            {getRequestStatusBadge(request.status)}
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-500">اسم الشركة</p>
+                              <p className="font-medium">{request.company_name}</p>
+                            </div>
+                            
+                            <div>
+                              <p className="text-sm text-gray-500">البريد الإلكتروني</p>
+                              <p className="font-medium">{request.email}</p>
+                            </div>
+                            
+                            <div>
+                              <p className="text-sm text-gray-500">رقم التواصل</p>
+                              <p className="font-medium">{request.phone}</p>
+                            </div>
+                            
+                            <div>
+                              <p className="text-sm text-gray-500">تاريخ الطلب</p>
+                              <p className="font-medium">{formatDateTime(request.created_at)}</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2">
+                          {request.status === 'pending' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={() => updateSubscriptionRequestStatus(request.id, 'approved')}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                موافقة
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => updateSubscriptionRequestStatus(request.id, 'rejected')}
+                              >
+                                رفض
+                              </Button>
+                            </>
+                          )}
+                          
+                          {request.status !== 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateSubscriptionRequestStatus(request.id, 'pending')}
+                            >
+                              إعادة للمراجعة
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ))
                 )}
