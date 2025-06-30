@@ -29,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // إرسال إيميل للعميل
     const customerEmailResponse = await resend.emails.send({
-      from: "TRNDSKY <noreply@trndsky.com>",
+      from: "TRNDSKY <onboarding@resend.dev>",
       to: [email],
       subject: "تم استلام طلب الاشتراك - TRNDSKY",
       html: `
@@ -83,7 +83,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // إرسال إيميل للإدارة
     const adminEmailResponse = await resend.emails.send({
-      from: "TRNDSKY System <system@trndsky.com>",
+      from: "TRNDSKY System <onboarding@resend.dev>",
       to: ["info@trndsky.com"],
       subject: "طلب اشتراك جديد - TRNDSKY",
       html: `
