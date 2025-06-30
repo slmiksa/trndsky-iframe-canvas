@@ -4,9 +4,6 @@ import { Button } from '@/components/ui/button';
 import MobileDownloadButtons from '@/components/MobileDownloadButtons';
 
 const Index = () => {
-  const handleSubscribeClick = () => {
-    window.open('https://trndsky.com/software', '_blank');
-  };
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-slate-900 p-4">
       <div className="text-center max-w-lg mx-auto">
         <div className="flex justify-center mb-6">
@@ -28,9 +25,11 @@ const Index = () => {
             </Button>
           </Link>
           
-          <Button size="lg" onClick={handleSubscribeClick} className="w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-            الإشتراك في النظام
-          </Button>
+          <Link to="/subscription-request" className="block">
+            <Button size="lg" className="w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
+              الإشتراك في النظام
+            </Button>
+          </Link>
         </div>
         
         <div className="mt-8 text-white text-base font-medium">
@@ -45,4 +44,3 @@ const Index = () => {
     </div>;
 };
 export default Index;
-

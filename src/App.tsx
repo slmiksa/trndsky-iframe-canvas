@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ClientPublicPage from "./pages/ClientPublicPage";
+import SubscriptionRequest from "./pages/SubscriptionRequest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App: React.FC = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/client/:accountId" element={<ClientPublicPage />} />
               <Route path="/tv" element={<ClientPublicPage />} />
+              <Route path="/subscription-request" element={<SubscriptionRequest />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </LanguageProvider>
