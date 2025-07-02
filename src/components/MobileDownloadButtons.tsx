@@ -35,7 +35,7 @@ const MobileDownloadButtons = () => {
   return <>
       <div className="flex justify-center gap-4">
         
-        <Button onClick={handleDownloadClick} variant="secondary" size="lg" className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6">أبل / أندرويد</Button>
+        <Button onClick={handleDownloadClick} variant="secondary" size="lg" className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6 text-xl">أبل / أندرويد</Button>
       </div>
 
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
