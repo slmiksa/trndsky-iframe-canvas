@@ -1,20 +1,9 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 const MobileDownloadButtons = () => {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [isPWA, setIsPWA] = React.useState(false);
-
   React.useEffect(() => {
     // Check if the app is running as a PWA (installed app)
     const checkPWA = () => {
@@ -24,21 +13,17 @@ const MobileDownloadButtons = () => {
       const isFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
       // Check for iOS PWA
       const isIOSPWA = (window.navigator as any).standalone === true;
-      
       setIsPWA(isStandalone || isFullscreen || isIOSPWA);
     };
-
     checkPWA();
-    
+
     // Listen for display mode changes
     const mediaQuery = window.matchMedia('(display-mode: standalone)');
     mediaQuery.addEventListener('change', checkPWA);
-    
     return () => {
       mediaQuery.removeEventListener('change', checkPWA);
     };
   }, []);
-
   const handleDownloadClick = () => {
     setDialogOpen(true);
   };
@@ -47,26 +32,10 @@ const MobileDownloadButtons = () => {
   if (isPWA) {
     return null;
   }
-
-  return (
-    <>
+  return <>
       <div className="flex justify-center gap-4">
-        <Button 
-          onClick={handleDownloadClick}
-          variant="secondary" 
-          size="lg"
-          className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6"
-        >
-          متجر آبل
-        </Button>
-        <Button 
-          onClick={handleDownloadClick}
-          variant="secondary" 
-          size="lg"
-          className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6"
-        >
-          قوقل بلاي
-        </Button>
+        
+        <Button onClick={handleDownloadClick} variant="secondary" size="lg" className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6">أبل / أندرويد</Button>
       </div>
 
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -82,8 +51,6 @@ const MobileDownloadButtons = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
-  );
+    </>;
 };
-
 export default MobileDownloadButtons;
