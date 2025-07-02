@@ -560,7 +560,8 @@ const ClientPublicPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">REMOTEWEB</h1>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">جاري التحميل...</p>
         </div>
       </div>
@@ -571,7 +572,8 @@ const ClientPublicPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">خطأ</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">REMOTEWEB</h1>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">خطأ</h2>
           <p className="text-gray-600">{error || 'لم يتم العثور على الحساب'}</p>
         </div>
       </div>
@@ -584,15 +586,17 @@ const ClientPublicPage = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 to-orange-50">
         <div className="max-w-md w-full mx-4">
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">REMOTEWEB</h1>
+            
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
               انتهت صلاحية الحساب
-            </h1>
+            </h2>
             
             <p className="text-gray-600 mb-6">
               عذراً، لقد انتهت صلاحية حساب <strong>{account.name}</strong> في تاريخ{' '}
@@ -642,6 +646,11 @@ const ClientPublicPage = () => {
         paddingRight: 'env(safe-area-inset-right)',
       }}
     >
+      {/* Add REMOTEWEB title overlay */}
+      <div className="absolute top-4 left-4 z-50 bg-black bg-opacity-50 rounded-lg px-3 py-1">
+        <h1 className="text-white font-bold text-lg tracking-wider">REMOTEWEB</h1>
+      </div>
+
       {/* SlideshowDisplay is now an overlay and manages its own visibility */}
       {account?.id && !subscriptionExpired && (
         <SlideshowDisplay accountId={account.id} onActivityChange={setIsSlideshowActive} />

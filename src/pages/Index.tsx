@@ -1,3 +1,4 @@
+
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import MobileDownloadButtons from '@/components/MobileDownloadButtons';
@@ -8,7 +9,9 @@ const Index = () => {
           <img src="/lovable-uploads/e3d01953-fe35-45d7-ac2b-e50bac917958.png" alt="TRNDSKY Logo" className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 object-contain" />
         </div>
         
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white tracking-wider mb-6 animate-pulse lg:text-lg">WELCOME</h1>
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white tracking-wider mb-2 animate-pulse">REMOTEWEB</h1>
+        
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white tracking-wider mb-6 opacity-90">WELCOME</h2>
         
         <div className="w-24 h-1 bg-gradient-to-r from-blue-400 to-purple-400 mx-auto rounded-full opacity-80 mb-6"></div>
         
