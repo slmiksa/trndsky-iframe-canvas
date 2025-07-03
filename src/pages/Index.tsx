@@ -56,7 +56,7 @@ const Index = () => {
           
           <Link to="/subscription-request" className="block">
             <Button size="lg" className="w-full bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
-              الإشتراك في النظام
+              للاشتراك والتجربة
             </Button>
           </Link>
         </div>
