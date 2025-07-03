@@ -16,6 +16,33 @@ const Index = () => {
         
         <p className="text-white text-lg sm:text-xl mb-8 font-medium">منصة إدارة  وتوحيد الشاشات والمواقع</p>
         
+        {/* قسم مزايا النظام */}
+        <div className="mb-8 bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+          <h3 className="text-xl font-bold text-white mb-6 text-center">النظام يمكنك من</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-white">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="w-3 h-3 bg-blue-400 rounded-full flex-shrink-0"></div>
+              <span className="text-sm sm:text-base">نقل موقع إلكتروني</span>
+            </div>
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="w-3 h-3 bg-purple-400 rounded-full flex-shrink-0"></div>
+              <span className="text-sm sm:text-base">إشعارات نصية وصور</span>
+            </div>
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="w-3 h-3 bg-blue-400 rounded-full flex-shrink-0"></div>
+              <span className="text-sm sm:text-base">شريط أخبار متحرك</span>
+            </div>
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="w-3 h-3 bg-purple-400 rounded-full flex-shrink-0"></div>
+              <span className="text-sm sm:text-base">سلايدات للمتاجر والشركات</span>
+            </div>
+            <div className="flex items-center space-x-3 rtl:space-x-reverse sm:col-span-2 justify-center">
+              <div className="w-3 h-3 bg-blue-400 rounded-full flex-shrink-0"></div>
+              <span className="text-sm sm:text-base">مؤقتات للبريك وأوقات الصلات</span>
+            </div>
+          </div>
+        </div>
+        
         <div className="space-y-3">
           <Link to="/login" className="block">
             <Button size="lg" className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg">
