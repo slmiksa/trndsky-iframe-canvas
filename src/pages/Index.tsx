@@ -36,9 +36,13 @@ const Index = () => {
               <div className="w-3 h-3 bg-purple-400 rounded-full flex-shrink-0"></div>
               <span className="text-sm sm:text-base">سلايدات للمتاجر والشركات</span>
             </div>
-            <div className="flex items-center space-x-3 rtl:space-x-reverse sm:col-span-2 justify-center">
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
               <div className="w-3 h-3 bg-blue-400 rounded-full flex-shrink-0"></div>
-              <span className="text-sm sm:text-base">مؤقتات للبريك وأوقات الصلات</span>
+              <span className="text-sm sm:text-base">مؤقتات تنازلية لأي غرض</span>
+            </div>
+            <div className="flex items-center space-x-3 rtl:space-x-reverse">
+              <div className="w-3 h-3 bg-purple-400 rounded-full flex-shrink-0"></div>
+              <span className="text-sm sm:text-base">التحكم بعدد شاشات غير محدود</span>
             </div>
           </div>
         </div>
