@@ -4,8 +4,8 @@ import MobileDownloadButtons from '@/components/MobileDownloadButtons';
 const Index = () => {
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-slate-900 p-4">
       <div className="text-center max-w-lg mx-auto">
-        <div className="flex justify-center mb-6">
-          <img src="/lovable-uploads/e3d01953-fe35-45d7-ac2b-e50bac917958.png" alt="TRNDSKY Logo" className="w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 object-contain" />
+        <div className="flex justify-center mb-3">
+          <img src="/lovable-uploads/e3d01953-fe35-45d7-ac2b-e50bac917958.png" alt="TRNDSKY Logo" className="w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 object-contain" />
         </div>
         
         
