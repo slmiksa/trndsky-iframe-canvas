@@ -276,26 +276,31 @@ const ClientDashboard = () => {
         )}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="websites" className="flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              {t('websites')}
+          <TabsList className="grid w-full grid-cols-5 gap-1">
+            <TabsTrigger value="websites" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Globe className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('websites')}</span>
+              <span className="sm:hidden">مواقع</span>
             </TabsTrigger>
-            <TabsTrigger value="slideshows" className="flex items-center gap-2">
-              <Images className="h-4 w-4" />
-              {t('slideshows')}
+            <TabsTrigger value="slideshows" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Images className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('slideshows')}</span>
+              <span className="sm:hidden">سلايد</span>
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              {t('notifications')}
+            <TabsTrigger value="notifications" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Bell className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('notifications')}</span>
+              <span className="sm:hidden">إشعارات</span>
             </TabsTrigger>
-            <TabsTrigger value="timers" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              {t('timers')}
+            <TabsTrigger value="timers" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('timers')}</span>
+              <span className="sm:hidden">مؤقت</span>
             </TabsTrigger>
-            <TabsTrigger value="news" className="flex items-center gap-2">
-              <Newspaper className="h-4 w-4" />
-              {t('news')}
+            <TabsTrigger value="news" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+              <Newspaper className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('news')}</span>
+              <span className="sm:hidden">أخبار</span>
             </TabsTrigger>
           </TabsList>
 
