@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 import MobileDownloadButtons from '@/components/MobileDownloadButtons';
 import AnimatedBackground from '@/components/AnimatedBackground';
+import Footer from '@/components/Footer';
 import { useLanguage } from '@/hooks/useLanguage';
 
 const Index = () => {
@@ -94,6 +95,9 @@ const Index = () => {
           <p className="text-white text-lg font-medium mb-4">{t('downloadApp')}</p>
           <MobileDownloadButtons />
         </div>
+        
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );

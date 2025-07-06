@@ -7,11 +7,11 @@ const Footer = () => {
   };
 
   return (
-    <footer className="mt-8 pt-4 border-t border-gray-200">
+    <footer className="mt-8 pt-4 pb-8">
       <div className="text-center">
         <button
           onClick={handleTrndSkyClick}
-          className="text-sm text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+          className="text-sm text-white/70 hover:text-white transition-colors cursor-pointer"
         >
           برمجة وتطوير TRNDSKY
         </button>
