@@ -95,7 +95,28 @@ const translations = {
     // Language
     'language': 'اللغة',
     'arabic': 'العربية',
-    'english': 'English'
+    'english': 'English',
+    
+    // Subscription Request Page
+    'back_to_home': 'العودة للصفحة الرئيسية',
+    'subscription_request_title': 'طلب الاشتراك في REMOTEWEB',
+    'subscription_request_subtitle': 'انضم إلى منصة TRNDSKY وابدأ في إدارة شاشاتك ومواقعك بكفاءة عالية',
+    'full_name': 'الاسم الكامل',
+    'full_name_placeholder': 'أدخل اسمك الكامل',
+    'email_placeholder': 'example@company.com',
+    'phone_number': 'رقم التواصل',
+    'phone_placeholder': '05xxxxxxxx',
+    'company_name': 'اسم الشركة',
+    'company_name_placeholder': 'أدخل اسم شركتك',
+    'submit_request': 'إرسال طلب الاشتراك',
+    'submitting': 'جاري الإرسال...',
+    'name_min_error': 'الاسم يجب أن يكون على الأقل حرفين',
+    'email_invalid_error': 'البريد الإلكتروني غير صحيح',
+    'phone_min_error': 'رقم الهاتف يجب أن يكون على الأقل 10 أرقام',
+    'company_required_error': 'اسم الشركة مطلوب',
+    'request_success': 'تم إرسال طلب الاشتراك بنجاح! سنتواصل معك قريباً.',
+    'email_warning': 'تم تسجيل طلبك بنجاح ولكن لم يتم إرسال الإيميل',
+    'request_error': 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.'
   },
   en: {
     // Header
@@ -180,7 +201,28 @@ const translations = {
     // Language
     'language': 'Language',
     'arabic': 'العربية',
-    'english': 'English'
+    'english': 'English',
+    
+    // Subscription Request Page
+    'back_to_home': 'Back to Home Page',
+    'subscription_request_title': 'REMOTEWEB Subscription Request',
+    'subscription_request_subtitle': 'Join TRNDSKY platform and start managing your screens and websites efficiently',
+    'full_name': 'Full Name',
+    'full_name_placeholder': 'Enter your full name',
+    'email_placeholder': 'example@company.com',
+    'phone_number': 'Contact Number',
+    'phone_placeholder': '05xxxxxxxx',
+    'company_name': 'Company Name',
+    'company_name_placeholder': 'Enter your company name',
+    'submit_request': 'Submit Subscription Request',
+    'submitting': 'Submitting...',
+    'name_min_error': 'Name must be at least 2 characters',
+    'email_invalid_error': 'Invalid email format',
+    'phone_min_error': 'Phone number must be at least 10 digits',
+    'company_required_error': 'Company name is required',
+    'request_success': 'Subscription request sent successfully! We will contact you soon.',
+    'email_warning': 'Your request was registered successfully but email could not be sent',
+    'request_error': 'An error occurred while sending the request. Please try again.'
   }
 };
 
