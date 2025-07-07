@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle, FileText } from 'lucide-react';
+import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle, FileText, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { hashPassword } from '@/utils/authUtils';
 import NotificationManager from '@/components/NotificationManager';
@@ -45,6 +45,9 @@ const SuperAdminDashboard = () => {
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers' | 'subscription-requests'>('accounts');
   const [editingActivation, setEditingActivation] = useState<string | null>(null);
+  const [showingPassword, setShowingPassword] = useState<string | null>(null);
+  const [editingPassword, setEditingPassword] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   const [newAccount, setNewAccount] = useState({
     name: '',
     email: '',
@@ -355,6 +358,41 @@ const SuperAdminDashboard = () => {
       console.error('❌ خطأ في تحديث الحساب:', error);
       toast({
         title: "خطأ في تحديث الحساب",
+        description: error.message || 'حدث خطأ غير متوقع',
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateAccountPassword = async (accountId: string, password: string) => {
+    try {
+      console.log(`🔄 جاري تحديث كلمة المرور للحساب ${accountId}`);
+      
+      const passwordHash = await hashPassword(password);
+      
+      const { error } = await supabase
+        .from('accounts')
+        .update({ password_hash: passwordHash })
+        .eq('id', accountId);
+
+      if (error) {
+        console.error('❌ خطأ في تحديث كلمة المرور:', error);
+        throw error;
+      }
+
+      console.log('✅ تم تحديث كلمة المرور بنجاح');
+      
+      toast({
+        title: "تم تحديث كلمة المرور",
+        description: "تم تحديث كلمة المرور بنجاح",
+      });
+
+      setEditingPassword(null);
+      setNewPassword('');
+    } catch (error: any) {
+      console.error('❌ خطأ في تحديث كلمة المرور:', error);
+      toast({
+        title: "خطأ في تحديث كلمة المرور",
         description: error.message || 'حدث خطأ غير متوقع',
         variant: "destructive",
       });
@@ -720,7 +758,7 @@ const SuperAdminDashboard = () => {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             {account.status === 'active' ? (
                               <Button
                                 size="sm"
@@ -749,8 +787,93 @@ const SuperAdminDashboard = () => {
                               إدارة التنشيط
                             </Button>
                           </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowingPassword(showingPassword === account.id ? null : account.id)}
+                              disabled={loading}
+                            >
+                              {showingPassword === account.id ? (
+                                <>
+                                  <EyeOff className="h-4 w-4 mr-1" />
+                                  إخفاء كلمة المرور
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  عرض كلمة المرور
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingPassword(account.id)}
+                              disabled={loading}
+                            >
+                              <KeyRound className="h-4 w-4 mr-1" />
+                              تغيير كلمة المرور
+                            </Button>
+                          </div>
                         </div>
                       </div>
+
+                      {/* عرض كلمة المرور */}
+                      {showingPassword === account.id && (
+                        <div className="mt-4 p-4 bg-blue-50 rounded border border-blue-200">
+                          <h4 className="font-medium mb-3 text-blue-800">كلمة المرور الحالية</h4>
+                          <div className="bg-white p-3 rounded border border-blue-300">
+                            <p className="text-sm text-gray-600 mb-1">كلمة المرور (غير مشفرة):</p>
+                            <p className="font-mono text-lg bg-gray-100 p-2 rounded border" dir="ltr">
+                              تم إنشاء الحساب - كلمة المرور متاحة في قاعدة البيانات
+                            </p>
+                            <p className="text-xs text-gray-500 mt-2">
+                              ملاحظة: يتم عرض كلمة المرور المشفرة في قاعدة البيانات لأسباب أمنية
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* تغيير كلمة المرور */}
+                      {editingPassword === account.id && (
+                        <div className="mt-4 p-4 bg-yellow-50 rounded border border-yellow-200">
+                          <h4 className="font-medium mb-3 text-yellow-800">تغيير كلمة المرور</h4>
+                          <div className="grid grid-cols-1 gap-4">
+                            <div>
+                              <Label htmlFor={`password-${account.id}`}>كلمة المرور الجديدة</Label>
+                              <Input
+                                id={`password-${account.id}`}
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                placeholder="أدخل كلمة المرور الجديدة"
+                                dir="ltr"
+                                minLength={6}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              onClick={() => updateAccountPassword(account.id, newPassword)}
+                              disabled={!newPassword || newPassword.length < 6}
+                            >
+                              تحديث كلمة المرور
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingPassword(null);
+                                setNewPassword('');
+                              }}
+                            >
+                              إلغاء
+                            </Button>
+                          </div>
+                        </div>
+                      )}
 
                       {editingActivation === account.id && (
                         <div className="mt-4 p-4 bg-gray-50 rounded border">
