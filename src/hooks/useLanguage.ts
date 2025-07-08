@@ -16,6 +16,10 @@ interface Translations {
   subscribeAndTry: string;
   reliablePlatform: string;
   downloadApp: string;
+  downloadButtonText: string;
+  addToHomeScreen: string;
+  addToHomeScreenInstructions: string;
+  understood: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -32,7 +36,11 @@ const translations: Record<Language, Translations> = {
     loginSystem: 'دخول النظام',
     subscribeAndTry: 'للاشتراك والتجربة',
     reliablePlatform: 'منصة موثوقة لخلق بيئة عمل ممتازة',
-    downloadApp: 'تحميل التطبيق'
+    downloadApp: 'تحميل التطبيق',
+    downloadButtonText: 'آيل / أندرويد',
+    addToHomeScreen: 'إضافة إلى الشاشة الرئيسية',
+    addToHomeScreenInstructions: 'لإضافة هذا الموقع إلى شاشتك الرئيسية كتطبيق، اتبع الخطوات الخاصة بمتصفحك. على أجهزة آيفون، اضغط على زر المشاركة ثم \'إضافة إلى الشاشة الرئيسية\'. على أجهزة أندرويد، اضغط على قائمة الخيارات (ثلاث نقاط) ثم \'تثبيت التطبيق\' أو \'إضافة إلى الشاشة الرئيسية\'.',
+    understood: 'فهمت'
   },
   en: {
     welcome: 'WELCOME',
@@ -47,7 +55,11 @@ const translations: Record<Language, Translations> = {
     loginSystem: 'Login System',
     subscribeAndTry: 'Subscribe & Try',
     reliablePlatform: 'Reliable platform for creating an excellent work environment',
-    downloadApp: 'Download App'
+    downloadApp: 'Download App',
+    downloadButtonText: 'Apple / Android',
+    addToHomeScreen: 'Add to Home Screen',
+    addToHomeScreenInstructions: 'To add this website to your home screen as an app, follow the steps for your browser. On iPhone, tap the share button then \'Add to Home Screen\'. On Android, tap the options menu (three dots) then \'Install app\' or \'Add to Home Screen\'.',
+    understood: 'Got it'
   }
 };
 
