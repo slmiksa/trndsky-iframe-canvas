@@ -8,6 +8,7 @@ import NotificationPopup from '@/components/NotificationPopup';
 import BreakTimerDisplay from '@/components/BreakTimerDisplay';
 import NewsTickerDisplay from '@/components/NewsTickerDisplay';
 import SlideshowDisplay from '@/components/SlideshowDisplay';
+import VideoDisplay from '@/components/VideoDisplay';
 import MobileDownloadButtons from '@/components/MobileDownloadButtons';
 
 interface Account {
@@ -65,6 +66,7 @@ const ClientPublicPage = () => {
   const [currentErrorMessage, setCurrentErrorMessage] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [isSlideshowActive, setIsSlideshowActive] = useState(false);
+  const [isVideoActive, setIsVideoActive] = useState(false);
 
   const { fetchActiveNotifications } = useNotifications();
   const { fetchActiveTimers } = useBreakTimers();
@@ -656,8 +658,13 @@ const ClientPublicPage = () => {
         <SlideshowDisplay accountId={account.id} onActivityChange={setIsSlideshowActive} />
       )}
 
-      {/* Render websites and other overlays only if slideshow is not active */}
-      {!isSlideshowActive && (
+      {/* VideoDisplay is now an overlay and manages its own visibility */}
+      {account?.id && !subscriptionExpired && (
+        <VideoDisplay accountId={account.id} onActivityChange={setIsVideoActive} />
+      )}
+
+      {/* Render websites and other overlays only if slideshow or video is not active */}
+      {!isSlideshowActive && !isVideoActive && (
         <>
           {/* Enhanced Loading indicator */}
           {(iframeLoading && currentWebsite) && (
@@ -791,6 +798,7 @@ const ClientPublicPage = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute bottom-0 left-0 bg-black bg-opacity-75 text-white text-xs p-2 z-50">
           <div>🎬 سلايدات نشطة: {isSlideshowActive ? 'نعم' : 'لا'}</div>
+          <div>🎥 فيديو نشط: {isVideoActive ? 'نعم' : 'لا'}</div>
         </div>
       )}
     </div>
