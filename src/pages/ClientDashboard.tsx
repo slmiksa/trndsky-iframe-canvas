@@ -20,7 +20,6 @@ import BranchManager from '@/components/BranchManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import LanguageToggle from '@/components/LanguageToggle';
 import Footer from '@/components/Footer';
-
 interface Website {
   id: string;
   website_url: string;
@@ -34,9 +33,14 @@ interface AccountInfo {
   status: 'active' | 'suspended' | 'pending';
 }
 const ClientDashboard = () => {
-  const { signOut, accountId, user } = useAuth();
-  const { t } = useLanguage();
-  
+  const {
+    signOut,
+    accountId,
+    user
+  } = useAuth();
+  const {
+    t
+  } = useLanguage();
   const [websites, setWebsites] = useState<Website[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -121,7 +125,9 @@ const ClientDashboard = () => {
         url: newWebsite.url,
         title: newWebsite.title
       });
-      const { error } = await supabase.from('account_websites').insert({
+      const {
+        error
+      } = await supabase.from('account_websites').insert({
         account_id: accountId,
         website_url: newWebsite.url,
         website_title: newWebsite.title || null,
@@ -136,7 +142,10 @@ const ClientDashboard = () => {
         title: t('website_added_successfully'),
         description: `${newWebsite.title || newWebsite.url}`
       });
-      setNewWebsite({ url: '', title: '' });
+      setNewWebsite({
+        url: '',
+        title: ''
+      });
       setShowAddForm(false);
       fetchWebsites();
     } catch (error: any) {
@@ -152,26 +161,28 @@ const ClientDashboard = () => {
   };
   const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
     try {
-      console.log('🔄 Toggling website status:', { websiteId, currentStatus });
-
+      console.log('🔄 Toggling website status:', {
+        websiteId,
+        currentStatus
+      });
       if (!currentStatus) {
         console.log('🛑 إيقاف جميع المواقع النشطة قبل تفعيل الموقع الجديد');
-        const { error: deactivateError } = await supabase
-          .from('account_websites')
-          .update({ is_active: false })
-          .eq('account_id', accountId)
-          .eq('is_active', true);
+        const {
+          error: deactivateError
+        } = await supabase.from('account_websites').update({
+          is_active: false
+        }).eq('account_id', accountId).eq('is_active', true);
         if (deactivateError) {
           console.error('❌ خطأ في إيقاف المواقع النشطة:', deactivateError);
           throw deactivateError;
         }
         console.log('✅ تم إيقاف جميع المواقع النشطة');
       }
-
-      const { error } = await supabase
-        .from('account_websites')
-        .update({ is_active: !currentStatus })
-        .eq('id', websiteId);
+      const {
+        error
+      } = await supabase.from('account_websites').update({
+        is_active: !currentStatus
+      }).eq('id', websiteId);
       if (error) {
         console.error('❌ Error updating website status:', error);
         throw error;
@@ -195,7 +206,9 @@ const ClientDashboard = () => {
   const deleteWebsite = async (websiteId: string) => {
     try {
       console.log('🗑️ Deleting website:', websiteId);
-      const { error } = await supabase.from('account_websites').delete().eq('id', websiteId);
+      const {
+        error
+      } = await supabase.from('account_websites').delete().eq('id', websiteId);
       if (error) {
         console.error('❌ Error deleting website:', error);
         throw error;
@@ -232,16 +245,14 @@ const ClientDashboard = () => {
       window.open(publicUrl, '_blank');
     }
   };
-  return (
-    <div className="min-h-screen bg-gray-50">
+  return <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{t('client_dashboard')}</h1>
               {accountId && <p className="text-sm text-gray-600">{t('account_id')}: {accountId}</p>}
-              {accountName && (
-                <div className="flex items-center gap-2 mt-2">
+              {accountName && <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-xs">
                     {t('public_page')}: /client/{accountName}
                   </Badge>
@@ -251,8 +262,7 @@ const ClientDashboard = () => {
                   <Button size="sm" variant="ghost" onClick={openPublicPage}>
                     <ExternalLink className="h-3 w-3" />
                   </Button>
-                </div>
-              )}
+                </div>}
             </div>
             <div className="flex items-center gap-3">
               <LanguageToggle />
@@ -266,19 +276,12 @@ const ClientDashboard = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Account Status Card */}
-        {accountInfo && (
-          <div className="mb-6">
-            <AccountStatusCard 
-              activationStartDate={accountInfo.activation_start_date} 
-              activationEndDate={accountInfo.activation_end_date} 
-              status={accountInfo.status} 
-              accountName={accountName} 
-            />
-          </div>
-        )}
+        {accountInfo && <div className="mb-6">
+            <AccountStatusCard activationStartDate={accountInfo.activation_start_date} activationEndDate={accountInfo.activation_end_date} status={accountInfo.status} accountName={accountName} />
+          </div>}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7 gap-1">
+          <TabsList className="grid w-full grid-cols-7 gap-1 px-[116px] py-0 my-0 mx-[8px] bg-slate-50">
             <TabsTrigger value="websites" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
               <Globe className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               <span className="hidden sm:inline">{t('websites')}</span>
@@ -336,26 +339,14 @@ const ClientDashboard = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {loading ? (
-                      <div className="text-center py-8">
+                    {loading ? <div className="text-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
                         <p className="mt-2 text-gray-600">{t('loading')}</p>
-                      </div>
-                    ) : websites.length === 0 ? (
-                      <div className="text-center py-8">
+                      </div> : websites.length === 0 ? <div className="text-center py-8">
                         <Globe className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                         <p className="text-gray-600">{t('no_websites_yet')}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {websites.map(website => (
-                          <div 
-                            key={website.id} 
-                            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                              selectedWebsite?.id === website.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
-                            }`} 
-                            onClick={() => setSelectedWebsite(website)}
-                          >
+                      </div> : <div className="space-y-4">
+                        {websites.map(website => <div key={website.id} className={`border rounded-lg p-4 cursor-pointer transition-colors ${selectedWebsite?.id === website.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'}`} onClick={() => setSelectedWebsite(website)}>
                             <div className="flex justify-between items-start mb-2">
                               <h3 className="font-semibold">
                                 {website.website_title || t('no_title_website')}
@@ -364,24 +355,16 @@ const ClientDashboard = () => {
                                 <Badge variant={website.is_active ? "default" : "secondary"}>
                                   {website.is_active ? t('active') : t('stopped')}
                                 </Badge>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleWebsiteStatus(website.id, website.is_active);
-                                  }}
-                                >
+                                <Button size="sm" variant="ghost" onClick={e => {
+                            e.stopPropagation();
+                            toggleWebsiteStatus(website.id, website.is_active);
+                          }}>
                                   {website.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteWebsite(website.id);
-                                  }}
-                                >
+                                <Button size="sm" variant="ghost" onClick={e => {
+                            e.stopPropagation();
+                            deleteWebsite(website.id);
+                          }}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -392,54 +375,42 @@ const ClientDashboard = () => {
                             <p className="text-xs text-gray-500">
                               {new Date(website.created_at).toLocaleDateString('ar-SA')}
                             </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          </div>)}
+                      </div>}
 
                     {/* نموذج إضافة موقع */}
-                    {showAddForm && (
-                      <div className="mt-6 border-t pt-6">
+                    {showAddForm && <div className="mt-6 border-t pt-6">
                         <form onSubmit={addWebsite} className="space-y-4">
                           <div>
                             <Label htmlFor="url">{t('website_url')}</Label>
-                            <Input 
-                              id="url" 
-                              type="url" 
-                              value={newWebsite.url} 
-                              onChange={(e) => setNewWebsite({ ...newWebsite, url: e.target.value })} 
-                              placeholder="https://example.com" 
-                              required 
-                            />
+                            <Input id="url" type="url" value={newWebsite.url} onChange={e => setNewWebsite({
+                          ...newWebsite,
+                          url: e.target.value
+                        })} placeholder="https://example.com" required />
                           </div>
                           <div>
                             <Label htmlFor="title">{t('website_title')}</Label>
-                            <Input 
-                              id="title" 
-                              type="text" 
-                              value={newWebsite.title} 
-                              onChange={(e) => setNewWebsite({ ...newWebsite, title: e.target.value })} 
-                              placeholder={t('website_name')} 
-                            />
+                            <Input id="title" type="text" value={newWebsite.title} onChange={e => setNewWebsite({
+                          ...newWebsite,
+                          title: e.target.value
+                        })} placeholder={t('website_name')} />
                           </div>
                           <div className="flex gap-2">
                             <Button type="submit" disabled={loading}>
                               {t('add')}
                             </Button>
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              onClick={() => {
-                                setShowAddForm(false);
-                                setNewWebsite({ url: '', title: '' });
-                              }}
-                            >
+                            <Button type="button" variant="outline" onClick={() => {
+                          setShowAddForm(false);
+                          setNewWebsite({
+                            url: '',
+                            title: ''
+                          });
+                        }}>
                               {t('cancel')}
                             </Button>
                           </div>
                         </form>
-                      </div>
-                    )}
+                      </div>}
                   </CardContent>
                 </Card>
               </div>
@@ -451,28 +422,17 @@ const ClientDashboard = () => {
                     <CardTitle>
                       {selectedWebsite ? selectedWebsite.website_title || t('website_preview') : t('website_preview')}
                     </CardTitle>
-                    {selectedWebsite && (
-                      <p className="text-sm text-gray-600 break-all">
+                    {selectedWebsite && <p className="text-sm text-gray-600 break-all">
                         {selectedWebsite.website_url}
-                      </p>
-                    )}
+                      </p>}
                   </CardHeader>
                   <CardContent className="h-96 lg:h-[500px]">
-                    {selectedWebsite ? (
-                      <iframe 
-                        src={selectedWebsite.website_url} 
-                        className="w-full h-full border rounded-lg" 
-                        title={selectedWebsite.website_title || 'Website Preview'} 
-                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups" 
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+                    {selectedWebsite ? <iframe src={selectedWebsite.website_url} className="w-full h-full border rounded-lg" title={selectedWebsite.website_title || 'Website Preview'} sandbox="allow-scripts allow-same-origin allow-forms allow-popups" /> : <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
                         <div className="text-center text-gray-500">
                           <Globe className="h-16 w-16 mx-auto mb-4 opacity-50" />
                           <p>{t('select_website_preview')}</p>
                         </div>
-                      </div>
-                    )}
+                      </div>}
                   </CardContent>
                 </Card>
               </div>
@@ -506,8 +466,6 @@ const ClientDashboard = () => {
       </main>
 
       <Footer />
-    </div>
-  );
+    </div>;
 };
-
 export default ClientDashboard;
