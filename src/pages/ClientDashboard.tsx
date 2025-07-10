@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info, Newspaper, Images, Video } from 'lucide-react';
+import { Plus, Globe, Eye, EyeOff, ExternalLink, Share2, Trash2, Bell, Clock, Info, Newspaper, Images, Video, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -16,6 +16,7 @@ import BreakTimerManager from '@/components/BreakTimerManager';
 import NewsTickerManager from '@/components/NewsTickerManager';
 import SlideshowManager from '@/components/SlideshowManager';
 import VideoManager from '@/components/VideoManager';
+import BranchManager from '@/components/BranchManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import LanguageToggle from '@/components/LanguageToggle';
 import Footer from '@/components/Footer';
@@ -277,7 +278,7 @@ const ClientDashboard = () => {
         )}
 
         <Tabs defaultValue="websites" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 gap-1">
+          <TabsList className="grid w-full grid-cols-7 gap-1">
             <TabsTrigger value="websites" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
               <Globe className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               <span className="hidden sm:inline">{t('websites')}</span>
@@ -307,6 +308,11 @@ const ClientDashboard = () => {
               <Newspaper className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
               <span className="hidden sm:inline">{t('news')}</span>
               <span className="sm:hidden">{t('news')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="branches" className="flex items-center gap-1 text-xs sm:text-sm px-2 sm:px-3">
+              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">{t('branches_management')}</span>
+              <span className="sm:hidden">{t('branches_management')}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -491,6 +497,10 @@ const ClientDashboard = () => {
 
           <TabsContent value="news">
             {accountId && <NewsTickerManager accountId={accountId} />}
+          </TabsContent>
+          
+          <TabsContent value="branches">
+            {accountId && <BranchManager accountId={accountId} />}
           </TabsContent>
         </Tabs>
       </main>
