@@ -29,6 +29,7 @@ const App: React.FC = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/client/:accountId" element={<ClientPublicPage />} />
+              <Route path="/client/:accountId/:branchPath" element={<ClientPublicPage />} />
               <Route path="/tv" element={<ClientPublicPage />} />
               <Route path="/subscription-request" element={<SubscriptionRequest />} />
               <Route path="*" element={<NotFound />} />
