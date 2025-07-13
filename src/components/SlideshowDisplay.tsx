@@ -44,17 +44,19 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
       let filteredSlideshows = data || [];
       
       if (branchId) {
-        // If we're in a specific branch, show only that branch's content OR global content (no branch association)
+        // If we're in a specific branch, show ONLY that branch's content (not global content)
         filteredSlideshows = filteredSlideshows.filter(slide => {
           const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
-          return !slideBranchId || slideBranchId === branchId;
+          return slideBranchId === branchId;
         });
+        console.log(`🔍 Branch ${branchId}: Found ${filteredSlideshows.length} branch-specific slideshows`);
       } else {
         // If we're in main account view, show only global content (no branch association)
         filteredSlideshows = filteredSlideshows.filter(slide => {
           const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
           return !slideBranchId;
         });
+        console.log(`🔍 Main account: Found ${filteredSlideshows.length} global slideshows`);
       }
 
       const firstActiveSlide = filteredSlideshows.find(slide => slide.is_active) || null;

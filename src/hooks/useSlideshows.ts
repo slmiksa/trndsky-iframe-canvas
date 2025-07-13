@@ -61,16 +61,62 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
     }
   };
 
-  const createSlideshow = async (slideshowData: Omit<Slideshow, 'id' | 'created_at' | 'updated_at'>) => {
+  const uploadImage = async (file: File, accountId: string): Promise<string> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${accountId}/${Date.now()}.${fileExt}`;
+      
+      console.log('📤 Uploading image:', fileName);
+      
+      const { data, error } = await supabase.storage
+        .from('slideshow-images')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('❌ Error uploading image:', error);
+        throw error;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('slideshow-images')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Image uploaded successfully:', publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('❌ Error in uploadImage:', error);
+      throw error;
+    }
+  };
+
+  const createSlideshow = async (slideshowData: Omit<Slideshow, 'id' | 'created_at' | 'updated_at'>, imageFiles?: File[]) => {
     try {
       console.log('➕ Creating slideshow:', slideshowData);
+      
+      let imageUrls: string[] = [];
+      
+      // Upload images if provided
+      if (imageFiles && imageFiles.length > 0) {
+        console.log('📤 Uploading', imageFiles.length, 'images...');
+        const uploadPromises = imageFiles.map(file => uploadImage(file, slideshowData.account_id));
+        imageUrls = await Promise.all(uploadPromises);
+      } else {
+        // Use existing image URLs if no new files
+        imageUrls = slideshowData.images;
+      }
       
       // Remove branch_id from the data since it's not in the database schema yet
       const { branch_id, ...dataWithoutBranchId } = slideshowData;
       
+      const finalData = {
+        ...dataWithoutBranchId,
+        images: imageUrls
+      };
+      
       const { data, error } = await supabase
         .from('account_slideshows')
-        .insert(dataWithoutBranchId)
+        .insert(finalData)
         .select();
 
       if (error) {

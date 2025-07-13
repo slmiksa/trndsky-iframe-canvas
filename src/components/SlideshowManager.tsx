@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,8 +77,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
     const files = Array.from(e.target.files || []);
     setSelectedImages(files);
 
-    const imageUrls = files.map(file => URL.createObjectURL(file));
-    setNewSlideshow({ ...newSlideshow, images: imageUrls });
+    // Create preview URLs for display only
+    const previewUrls = files.map(file => URL.createObjectURL(file));
+    setNewSlideshow({ ...newSlideshow, images: previewUrls });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,7 +94,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
       return;
     }
 
-    if (newSlideshow.images.length === 0) {
+    if (selectedImages.length === 0) {
       toast({
         title: "خطأ",
         description: 'يرجى رفع صورة واحدة على الأقل',
@@ -109,17 +109,25 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
       const slideshowData = {
         account_id: accountId,
         title: newSlideshow.title,
-        images: newSlideshow.images,
+        images: [], // Will be populated after upload
         interval_seconds: newSlideshow.interval_seconds,
         is_active: true,
         branch_id: branchId,
       };
 
-      const result = await createSlideshow(slideshowData);
+      // Pass the actual files for upload
+      const result = await createSlideshow(slideshowData, selectedImages);
 
       toast({
         title: "نجح",
         description: 'تم إضافة السلايدات بنجاح',
+      });
+
+      // Clean up preview URLs
+      newSlideshow.images.forEach(url => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
       });
 
       setNewSlideshow({
@@ -236,9 +244,21 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                     required
                   />
                   {selectedImages.length > 0 && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      عدد الصور: {selectedImages.length}
-                    </p>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-2">
+                        عدد الصور: {selectedImages.length}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {newSlideshow.images.map((url, index) => (
+                          <img
+                            key={index}
+                            src={url}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-16 object-cover rounded border"
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
                 <div>
@@ -257,12 +277,26 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSubmitting} className="flex-1">
-                    {isSubmitting ? 'جاري الإرسال...' : 'إضافة'}
+                    {isSubmitting ? 'جاري الرفع والحفظ...' : 'إضافة'}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowAddForm(false)}
+                    onClick={() => {
+                      // Clean up preview URLs
+                      newSlideshow.images.forEach(url => {
+                        if (url.startsWith('blob:')) {
+                          URL.revokeObjectURL(url);
+                        }
+                      });
+                      setShowAddForm(false);
+                      setNewSlideshow({
+                        title: '',
+                        images: [],
+                        interval_seconds: 5,
+                      });
+                      setSelectedImages([]);
+                    }}
                   >
                     {t('cancel')}
                   </Button>
