@@ -52,45 +52,37 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
   const { t } = useLanguage();
 
   useEffect(() => {
-    fetchBranches();
+    // For now, we'll use local storage as a temporary solution
+    // until the account_branches table is properly set up in the database
+    loadBranchesFromStorage();
   }, [accountId]);
 
-  const fetchBranches = async () => {
+  const loadBranchesFromStorage = () => {
     try {
-      console.log('🔍 Fetching branches for account:', accountId);
-      
-      const { data, error } = await supabase
-        .rpc('get_account_branches', { account_id_param: accountId });
-
-      if (error) {
-        console.error('❌ Error fetching branches via RPC:', error);
-        // Fallback to direct query
-        const { data: directData, error: directError } = await supabase
-          .from('account_branches')
-          .select('*')
-          .eq('account_id', accountId)
-          .order('created_at', { ascending: true });
-        
-        if (directError) {
-          console.error('❌ Error fetching branches directly:', directError);
-          throw directError;
-        }
-        
-        console.log('✅ Branches fetched via direct query:', directData);
-        setBranches(directData || []);
+      console.log('🔍 Loading branches from localStorage for account:', accountId);
+      const stored = localStorage.getItem(`branches_${accountId}`);
+      if (stored) {
+        const parsedBranches = JSON.parse(stored);
+        setBranches(parsedBranches);
+        console.log('✅ Branches loaded from localStorage:', parsedBranches);
       } else {
-        console.log('✅ Branches fetched via RPC:', data);
-        setBranches(data || []);
+        setBranches([]);
+        console.log('ℹ️ No branches found in localStorage for account:', accountId);
       }
     } catch (error) {
-      console.error('Error fetching branches:', error);
-      toast({
-        title: t('error'),
-        description: t('failed_to_load_branches'),
-        variant: 'destructive',
-      });
+      console.error('Error loading branches from localStorage:', error);
+      setBranches([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveBranchesToStorage = (updatedBranches: Branch[]) => {
+    try {
+      localStorage.setItem(`branches_${accountId}`, JSON.stringify(updatedBranches));
+      console.log('💾 Branches saved to localStorage:', updatedBranches);
+    } catch (error) {
+      console.error('Error saving branches to localStorage:', error);
     }
   };
 
@@ -111,56 +103,18 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         branch_path: newBranchPath.trim(),
       });
 
-      // Check current user authentication
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('👤 Current user:', user?.id);
+      const newBranch: Branch = {
+        id: `branch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        account_id: accountId,
+        branch_name: newBranchName.trim(),
+        branch_path: newBranchPath.trim(),
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
 
-      // Try using the RPC function first
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('create_account_branch', {
-          account_id_param: accountId,
-          branch_name_param: newBranchName.trim(),
-          branch_path_param: newBranchPath.trim()
-        });
-
-      if (rpcError) {
-        console.error('❌ Error creating branch via RPC:', rpcError);
-        
-        // Fallback to direct insert
-        const { data: insertData, error: insertError } = await supabase
-          .from('account_branches')
-          .insert({
-            account_id: accountId,
-            branch_name: newBranchName.trim(),
-            branch_path: newBranchPath.trim(),
-            is_active: true,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('❌ Error creating branch via direct insert:', insertError);
-          throw insertError;
-        }
-
-        console.log('✅ Branch created via direct insert:', insertData);
-        setBranches([...branches, insertData]);
-      } else {
-        console.log('✅ Branch created via RPC, ID:', rpcData);
-        // Fetch the created branch details
-        const { data: newBranch, error: fetchError } = await supabase
-          .from('account_branches')
-          .select('*')
-          .eq('id', rpcData)
-          .single();
-        
-        if (!fetchError && newBranch) {
-          setBranches([...branches, newBranch]);
-        } else {
-          // Refetch all branches if we can't get the specific one
-          fetchBranches();
-        }
-      }
+      const updatedBranches = [...branches, newBranch];
+      setBranches(updatedBranches);
+      saveBranchesToStorage(updatedBranches);
 
       setNewBranchName('');
       setNewBranchPath('');
@@ -184,34 +138,14 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     if (!editingBranch || !newBranchName.trim() || !newBranchPath.trim()) return;
 
     try {
-      const { error } = await supabase
-        .rpc('update_account_branch', {
-          branch_id_param: editingBranch.id,
-          branch_name_param: newBranchName.trim(),
-          branch_path_param: newBranchPath.trim(),
-        });
-
-      if (error) {
-        console.error('❌ Error updating branch via RPC:', error);
-        
-        // Fallback to direct update
-        const { data: updateData, error: updateError } = await supabase
-          .from('account_branches')
-          .update({
-            branch_name: newBranchName.trim(),
-            branch_path: newBranchPath.trim(),
-          })
-          .eq('id', editingBranch.id)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-        
-        setBranches(branches.map(b => b.id === editingBranch.id ? updateData : b));
-      } else {
-        // Refetch branches after RPC update
-        fetchBranches();
-      }
+      const updatedBranches = branches.map(b => 
+        b.id === editingBranch.id 
+          ? { ...b, branch_name: newBranchName.trim(), branch_path: newBranchPath.trim() }
+          : b
+      );
+      
+      setBranches(updatedBranches);
+      saveBranchesToStorage(updatedBranches);
 
       setEditingBranch(null);
       setNewBranchName('');
@@ -233,22 +167,9 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const handleDeleteBranch = async (branchId: string) => {
     try {
-      const { error: rpcError } = await supabase
-        .rpc('delete_account_branch', { branch_id_param: branchId });
-
-      if (rpcError) {
-        console.error('❌ Error deleting branch via RPC:', rpcError);
-        
-        // Fallback to direct delete
-        const { error: deleteError } = await supabase
-          .from('account_branches')
-          .delete()
-          .eq('id', branchId);
-
-        if (deleteError) throw deleteError;
-      }
-
-      setBranches(branches.filter(b => b.id !== branchId));
+      const updatedBranches = branches.filter(b => b.id !== branchId);
+      setBranches(updatedBranches);
+      saveBranchesToStorage(updatedBranches);
       
       toast({
         title: t('success'),
@@ -266,30 +187,12 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const toggleBranchStatus = async (branchId: string, currentStatus: boolean) => {
     try {
-      const { error: rpcError } = await supabase
-        .rpc('toggle_branch_status', {
-          branch_id_param: branchId,
-          new_status: !currentStatus
-        });
-
-      if (rpcError) {
-        console.error('❌ Error toggling branch status via RPC:', rpcError);
-        
-        // Fallback to direct update
-        const { data, error: updateError } = await supabase
-          .from('account_branches')
-          .update({ is_active: !currentStatus })
-          .eq('id', branchId)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-        
-        setBranches(branches.map(b => b.id === branchId ? data : b));
-      } else {
-        // Refetch branches after RPC update
-        fetchBranches();
-      }
+      const updatedBranches = branches.map(b => 
+        b.id === branchId ? { ...b, is_active: !currentStatus } : b
+      );
+      
+      setBranches(updatedBranches);
+      saveBranchesToStorage(updatedBranches);
       
       toast({
         title: t('success'),
