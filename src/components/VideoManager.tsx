@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ interface Video {
   video_url: string;
   is_active: boolean;
   created_at: string;
+  account_id: string;
 }
 
 interface VideoManagerProps {
@@ -35,13 +37,21 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
   const fetchVideos = async () => {
     try {
       setLoading(true);
-      // For now, return empty array since the table doesn't exist yet
-      setVideos([]);
-      toast({
-        title: "معلومة",
-        description: "ميزة الفيديوهات قيد التطوير - ستكون متاحة قريباً",
-        variant: "default"
-      });
+      console.log('🎥 Fetching videos for account:', accountId, 'branch:', branchId);
+      
+      const { data, error } = await (supabase as any)
+        .from('account_videos')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error fetching videos:', error);
+        throw error;
+      }
+
+      console.log('✅ Videos fetched:', data);
+      setVideos(data || []);
     } catch (error) {
       console.error('Error fetching videos:', error);
       toast({
@@ -69,16 +79,45 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       });
       return;
     }
+    
     try {
       setIsCreating(true);
+      console.log('🎥 Creating video:', { title: newVideoTitle, url: newVideoUrl });
 
-      // For now, just show a placeholder message
+      const { data, error } = await (supabase as any)
+        .from('account_videos')
+        .insert([
+          {
+            account_id: accountId,
+            title: newVideoTitle.trim(),
+            video_url: newVideoUrl.trim(),
+            is_active: false
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error creating video:', error);
+        throw error;
+      }
+
+      console.log('✅ Video created successfully:', data);
+      
+      // Store branch association in localStorage if branchId exists
+      if (branchId && data) {
+        localStorage.setItem(`video_branch_${data.id}`, branchId);
+        console.log(`📍 Video ${data.id} associated with branch: ${branchId}`);
+      }
+
       toast({
-        title: "قريباً",
-        description: "ميزة الفيديوهات قيد التطوير - ستكون متاحة قريباً"
+        title: "تم بنجاح",
+        description: "تم إضافة الفيديو بنجاح",
       });
+
       setNewVideoTitle('');
       setNewVideoUrl('');
+      fetchVideos(); // Refresh the list
     } catch (error) {
       console.error('Error creating video:', error);
       toast({
@@ -100,13 +139,34 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       });
       return;
     }
+    
     try {
-      // For now, just show a placeholder message
+      console.log('🎥 Updating video:', editingVideo.id);
+
+      const { data, error } = await (supabase as any)
+        .from('account_videos')
+        .update({
+          title: editingVideo.title.trim(),
+          video_url: editingVideo.video_url.trim(),
+        })
+        .eq('id', editingVideo.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error updating video:', error);
+        throw error;
+      }
+
+      console.log('✅ Video updated successfully:', data);
+      
       toast({
-        title: "قريباً",
-        description: "ميزة الفيديوهات قيد التطوير - ستكون متاحة قريباً"
+        title: "تم بنجاح",
+        description: "تم تحديث الفيديو بنجاح",
       });
+
       setEditingVideo(null);
+      fetchVideos(); // Refresh the list
     } catch (error) {
       console.error('Error updating video:', error);
       toast({
@@ -119,11 +179,26 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
   const toggleVideoStatus = async (videoId: string, currentStatus: boolean) => {
     try {
-      // For now, just show a placeholder message
+      console.log('🎥 Toggling video status:', videoId, 'from', currentStatus, 'to', !currentStatus);
+
+      const { error } = await (supabase as any)
+        .from('account_videos')
+        .update({ is_active: !currentStatus })
+        .eq('id', videoId);
+
+      if (error) {
+        console.error('❌ Error toggling video status:', error);
+        throw error;
+      }
+
+      console.log('✅ Video status toggled successfully');
+      
       toast({
-        title: "قريباً",
-        description: "ميزة الفيديوهات قيد التطوير - ستكون متاحة قريباً"
+        title: "تم بنجاح",
+        description: !currentStatus ? "تم تفعيل الفيديو" : "تم إيقاف الفيديو",
       });
+      
+      fetchVideos(); // Refresh the list
     } catch (error) {
       console.error('Error toggling video status:', error);
       toast({
@@ -136,11 +211,29 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
   const deleteVideo = async (videoId: string) => {
     try {
-      // For now, just show a placeholder message
+      console.log('🎥 Deleting video:', videoId);
+
+      const { error } = await (supabase as any)
+        .from('account_videos')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) {
+        console.error('❌ Error deleting video:', error);
+        throw error;
+      }
+
+      console.log('✅ Video deleted successfully');
+      
+      // Remove branch association from localStorage
+      localStorage.removeItem(`video_branch_${videoId}`);
+      
       toast({
-        title: "قريباً",
-        description: "ميزة الفيديوهات قيد التطوير - ستكون متاحة قريباً"
+        title: "تم بنجاح",
+        description: "تم حذف الفيديو بنجاح",
       });
+      
+      fetchVideos(); // Refresh the list
     } catch (error) {
       console.error('Error deleting video:', error);
       toast({
@@ -174,15 +267,23 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       });
       return;
     }
+    
     try {
       setUploadingFile(true);
+      console.log('📤 Uploading video file:', file.name);
+      
       const fileExt = file.name.split('.').pop();
       const fileName = `video_${Date.now()}.${fileExt}`;
       const filePath = `${accountId}/${fileName}`;
+      
       const { error: uploadError } = await supabase.storage.from('videos').upload(filePath, file);
       if (uploadError) throw uploadError;
+      
       const { data: urlData } = supabase.storage.from('videos').getPublicUrl(filePath);
       setNewVideoUrl(urlData.publicUrl);
+      
+      console.log('✅ Video file uploaded successfully:', urlData.publicUrl);
+      
       toast({
         title: "تم بنجاح",
         description: "تم رفع الفيديو بنجاح"
@@ -198,6 +299,16 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       setUploadingFile(false);
     }
   };
+
+  // Filter videos based on branch
+  const filteredVideos = videos.filter(video => {
+    const videoBranchId = localStorage.getItem(`video_branch_${video.id}`);
+    if (branchId) {
+      return videoBranchId === branchId;
+    } else {
+      return !videoBranchId || videoBranchId === '';
+    }
+  });
 
   if (loading) {
     return <div className="flex items-center justify-center p-8">
@@ -246,11 +357,17 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       </Card>
 
       <div className="grid gap-4">
-        <h3 className="text-lg font-semibold">الفيديوهات الحالية</h3>
+        <h3 className="text-lg font-semibold">
+          الفيديوهات الحالية
+          {branchId && <span className="text-sm text-muted-foreground ml-2">(فرع محدد)</span>}
+          {!branchId && <span className="text-sm text-muted-foreground ml-2">(الحساب الرئيسي)</span>}
+        </h3>
         
-        {videos.length === 0 ? <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">لا توجد فيديوهات. أضف فيديو جديد للبدء.</CardContent>
-          </Card> : videos.map(video => <Card key={video.id}>
+        {filteredVideos.length === 0 ? <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              لا توجد فيديوهات. أضف فيديو جديد للبدء.
+            </CardContent>
+          </Card> : filteredVideos.map(video => <Card key={video.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
