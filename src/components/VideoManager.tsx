@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -264,10 +265,17 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('📤 Uploading video file:', file.name, 'Size:', formatFileSize(file.size));
+    console.log('📤 Starting video upload process...');
+    console.log('📤 File details:', {
+      name: file.name,
+      size: formatFileSize(file.size),
+      type: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
 
     // Check file type only
     if (!file.type.startsWith('video/')) {
+      console.error('❌ Invalid file type:', file.type);
       toast({
         title: "خطأ",
         description: "يرجى اختيار ملف فيديو صالح",
@@ -283,8 +291,43 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       const fileName = `video_${Date.now()}.${fileExt}`;
       const filePath = `${accountId}/${fileName}`;
       
-      console.log('📤 Starting upload to path:', filePath);
+      console.log('📤 Upload configuration:', {
+        filePath,
+        fileName,
+        accountId,
+        fileExtension: fileExt
+      });
+
+      // Test connection to storage first
+      console.log('🔍 Testing storage connection...');
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
       
+      if (bucketsError) {
+        console.error('❌ Storage connection error:', bucketsError);
+        toast({
+          title: "خطأ في الاتصال",
+          description: "لا يمكن الوصول إلى مساحة التخزين. يرجى المحاولة لاحقاً",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('✅ Storage buckets available:', buckets.map(b => b.name));
+      
+      const videosBucket = buckets.find(b => b.name === 'videos');
+      if (!videosBucket) {
+        console.error('❌ Videos bucket not found');
+        toast({
+          title: "خطأ",
+          description: "مساحة تخزين الفيديوهات غير متوفرة",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('✅ Videos bucket found:', videosBucket);
+      
+      console.log('📤 Starting file upload...');
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('videos')
         .upload(filePath, file, {
@@ -293,38 +336,60 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
         });
         
       if (uploadError) {
-        console.error('❌ Upload error:', uploadError);
+        console.error('❌ Upload error details:', {
+          message: uploadError.message,
+          statusCode: uploadError.statusCode,
+          error: uploadError
+        });
         
-        // Handle specific error cases
+        // Handle specific error cases with more detail
         if (uploadError.message.includes('Bucket not found')) {
           toast({
             title: "خطأ",
-            description: "مساحة التخزين غير متوفرة. يرجى المحاولة لاحقاً",
+            description: "مساحة التخزين غير متوفرة. يرجى التأكد من إعداد قاعدة البيانات",
             variant: "destructive"
           });
-          return;
+        } else if (uploadError.message.includes('Duplicate')) {
+          toast({
+            title: "خطأ",
+            description: "ملف بنفس الاسم موجود. يرجى المحاولة مرة أخرى",
+            variant: "destructive"
+          });
+        } else if (uploadError.statusCode === 413) {
+          toast({
+            title: "خطأ",
+            description: "حجم الملف كبير جداً. يرجى اختيار ملف أصغر",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "خطأ في الرفع",
+            description: `تفاصيل الخطأ: ${uploadError.message}`,
+            variant: "destructive"
+          });
         }
-        
-        throw uploadError;
+        return;
       }
+      
+      console.log('✅ Upload successful:', uploadData);
       
       const { data: urlData } = supabase.storage
         .from('videos')
         .getPublicUrl(filePath);
         
-      setNewVideoUrl(urlData.publicUrl);
+      console.log('✅ Public URL generated:', urlData.publicUrl);
       
-      console.log('✅ Video file uploaded successfully:', urlData.publicUrl);
+      setNewVideoUrl(urlData.publicUrl);
       
       toast({
         title: "تم بنجاح",
-        description: "تم رفع الفيديو بنجاح"
+        description: "تم رفع الفيديو بنجاح. يمكنك الآن إضافة عنوان وحفظ الفيديو"
       });
     } catch (error) {
-      console.error('Error uploading video:', error);
+      console.error('❌ Unexpected error during upload:', error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ في رفع الفيديو. يرجى المحاولة مرة أخرى",
+        title: "خطأ غير متوقع",
+        description: `حدث خطأ: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`,
         variant: "destructive"
       });
     } finally {
