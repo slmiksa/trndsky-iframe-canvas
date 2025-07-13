@@ -25,21 +25,20 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching notifications for account:', accountId, 'branch:', branchId);
       
-      // Build query conditions
-      const baseQuery = supabase
-        .from('notifications')
-        .select('*')
-        .eq('account_id', accountId);
-
-      // Apply branch filter
-      let query;
-      if (branchId) {
-        query = baseQuery.eq('branch_id', branchId);
-      } else {
-        query = baseQuery.is('branch_id', null);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+      // Build the query with proper typing by avoiding reassignments
+      const { data, error } = branchId
+        ? await supabase
+            .from('notifications')
+            .select('*')
+            .eq('account_id', accountId)
+            .eq('branch_id', branchId)
+            .order('created_at', { ascending: false })
+        : await supabase
+            .from('notifications')
+            .select('*')
+            .eq('account_id', accountId)
+            .is('branch_id', null)
+            .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching notifications:', error);
@@ -59,22 +58,22 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching active notifications for account:', accountId, 'branch:', branchId);
       
-      // Build query conditions
-      const baseQuery = supabase
-        .from('notifications')
-        .select('*')
-        .eq('account_id', accountId)
-        .eq('is_active', true);
-
-      // Apply branch filter
-      let query;
-      if (branchId) {
-        query = baseQuery.eq('branch_id', branchId);
-      } else {
-        query = baseQuery.is('branch_id', null);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+      // Build the query with proper typing by avoiding reassignments
+      const { data, error } = branchId
+        ? await supabase
+            .from('notifications')
+            .select('*')
+            .eq('account_id', accountId)
+            .eq('is_active', true)
+            .eq('branch_id', branchId)
+            .order('created_at', { ascending: false })
+        : await supabase
+            .from('notifications')
+            .select('*')
+            .eq('account_id', accountId)
+            .eq('is_active', true)
+            .is('branch_id', null)
+            .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching active notifications:', error);
