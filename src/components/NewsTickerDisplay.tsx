@@ -8,7 +8,8 @@ interface NewsItem {
   is_active: boolean;
   display_order: number | null;
   created_at: string;
-  branch_id?: string;
+  branch_id?: string | null;
+  account_id: string;
 }
 
 interface NewsTickerDisplayProps {

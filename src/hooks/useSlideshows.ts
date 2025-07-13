@@ -10,7 +10,7 @@ interface Slideshow {
   interval_seconds: number;
   is_active: boolean;
   created_at: string;
-  branch_id?: string;
+  branch_id?: string | null;
 }
 
 export const useSlideshows = (accountId?: string, branchId?: string | null) => {

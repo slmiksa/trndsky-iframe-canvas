@@ -7,7 +7,9 @@ interface Slideshow {
   images: string[];
   interval_seconds: number;
   is_active: boolean;
-  branch_id?: string;
+  branch_id?: string | null;
+  account_id: string;
+  created_at: string;
 }
 
 interface SlideshowDisplayProps {

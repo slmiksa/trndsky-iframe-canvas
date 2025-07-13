@@ -6,7 +6,9 @@ interface Video {
   title: string;
   video_url: string;
   is_active: boolean;
-  branch_id?: string;
+  branch_id?: string | null;
+  account_id: string;
+  created_at: string;
 }
 
 interface VideoDisplayProps {
