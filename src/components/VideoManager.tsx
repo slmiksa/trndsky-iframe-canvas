@@ -40,7 +40,8 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       setLoading(true);
       console.log('🎥 Fetching videos for account:', accountId, 'branch:', branchId);
       
-      const { data, error } = await supabase
+      // Use type assertion to work around TypeScript issues
+      const { data, error } = await (supabase as any)
         .from('account_videos')
         .select('*')
         .eq('account_id', accountId)
@@ -48,6 +49,12 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
       if (error) {
         console.error('❌ Error fetching videos:', error);
+        // If table doesn't exist yet, just set empty array
+        if (error.code === '42P01') {
+          console.log('📝 account_videos table not found, setting empty array');
+          setVideos([]);
+          return;
+        }
         throw error;
       }
 
@@ -60,6 +67,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
         description: "حدث خطأ في تحميل الفيديوهات",
         variant: "destructive"
       });
+      setVideos([]);
     } finally {
       setLoading(false);
     }
@@ -85,7 +93,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       setIsCreating(true);
       console.log('🎥 Creating video:', { title: newVideoTitle, url: newVideoUrl });
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('account_videos')
         .insert([
           {
@@ -101,6 +109,14 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
       if (error) {
         console.error('❌ Error creating video:', error);
+        if (error.code === '42P01') {
+          toast({
+            title: "خطأ",
+            description: "جدول الفيديوهات غير موجود. يرجى التأكد من تطبيق migration للقاعدة",
+            variant: "destructive"
+          });
+          return;
+        }
         throw error;
       }
 
@@ -139,7 +155,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     try {
       console.log('🎥 Updating video:', editingVideo.id);
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('account_videos')
         .update({
           title: editingVideo.title.trim(),
@@ -177,7 +193,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     try {
       console.log('🎥 Toggling video status:', videoId, 'from', currentStatus, 'to', !currentStatus);
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('account_videos')
         .update({ is_active: !currentStatus })
         .eq('id', videoId);
@@ -209,7 +225,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     try {
       console.log('🎥 Deleting video:', videoId);
 
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('account_videos')
         .delete()
         .eq('id', videoId);
