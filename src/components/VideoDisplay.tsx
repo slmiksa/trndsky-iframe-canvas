@@ -31,9 +31,42 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, branchId, onActi
     try {
       console.log('🎥 Fetching active video for account:', accountId, 'branch:', branchId);
       
-      // For now, temporarily return null - will be enabled when database is set up
-      const videoData = null;
+      // Filter videos based on branch - STRICT branch filtering
+      // For now, temporarily return null since video table doesn't exist yet
+      // But when it exists, apply the same branch filtering logic as slideshows
+      
+      let videoData = null;
       const hasActive = false;
+
+      // TODO: When video table is ready, implement this logic:
+      /*
+      const { data, error } = await supabase
+        .from('account_videos')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      let filteredVideos = data || [];
+      
+      if (branchId) {
+        // Show only videos for this specific branch
+        filteredVideos = filteredVideos.filter(video => {
+          const videoBranchId = localStorage.getItem(`video_branch_${video.id}`);
+          return videoBranchId === branchId;
+        });
+      } else {
+        // Show only global videos (no branch association)
+        filteredVideos = filteredVideos.filter(video => {
+          const videoBranchId = localStorage.getItem(`video_branch_${video.id}`);
+          return !videoBranchId || videoBranchId === '';
+        });
+      }
+
+      videoData = filteredVideos.find(video => video.is_active) || null;
+      const hasActive = !!videoData;
+      */
 
       if (isActiveRef.current !== hasActive) {
         onActivityChange(hasActive);
@@ -60,18 +93,18 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, branchId, onActi
   useEffect(() => {
     if (!accountId) return;
 
-    console.log('📡 VideoDisplay: Setting up listeners for:', accountId);
+    console.log('📡 VideoDisplay: Setting up listeners for account:', accountId, 'branch:', branchId);
     
     fetchActiveVideo(); // Initial fetch
     
     const channel = supabase
-      .channel(`video-display-${accountId}`)
+      .channel(`video-display-${accountId}-${branchId || 'main'}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'account_slideshows',
+          table: 'account_slideshows', // Will change to account_videos when ready
           filter: `account_id=eq.${accountId}`
         },
         async () => {
@@ -89,7 +122,7 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, branchId, onActi
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       clearInterval(backupInterval);
     };
-  }, [accountId, onActivityChange]);
+  }, [accountId, branchId, onActivityChange]);
 
   // Auto-restart video when it ends
   useEffect(() => {

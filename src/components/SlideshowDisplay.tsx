@@ -40,13 +40,14 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      // Filter slideshows based on branch using localStorage
+      // Filter slideshows based on branch - STRICT branch filtering
       let filteredSlideshows = data || [];
       
       if (branchId) {
-        // If we're in a specific branch, show ONLY that branch's content (not global content)
+        // If we're in a specific branch, show ONLY that branch's content
         filteredSlideshows = filteredSlideshows.filter(slide => {
           const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
+          console.log(`🔍 Checking slideshow ${slide.id}: stored branch = ${slideBranchId}, current branch = ${branchId}`);
           return slideBranchId === branchId;
         });
         console.log(`🔍 Branch ${branchId}: Found ${filteredSlideshows.length} branch-specific slideshows`);
@@ -54,7 +55,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
         // If we're in main account view, show only global content (no branch association)
         filteredSlideshows = filteredSlideshows.filter(slide => {
           const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
-          return !slideBranchId;
+          console.log(`🔍 Checking slideshow ${slide.id}: stored branch = ${slideBranchId}, showing global only`);
+          return !slideBranchId || slideBranchId === '';
         });
         console.log(`🔍 Main account: Found ${filteredSlideshows.length} global slideshows`);
       }
@@ -106,12 +108,12 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
   useEffect(() => {
     if (!accountId) return;
 
-    console.log('📡 SlideshowDisplay: Setting up internal listeners for:', accountId);
+    console.log('📡 SlideshowDisplay: Setting up internal listeners for account:', accountId, 'branch:', branchId);
     
     fetchActiveSlideshow(); // Initial fetch
     
     const channel = supabase
-      .channel(`slideshow-display-${accountId}`)
+      .channel(`slideshow-display-${accountId}-${branchId || 'main'}`)
       .on(
         'postgres_changes',
         {
@@ -135,7 +137,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       clearInterval(backupInterval);
     };
-  }, [accountId, onActivityChange]);
+  }, [accountId, branchId, onActivityChange]);
 
   const clearAllTimers = () => {
     if (imageIntervalRef.current) {
@@ -187,7 +189,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
       console.error("🔥 Error during image preloading:", error);
     }
   }, [activeSlideshow, imageIndex, loading]);
-
 
   // Clean up timers on unmount
   useEffect(() => {
