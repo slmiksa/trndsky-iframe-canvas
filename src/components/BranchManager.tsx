@@ -34,6 +34,7 @@ interface Branch {
   is_active: boolean;
   created_at: string;
   account_id: string;
+  updated_at?: string;
 }
 
 interface BranchManagerProps {
@@ -61,7 +62,8 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
       console.log('🔍 Loading branches from database for account:', accountId);
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Use type assertion to work around missing types
+      const { data, error } = await (supabase as any)
         .from('account_branches')
         .select('*')
         .eq('account_id', accountId)
@@ -74,7 +76,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
       setBranches(data || []);
       console.log('✅ Branches loaded from database:', data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading branches:', error);
       toast({
         title: t('error'),
@@ -103,7 +105,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         branch_path: newBranchPath.trim(),
       });
 
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('account_branches')
         .insert({
           account_id: accountId,
@@ -147,7 +149,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('✏️ Updating branch in database:', editingBranch.id);
       
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('account_branches')
         .update({
           branch_name: newBranchName.trim(),
@@ -187,7 +189,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('🗑️ Deleting branch from database:', branchId);
       
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('account_branches')
         .delete()
         .eq('id', branchId);
@@ -219,7 +221,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('🔄 Toggling branch status in database:', branchId);
       
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('account_branches')
         .update({
           is_active: !currentStatus,
