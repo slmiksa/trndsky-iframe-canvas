@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Settings, Users, Image, Video, MessageSquare, Clock, MapPin, Globe } from 'lucide-react';
+import { ExternalLink, Settings, Users, Image, Video, MessageSquare, Clock, MapPin, Globe, Calendar, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useLanguage } from '@/hooks/useLanguage';
 
 // Import managers
 import SlideshowManager from '@/components/SlideshowManager';
@@ -42,6 +44,7 @@ interface Branch {
 const ClientDashboard: React.FC = () => {
   const { accountId } = useParams<{ accountId: string }>();
   const { user, userRole, loading: authLoading } = useAuth();
+  const { t } = useLanguage();
   const [account, setAccount] = useState<Account | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -94,7 +97,7 @@ const ClientDashboard: React.FC = () => {
       console.error('Error loading account:', error);
       setError(error.message);
       toast({
-        title: "خطأ في تحميل البيانات",
+        title: t('error') || "خطأ في تحميل البيانات",
         description: error.message,
         variant: "destructive",
       });
@@ -114,11 +117,11 @@ const ClientDashboard: React.FC = () => {
 
       if (error) {
         console.error('❌ Error loading branches:', error);
-        throw error;
+        // Don't throw error for branches as it's not critical
+      } else {
+        setBranches(data || []);
+        console.log('✅ Branches loaded:', data);
       }
-
-      setBranches(data || []);
-      console.log('✅ Branches loaded:', data);
     } catch (error: any) {
       console.error('Error loading branches:', error);
       // Don't show error toast for branches as it's not critical
@@ -153,12 +156,39 @@ const ClientDashboard: React.FC = () => {
     window.open(url, '_blank');
   };
 
+  // Helper function to format date
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return null;
+    return new Date(dateString).toLocaleDateString('ar-SA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Helper function to check if subscription is expiring soon
+  const isExpiringSoon = (endDate: string | null) => {
+    if (!endDate) return false;
+    const end = new Date(endDate);
+    const now = new Date();
+    const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return daysLeft <= 7 && daysLeft > 0;
+  };
+
+  // Helper function to check if subscription is expired
+  const isExpired = (endDate: string | null) => {
+    if (!endDate) return false;
+    const end = new Date(endDate);
+    const now = new Date();
+    return end.getTime() < now.getTime();
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">جاري التحميل...</p>
+          <p className="text-gray-600">{t('loading') || 'جاري التحميل'}...</p>
         </div>
       </div>
     );
@@ -182,12 +212,45 @@ const ClientDashboard: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                لوحة تحكم {account.name}
+                {t('dashboard_title') || 'لوحة تحكم'} {account.name}
               </h1>
               <div className="flex items-center gap-4 mt-2">
                 <Badge variant={account.status === 'active' ? 'default' : 'destructive'}>
-                  {account.status === 'active' ? 'نشط' : 'معطل'}
+                  {account.status === 'active' ? (t('active') || 'نشط') : (t('inactive') || 'معطل')}
                 </Badge>
+                
+                {/* Subscription Status */}
+                {account.is_subscription_active ? (
+                  <Badge 
+                    variant={
+                      isExpired(account.activation_end_date) ? 'destructive' : 
+                      isExpiringSoon(account.activation_end_date) ? 'secondary' : 'default'
+                    }
+                    className="flex items-center gap-1"
+                  >
+                    <Calendar className="h-3 w-3" />
+                    {isExpired(account.activation_end_date) ? 
+                      (t('subscription_expired') || 'انتهت الصلاحية') :
+                      isExpiringSoon(account.activation_end_date) ?
+                      (t('expiring_soon') || 'تنتهي قريباً') :
+                      (t('subscription_active') || 'اشتراك نشط')
+                    }
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {t('subscription_inactive') || 'اشتراك غير نشط'}
+                  </Badge>
+                )}
+
+                {/* Expiration Date */}
+                {account.activation_end_date && (
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {t('expires_on') || 'ينتهي في'}: {formatDate(account.activation_end_date)}
+                  </Badge>
+                )}
+                
                 {selectedBranchId && selectedBranch && (
                   <Badge variant="secondary" className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
@@ -197,14 +260,14 @@ const ClientDashboard: React.FC = () => {
                 {!selectedBranchId && (
                   <Badge variant="outline" className="flex items-center gap-1">
                     <Settings className="h-3 w-3" />
-                    الحساب الرئيسي
+                    {t('main_account') || 'الحساب الرئيسي'}
                   </Badge>
                 )}
               </div>
             </div>
             <Button onClick={openPublicPage} className="flex items-center gap-2">
               <ExternalLink className="h-4 w-4" />
-              عرض الصفحة العامة
+              {t('view_public_page') || 'عرض الصفحة العامة'}
             </Button>
           </div>
         </div>
@@ -233,27 +296,27 @@ const ClientDashboard: React.FC = () => {
               <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="slideshows" className="flex items-center gap-2">
                   <Image className="h-4 w-4" />
-                  العروض
+                  {t('slideshows') || 'العروض'}
                 </TabsTrigger>
                 <TabsTrigger value="videos" className="flex items-center gap-2">
                   <Video className="h-4 w-4" />
-                  الفيديوهات
+                  {t('videos') || 'الفيديوهات'}
                 </TabsTrigger>
                 <TabsTrigger value="websites" className="flex items-center gap-2">
                   <Globe className="h-4 w-4" />
-                  المواقع
+                  {t('websites') || 'المواقع'}
                 </TabsTrigger>
                 <TabsTrigger value="notifications" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  الإشعارات
+                  {t('notifications') || 'الإشعارات'}
                 </TabsTrigger>
                 <TabsTrigger value="news" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  الأخبار
+                  {t('news') || 'الأخبار'}
                 </TabsTrigger>
                 <TabsTrigger value="timers" className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
-                  المؤقتات
+                  {t('timers') || 'المؤقتات'}
                 </TabsTrigger>
               </TabsList>
 

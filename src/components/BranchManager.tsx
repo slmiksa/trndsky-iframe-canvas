@@ -71,6 +71,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
       if (error) {
         console.error('❌ Error loading branches:', error);
+        console.error('❌ Error details:', JSON.stringify(error));
         throw error;
       }
 
@@ -119,6 +120,9 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
       if (error) {
         console.error('❌ Error adding branch:', error);
+        console.error('❌ Error details:', JSON.stringify(error));
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error message:', error.message);
         throw error;
       }
 
