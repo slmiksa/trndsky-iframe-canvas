@@ -17,6 +17,7 @@ import NewsTickerManager from '@/components/NewsTickerManager';
 import SlideshowManager from '@/components/SlideshowManager';
 import VideoManager from '@/components/VideoManager';
 import BranchManager from '@/components/BranchManager';
+import BranchPublicLinks from '@/components/BranchPublicLinks';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import LanguageToggle from '@/components/LanguageToggle';
 import Footer from '@/components/Footer';
@@ -55,8 +56,8 @@ const ClientDashboard = () => {
   const [accountName, setAccountName] = useState<string>('');
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<any[]>([]);
 
-  // Fetch account information including subscription details
   const fetchAccountInfo = async () => {
     if (!accountId) return;
     try {
@@ -110,9 +111,25 @@ const ClientDashboard = () => {
     }
   };
 
+  const fetchBranches = async () => {
+    if (!accountId) return;
+    
+    try {
+      const stored = localStorage.getItem(`branches_${accountId}`);
+      if (stored) {
+        const branchesData = JSON.parse(stored);
+        setBranches(branchesData);
+        console.log('✅ Branches loaded from localStorage:', branchesData);
+      }
+    } catch (error) {
+      console.error('❌ Error loading branches:', error);
+    }
+  };
+
   useEffect(() => {
     fetchWebsites();
     fetchAccountInfo();
+    fetchBranches();
     
     // Load selected branch from localStorage
     if (accountId) {
@@ -129,6 +146,7 @@ const ClientDashboard = () => {
     
     // Refresh content when branch changes
     fetchWebsites();
+    fetchBranches(); // Refresh branches too
   };
 
   const getCurrentBranchName = () => {
@@ -307,17 +325,6 @@ const ClientDashboard = () => {
                   )}
                 </div>
               )}
-              {accountName && <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    {t('public_page')}: /client/{accountName}
-                  </Badge>
-                  <Button size="sm" variant="ghost" onClick={copyPublicLink}>
-                    <Share2 className="h-3 w-3" />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={openPublicPage}>
-                    <ExternalLink className="h-3 w-3" />
-                  </Button>
-                </div>}
             </div>
             <div className="flex items-center gap-3">
               <LanguageToggle />
@@ -334,6 +341,17 @@ const ClientDashboard = () => {
         {accountInfo && <div className="mb-6">
             <AccountStatusCard activationStartDate={accountInfo.activation_start_date} activationEndDate={accountInfo.activation_end_date} status={accountInfo.status} accountName={accountName} />
           </div>}
+
+        {/* Branch Public Links Card */}
+        {accountName && (
+          <div className="mb-6">
+            <BranchPublicLinks 
+              accountName={accountName}
+              branches={branches}
+              selectedBranchId={selectedBranchId}
+            />
+          </div>
+        )}
 
         <Tabs defaultValue="websites" className="space-y-6">
           <TabsList className="grid w-full grid-cols-7 gap-1 px-[116px] py-0 my-0 mx-[8px] bg-slate-50">

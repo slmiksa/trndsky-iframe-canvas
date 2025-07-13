@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import SlideshowDisplay from '@/components/SlideshowDisplay';
@@ -13,6 +14,8 @@ const ClientPublicPage: React.FC = () => {
   const [hasNotifications, setHasNotifications] = useState(false);
   const [hasNewsTicker, setHasNewsTicker] = useState(false);
   const [hasBreakTimer, setHasBreakTimer] = useState(false);
+  const [hasWebsites, setHasWebsites] = useState(false);
+  const [activeWebsite, setActiveWebsite] = useState<any>(null);
 
   // Parse branch ID from URL path (e.g., "jed", "ryd", etc.)
   const branchId = branchPath?.startsWith('/') ? branchPath.slice(1) : branchPath;
@@ -33,6 +36,59 @@ const ClientPublicPage: React.FC = () => {
     } else {
       localStorage.removeItem('tv_branch_id');
     }
+  }, [currentAccountId, currentBranchId]);
+
+  // Check for active websites
+  const checkActiveWebsites = async () => {
+    if (!currentAccountId) return;
+
+    try {
+      console.log('🔍 Checking active websites for account:', currentAccountId, 'branch:', currentBranchId);
+      
+      const { data, error } = await supabase
+        .from('account_websites')
+        .select('*')
+        .eq('account_id', currentAccountId)
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('❌ Error fetching websites:', error);
+        return;
+      }
+
+      // Filter websites based on branch using localStorage
+      let filteredWebsites = data || [];
+      
+      if (currentBranchId) {
+        // If we're in a specific branch, show only that branch's content
+        filteredWebsites = filteredWebsites.filter(website => {
+          const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
+          return websiteBranchId === currentBranchId;
+        });
+      } else {
+        // If we're in main account view, show only global content (no branch association)
+        filteredWebsites = filteredWebsites.filter(website => {
+          const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
+          return !websiteBranchId;
+        });
+      }
+
+      const activeWebsiteData = filteredWebsites[0] || null;
+      setActiveWebsite(activeWebsiteData);
+      setHasWebsites(!!activeWebsiteData);
+      
+      console.log('🌐 Active website for branch:', currentBranchId || 'main', activeWebsiteData?.website_title || 'none');
+    } catch (error) {
+      console.error('❌ Error in checkActiveWebsites:', error);
+    }
+  };
+
+  useEffect(() => {
+    checkActiveWebsites();
+    
+    // Set up interval to check for website changes
+    const interval = setInterval(checkActiveWebsites, 10000);
+    return () => clearInterval(interval);
   }, [currentAccountId, currentBranchId]);
 
   const handleSlideshowActivity = (isActive: boolean) => {
@@ -60,17 +116,6 @@ const ClientPublicPage: React.FC = () => {
     setHasBreakTimer(isActive);
   };
 
-  useEffect(() => {
-    // We need to check if news ticker has content
-    const checkNewsTickerActivity = async () => {
-      // This will be handled by NewsTickerDisplay internally
-      // For now, we'll assume it's active if we have an account
-      setHasNewsTicker(!!currentAccountId);
-    };
-    
-    checkNewsTickerActivity();
-  }, [currentAccountId, currentBranchId]);
-
   if (!currentAccountId) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -84,8 +129,29 @@ const ClientPublicPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Priority order: Videos > Slideshows > Break Timer */}
-      {hasVideos && (
+      {/* Priority order: Websites > Videos > Slideshows > Break Timer */}
+      {hasWebsites && activeWebsite && (
+        <div className="fixed inset-0 z-40">
+          <iframe
+            src={activeWebsite.website_url}
+            className="w-full h-full border-0"
+            title={activeWebsite.website_title || 'Website Display'}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+          />
+          
+          {/* Website info overlay */}
+          <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 z-50">
+            <h2 className="text-white text-xl font-semibold">{activeWebsite.website_title || 'موقع ويب'}</h2>
+            <div className="text-white/80 text-sm">
+              <p>موقع نشط</p>
+              {currentBranchId && <p className="text-xs text-blue-300">فرع: {currentBranchId}</p>}
+              {!currentBranchId && <p className="text-xs text-green-300">الحساب الرئيسي</p>}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!hasWebsites && hasVideos && (
         <VideoDisplay 
           accountId={currentAccountId}
           branchId={currentBranchId}
@@ -93,7 +159,7 @@ const ClientPublicPage: React.FC = () => {
         />
       )}
       
-      {!hasVideos && hasSlideshows && (
+      {!hasWebsites && !hasVideos && hasSlideshows && (
         <SlideshowDisplay 
           accountId={currentAccountId}
           branchId={currentBranchId}
@@ -101,7 +167,7 @@ const ClientPublicPage: React.FC = () => {
         />
       )}
       
-      {!hasVideos && !hasSlideshows && hasBreakTimer && (
+      {!hasWebsites && !hasVideos && !hasSlideshows && hasBreakTimer && (
         <BreakTimerDisplayContainer 
           accountId={currentAccountId}
           branchId={currentBranchId}
@@ -127,7 +193,7 @@ const ClientPublicPage: React.FC = () => {
       )}
 
       {/* Default content when nothing is active */}
-      {!hasVideos && !hasSlideshows && !hasBreakTimer && (
+      {!hasWebsites && !hasVideos && !hasSlideshows && !hasBreakTimer && (
         <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center">
           <div className="text-center text-white">
             <div className="mb-8">
@@ -156,6 +222,7 @@ const ClientPublicPage: React.FC = () => {
         <div className="fixed bottom-4 left-4 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-xs z-50">
           <div>Account: {currentAccountId}</div>
           <div>Branch: {currentBranchId || 'Main'}</div>
+          <div>Websites: {hasWebsites ? '✅' : '❌'}</div>
           <div>Videos: {hasVideos ? '✅' : '❌'}</div>
           <div>Slideshows: {hasSlideshows ? '✅' : '❌'}</div>
           <div>Notifications: {hasNotifications ? '✅' : '❌'}</div>
