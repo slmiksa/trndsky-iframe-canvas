@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Play, Pause, Plus, Trash2, Edit, Video, Upload } from 'lucide-react';
+
 interface Video {
   id: string;
   title: string;
@@ -15,12 +16,13 @@ interface Video {
   is_active: boolean;
   created_at: string;
 }
+
 interface VideoManagerProps {
   accountId: string;
+  branchId?: string | null;
 }
-const VideoManager: React.FC<VideoManagerProps> = ({
-  accountId
-}) => {
+
+const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
   const [newVideoTitle, setNewVideoTitle] = useState('');
@@ -28,9 +30,8 @@ const VideoManager: React.FC<VideoManagerProps> = ({
   const [editingVideo, setEditingVideo] = useState<Video | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
+
   const fetchVideos = async () => {
     try {
       setLoading(true);
@@ -52,11 +53,13 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       setLoading(false);
     }
   };
+
   useEffect(() => {
     if (accountId) {
       fetchVideos();
     }
-  }, [accountId]);
+  }, [accountId, branchId]);
+
   const createVideo = async () => {
     if (!newVideoTitle.trim() || !newVideoUrl.trim()) {
       toast({
@@ -87,6 +90,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       setIsCreating(false);
     }
   };
+
   const updateVideo = async () => {
     if (!editingVideo || !editingVideo.title.trim() || !editingVideo.video_url.trim()) {
       toast({
@@ -112,6 +116,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       });
     }
   };
+
   const toggleVideoStatus = async (videoId: string, currentStatus: boolean) => {
     try {
       // For now, just show a placeholder message
@@ -128,6 +133,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       });
     }
   };
+
   const deleteVideo = async (videoId: string) => {
     try {
       // For now, just show a placeholder message
@@ -144,6 +150,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       });
     }
   };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -172,13 +179,9 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       const fileExt = file.name.split('.').pop();
       const fileName = `video_${Date.now()}.${fileExt}`;
       const filePath = `${accountId}/${fileName}`;
-      const {
-        error: uploadError
-      } = await supabase.storage.from('videos').upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from('videos').upload(filePath, file);
       if (uploadError) throw uploadError;
-      const {
-        data: urlData
-      } = supabase.storage.from('videos').getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage.from('videos').getPublicUrl(filePath);
       setNewVideoUrl(urlData.publicUrl);
       toast({
         title: "تم بنجاح",
@@ -195,11 +198,13 @@ const VideoManager: React.FC<VideoManagerProps> = ({
       setUploadingFile(false);
     }
   };
+
   if (loading) {
     return <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>;
   }
+
   return <div className="space-y-6">
       <Card>
         <CardHeader>
@@ -331,4 +336,5 @@ const VideoManager: React.FC<VideoManagerProps> = ({
         </AlertDialog>}
     </div>;
 };
+
 export default VideoManager;

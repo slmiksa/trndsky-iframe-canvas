@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type Language = 'ar' | 'en';
@@ -16,6 +15,7 @@ const translations = {
     // Header
     'client_dashboard': 'لوحة تحكم العميل',
     'account_id': 'معرف الحساب',
+    'current_branch': 'الفرع الحالي',
     'public_page': 'الصفحة العامة',
     'logout': 'تسجيل الخروج',
     
@@ -37,6 +37,38 @@ const translations = {
     'account_suspended_message': 'تم تعليق حسابك. يرجى التواصل معنا لتفعيل الحساب مرة أخرى.',
     'pending_activation_title': 'في انتظار التفعيل',
     'pending_activation_message': 'حسابك في انتظار التفعيل. سيتم تفعيله قريباً.',
+    
+    // Branches
+    'branches_management': 'إدارة الفروع',
+    'add_branch': 'إضافة فرع',
+    'add_new_branch': 'إضافة فرع جديد',
+    'branch_name': 'اسم الفرع',
+    'enter_branch_name': 'أدخل اسم الفرع',
+    'branch_path': 'مسار الفرع',
+    'main_account': 'الحساب الرئيسي',
+    'controls_all_branches': 'يتحكم في جميع الفروع',
+    'selected': 'محدد',
+    'select': 'تحديد',
+    'selected_branch': 'الفرع المحدد',
+    'branch_selected': 'تم تحديد الفرع',
+    'main_account_selected': 'تم تحديد الحساب الرئيسي',
+    'inactive': 'غير نشط',
+    'deactivate': 'إلغاء التفعيل',
+    'activate': 'تفعيل',
+    'edit_branch': 'تعديل الفرع',
+    'update_branch': 'تحديث الفرع',
+    'delete_branch': 'حذف الفرع',
+    'are_you_sure_delete_branch': 'هل أنت متأكد من حذف هذا الفرع؟',
+    'branch_added_successfully': 'تم إضافة الفرع بنجاح',
+    'branch_updated_successfully': 'تم تحديث الفرع بنجاح',
+    'branch_deleted_successfully': 'تم حذف الفرع بنجاح',
+    'branch_status_updated': 'تم تحديث حالة الفرع',
+    'failed_to_add_branch': 'فشل في إضافة الفرع',
+    'failed_to_update_branch': 'فشل في تحديث الفرع',
+    'failed_to_delete_branch': 'فشل في حذف الفرع',
+    'failed_to_update_branch_status': 'فشل في تحديث حالة الفرع',
+    'please_fill_all_fields': 'يرجى ملء جميع الحقول',
+    'success': 'نجح',
     
     // Tabs
     'websites': 'المواقع',
@@ -122,6 +154,7 @@ const translations = {
     // Header
     'client_dashboard': 'Client Dashboard',
     'account_id': 'Account ID',
+    'current_branch': 'Current Branch',
     'public_page': 'Public Page',
     'logout': 'Logout',
     
@@ -143,6 +176,38 @@ const translations = {
     'account_suspended_message': 'Your account has been suspended. Please contact us to reactivate your account.',
     'pending_activation_title': 'Pending Activation',
     'pending_activation_message': 'Your account is pending activation. It will be activated soon.',
+    
+    // Branches
+    'branches_management': 'Branches Management',
+    'add_branch': 'Add Branch',
+    'add_new_branch': 'Add New Branch',
+    'branch_name': 'Branch Name',
+    'enter_branch_name': 'Enter branch name',
+    'branch_path': 'Branch Path',
+    'main_account': 'Main Account',
+    'controls_all_branches': 'Controls all branches',
+    'selected': 'Selected',
+    'select': 'Select',
+    'selected_branch': 'Selected Branch',
+    'branch_selected': 'Branch selected',
+    'main_account_selected': 'Main account selected',
+    'inactive': 'Inactive',
+    'deactivate': 'Deactivate',
+    'activate': 'Activate',
+    'edit_branch': 'Edit Branch',
+    'update_branch': 'Update Branch',
+    'delete_branch': 'Delete Branch',
+    'are_you_sure_delete_branch': 'Are you sure you want to delete this branch?',
+    'branch_added_successfully': 'Branch added successfully',
+    'branch_updated_successfully': 'Branch updated successfully',
+    'branch_deleted_successfully': 'Branch deleted successfully',
+    'branch_status_updated': 'Branch status updated',
+    'failed_to_add_branch': 'Failed to add branch',
+    'failed_to_update_branch': 'Failed to update branch',
+    'failed_to_delete_branch': 'Failed to delete branch',
+    'failed_to_update_branch_status': 'Failed to update branch status',
+    'please_fill_all_fields': 'Please fill all fields',
+    'success': 'Success',
     
     // Tabs
     'websites': 'Websites',

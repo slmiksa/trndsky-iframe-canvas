@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,7 +35,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
     createTimer,
     updateTimer,
     deleteTimer,
-  } = useBreakTimers(accountId, branchId);
+  } = useBreakTimers(accountId);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTimer, setNewTimer] = useState({
@@ -44,6 +45,19 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
     position: 'center',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filter timers by branch if branchId is provided
+  const filteredTimers = branchId 
+    ? timers.filter(timer => {
+        // For localStorage implementation, we'll store branch_id in the timer data
+        const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
+        return timerBranchId === branchId;
+      })
+    : timers.filter(timer => {
+        // Show only main account timers (no branch association)
+        const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
+        return !timerBranchId;
+      });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,6 +125,11 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
 
       const result = await createTimer(timerData);
 
+      // Store branch association in localStorage
+      if (branchId && result?.id) {
+        localStorage.setItem(`timer_branch_${result.id}`, branchId);
+      }
+
       console.log('✅ Timer created successfully:', result);
       toast({
         title: "تم إنشاء المؤقت",
@@ -159,6 +178,10 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
   const handleDeleteTimer = async (id: string) => {
     try {
       await deleteTimer(id);
+      
+      // Remove branch association from localStorage
+      localStorage.removeItem(`timer_branch_${id}`);
+      
       toast({
         title: "تم حذف المؤقت",
         description: "تم حذف المؤقت بنجاح",
@@ -191,7 +214,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            إدارة مؤقتات البريك ({timers.length})
+            إدارة مؤقتات البريك ({filteredTimers.length})
           </CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
@@ -274,7 +297,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
         </div>
       </CardHeader>
       <CardContent>
-        {timers.length === 0 ? (
+        {filteredTimers.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">لا توجد مؤقتات بعد</p>
@@ -282,7 +305,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
           </div>
         ) : (
           <div className="space-y-4">
-            {timers.map((timer) => (
+            {filteredTimers.map((timer) => (
               <div
                 key={timer.id}
                 className="border rounded-lg p-4 hover:bg-gray-50"
