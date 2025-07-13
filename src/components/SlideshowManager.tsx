@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit2, Trash2, Image, Play, Pause } from 'lucide-react';
+import { Plus, Edit2, Trash2, Image, Play, Pause, Eye } from 'lucide-react';
 import { useSlideshows } from '@/hooks/useSlideshows';
 import { Slider } from '@/components/ui/slider';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -85,7 +86,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
     if (!newSlideshow.title.trim()) {
       toast({
         title: t('error'),
-        description: 'Slideshow title is required',
+        description: 'عنوان السلايدات مطلوب',
         variant: "destructive",
       });
       return;
@@ -94,7 +95,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
     if (newSlideshow.images.length === 0) {
       toast({
         title: t('error'),
-        description: 'Please upload at least one image',
+        description: 'يرجى رفع صورة واحدة على الأقل',
         variant: "destructive",
       });
       return;
@@ -115,7 +116,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
 
       toast({
         title: t('success'),
-        description: t('slideshow_added_successfully'),
+        description: 'تم إضافة السلايدات بنجاح',
       });
 
       setNewSlideshow({
@@ -129,7 +130,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
       console.error('Error creating slideshow:', error);
       toast({
         title: t('error'),
-        description: t('error_adding_slideshow') + `: ${error.message || 'Unknown error'}`,
+        description: `خطأ في إضافة السلايدات: ${error.message || 'خطأ غير معروف'}`,
         variant: "destructive",
       });
     } finally {
@@ -145,13 +146,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
 
       toast({
         title: t('success'),
-        description: `Slideshow ${!slideshow.is_active ? 'activated' : 'stopped'}`,
+        description: `تم ${!slideshow.is_active ? 'تفعيل' : 'إيقاف'} السلايدات`,
       });
     } catch (error: any) {
       console.error('Error updating slideshow:', error);
       toast({
         title: t('error'),
-        description: t('error_updating_slideshow') + `: ${error.message || 'Unknown error'}`,
+        description: `خطأ في تحديث السلايدات: ${error.message || 'خطأ غير معروف'}`,
         variant: "destructive",
       });
     }
@@ -163,13 +164,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
 
       toast({
         title: t('success'),
-        description: t('slideshow_deleted'),
+        description: 'تم حذف السلايدات',
       });
     } catch (error: any) {
       console.error('Error deleting slideshow:', error);
       toast({
         title: t('error'),
-        description: t('error_deleting_slideshow') + `: ${error.message || 'Unknown error'}`,
+        description: `خطأ في حذف السلايدات: ${error.message || 'خطأ غير معروف'}`,
         variant: "destructive",
       });
     }
@@ -196,22 +197,22 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <Image className="h-5 w-5" />
-            {t('slideshows')} ({slideshows.length})
+            السلايدات ({slideshows.length})
           </CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                {t('add_slideshow')}
+                إضافة سلايدات
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>{t('add_slideshow')}</DialogTitle>
+                <DialogTitle>إضافة سلايدات</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="title">{t('slideshow_title')}</Label>
+                  <Label htmlFor="title">عنوان السلايدات</Label>
                   <Input
                     id="title"
                     value={newSlideshow.title}
@@ -220,7 +221,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                   />
                 </div>
                 <div>
-                  <Label htmlFor="images">{t('upload_images')}</Label>
+                  <Label htmlFor="images">رفع الصور</Label>
                   <Input
                     id="images"
                     type="file"
@@ -231,12 +232,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                   />
                   {selectedImages.length > 0 && (
                     <p className="text-sm text-gray-500 mt-1">
-                      {t('images_count', { count: selectedImages.length })}
+                      عدد الصور: {selectedImages.length}
                     </p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="interval">{t('slideshow_interval')}</Label>
+                  <Label htmlFor="interval">مدة عرض كل صورة (ثواني)</Label>
                   <Slider
                     id="interval"
                     defaultValue={[newSlideshow.interval]}
@@ -246,12 +247,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                     onValueChange={(value) => setNewSlideshow({ ...newSlideshow, interval: value[0] })}
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    {newSlideshow.interval} {t('seconds')}
+                    {newSlideshow.interval} ثواني
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSubmitting} className="flex-1">
-                    {isSubmitting ? 'Submitting...' : t('add')}
+                    {isSubmitting ? 'جاري الإرسال...' : 'إضافة'}
                   </Button>
                   <Button
                     type="button"
@@ -270,7 +271,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
         {slideshows.length === 0 ? (
           <div className="text-center py-8">
             <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">{t('no_slideshows_yet')}</p>
+            <p className="text-gray-600">لا توجد سلايدات بعد</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -286,7 +287,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={slideshow.is_active ? "default" : "secondary"}>
-                      {slideshow.is_active ? t('active') : t('stopped')}
+                      {slideshow.is_active ? t('active') : 'متوقف'}
                     </Badge>
                     <Button
                       size="sm"
@@ -311,16 +312,16 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>
-                            {t('delete_slideshow')}
+                            حذف السلايدات
                           </AlertDialogTitle>
                           <AlertDialogDescription>
-                            {t('are_you_sure_delete_slideshow')}
+                            هل أنت متأكد من حذف هذه السلايدات؟
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                           <AlertDialogAction onClick={() => handleDeleteSlideshow(slideshow.id)}>
-                            {t('delete')}
+                            حذف
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
@@ -328,7 +329,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                   </div>
                 </div>
                 <div className="text-sm text-gray-600">
-                  {t('display_duration')}: {slideshow.interval} {t('seconds')}
+                  مدة العرض: {slideshow.interval} ثواني
                 </div>
                 <div className="text-xs text-gray-500">
                   {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
@@ -347,7 +348,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
       }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{previewSlideshow?.title || t('slideshow_preview')}</DialogTitle>
+            <DialogTitle>{previewSlideshow?.title || 'معاينة السلايدات'}</DialogTitle>
           </DialogHeader>
           {previewSlideshow ? (
             <div className="relative">
@@ -370,11 +371,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
           ) : (
             <div className="text-center py-8">
               <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">{t('select_slideshow_preview')}</p>
+              <p className="text-gray-600">اختر سلايدات لمعاينتها</p>
             </div>
           )}
           <Button variant="outline" className="mt-4" onClick={handleClosePreview}>
-            {t('close')}
+            إغلاق
           </Button>
         </DialogContent>
       </Dialog>

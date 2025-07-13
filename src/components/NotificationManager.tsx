@@ -14,6 +14,9 @@ interface Notification {
   account_id: string;
   title: string;
   message: string;
+  image_url: string | null;
+  position: string;
+  display_duration: number;
   is_active: boolean;
   created_at: string;
 }
@@ -78,17 +81,19 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
     try {
       const notificationData = {
         account_id: accountId,
-        branch_id: branchId,
         title: newNotification.title,
         message: newNotification.message,
+        image_url: null,
+        position: 'top-right',
+        display_duration: 5,
         is_active: true,
       };
 
       const result = await createNotification(notificationData);
 
       // Store branch association in localStorage
-      if (branchId && result?.id) {
-        localStorage.setItem(`notification_branch_${result.id}`, branchId);
+      if (branchId && result && result[0]?.id) {
+        localStorage.setItem(`notification_branch_${result[0].id}`, branchId);
       }
 
       toast({
@@ -102,7 +107,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
         message: '',
       });
       setShowAddForm(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating notification:', error);
       toast({
         title: "خطأ في إنشاء الإشعار",
