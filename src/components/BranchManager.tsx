@@ -62,8 +62,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
       console.log('🔍 Loading branches from database for account:', accountId);
       setLoading(true);
       
-      // Use type assertion to work around missing types
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('account_branches')
         .select('*')
         .eq('account_id', accountId)
@@ -80,7 +79,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
       console.error('Error loading branches:', error);
       toast({
         title: t('error'),
-        description: 'فشل في تحميل الفروع من قاعدة البيانات',
+        description: 'فشل في تحميل الفروع من قاعدة البيانات: ' + error.message,
         variant: 'destructive',
       });
     } finally {
@@ -105,7 +104,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         branch_path: newBranchPath.trim(),
       });
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('account_branches')
         .insert({
           account_id: accountId,
@@ -132,7 +131,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         description: t('branch_added_successfully'),
       });
       
-      loadBranches(); // Reload branches from database
+      loadBranches();
     } catch (error: any) {
       console.error('Error adding branch:', error);
       toast({
@@ -149,7 +148,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('✏️ Updating branch in database:', editingBranch.id);
       
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('account_branches')
         .update({
           branch_name: newBranchName.trim(),
@@ -174,7 +173,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         description: t('branch_updated_successfully'),
       });
       
-      loadBranches(); // Reload branches from database
+      loadBranches();
     } catch (error: any) {
       console.error('Error updating branch:', error);
       toast({
@@ -189,7 +188,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('🗑️ Deleting branch from database:', branchId);
       
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('account_branches')
         .delete()
         .eq('id', branchId);
@@ -206,7 +205,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         description: t('branch_deleted_successfully'),
       });
       
-      loadBranches(); // Reload branches from database
+      loadBranches();
     } catch (error: any) {
       console.error('Error deleting branch:', error);
       toast({
@@ -221,7 +220,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('🔄 Toggling branch status in database:', branchId);
       
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('account_branches')
         .update({
           is_active: !currentStatus,
@@ -241,7 +240,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         description: t('branch_status_updated'),
       });
       
-      loadBranches(); // Reload branches from database
+      loadBranches();
     } catch (error: any) {
       console.error('Error updating branch status:', error);
       toast({
@@ -256,7 +255,6 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     console.log('🔄 Branch selected:', branchId);
     onBranchSelect?.(branchId);
     
-    // Store selected branch in localStorage for persistence
     if (branchId) {
       localStorage.setItem(`selected_branch_${accountId}`, branchId);
     } else {
