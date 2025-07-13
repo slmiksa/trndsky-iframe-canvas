@@ -13,9 +13,10 @@ interface Notification {
   display_duration: number;
   created_at: string;
   updated_at: string;
+  branch_id?: string | null;
 }
 
-export const useNotifications = (accountId?: string) => {
+export const useNotifications = (accountId?: string, branchId?: string | null) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,13 +24,21 @@ export const useNotifications = (accountId?: string) => {
     if (!accountId) return;
 
     try {
-      console.log('🔍 Fetching notifications for account:', accountId);
+      console.log('🔍 Fetching notifications for account:', accountId, 'branch:', branchId);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: false });
+        .eq('account_id', accountId);
+
+      // Filter by branch_id if provided
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      } else {
+        query = query.is('branch_id', null);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching notifications:', error);
@@ -45,16 +54,24 @@ export const useNotifications = (accountId?: string) => {
     }
   };
 
-  const fetchActiveNotifications = async (accountId: string) => {
+  const fetchActiveNotifications = async (accountId: string, branchId?: string | null) => {
     try {
-      console.log('🔍 Fetching active notifications for account:', accountId);
+      console.log('🔍 Fetching active notifications for account:', accountId, 'branch:', branchId);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('notifications')
         .select('*')
         .eq('account_id', accountId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        .eq('is_active', true);
+
+      // Filter by branch_id if provided
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      } else {
+        query = query.is('branch_id', null);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching active notifications:', error);
@@ -187,7 +204,7 @@ export const useNotifications = (accountId?: string) => {
 
   useEffect(() => {
     fetchNotifications();
-  }, [accountId]);
+  }, [accountId, branchId]);
 
   return {
     notifications,
