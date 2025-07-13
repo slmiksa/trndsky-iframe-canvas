@@ -17,6 +17,7 @@ interface Video {
   is_active: boolean;
   created_at: string;
   account_id: string;
+  branch_id?: string | null;
 }
 
 interface VideoManagerProps {
@@ -39,7 +40,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       setLoading(true);
       console.log('🎥 Fetching videos for account:', accountId, 'branch:', branchId);
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('account_videos')
         .select('*')
         .eq('account_id', accountId)
@@ -84,14 +85,15 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       setIsCreating(true);
       console.log('🎥 Creating video:', { title: newVideoTitle, url: newVideoUrl });
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('account_videos')
         .insert([
           {
             account_id: accountId,
             title: newVideoTitle.trim(),
             video_url: newVideoUrl.trim(),
-            is_active: false
+            is_active: false,
+            branch_id: branchId
           }
         ])
         .select()
@@ -104,12 +106,6 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
       console.log('✅ Video created successfully:', data);
       
-      // Store branch association in localStorage if branchId exists
-      if (branchId && data) {
-        localStorage.setItem(`video_branch_${data.id}`, branchId);
-        console.log(`📍 Video ${data.id} associated with branch: ${branchId}`);
-      }
-
       toast({
         title: "تم بنجاح",
         description: "تم إضافة الفيديو بنجاح",
@@ -117,7 +113,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
       setNewVideoTitle('');
       setNewVideoUrl('');
-      fetchVideos(); // Refresh the list
+      fetchVideos();
     } catch (error) {
       console.error('Error creating video:', error);
       toast({
@@ -143,7 +139,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     try {
       console.log('🎥 Updating video:', editingVideo.id);
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('account_videos')
         .update({
           title: editingVideo.title.trim(),
@@ -166,7 +162,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       });
 
       setEditingVideo(null);
-      fetchVideos(); // Refresh the list
+      fetchVideos();
     } catch (error) {
       console.error('Error updating video:', error);
       toast({
@@ -181,7 +177,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     try {
       console.log('🎥 Toggling video status:', videoId, 'from', currentStatus, 'to', !currentStatus);
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('account_videos')
         .update({ is_active: !currentStatus })
         .eq('id', videoId);
@@ -198,7 +194,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
         description: !currentStatus ? "تم تفعيل الفيديو" : "تم إيقاف الفيديو",
       });
       
-      fetchVideos(); // Refresh the list
+      fetchVideos();
     } catch (error) {
       console.error('Error toggling video status:', error);
       toast({
@@ -213,7 +209,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     try {
       console.log('🎥 Deleting video:', videoId);
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('account_videos')
         .delete()
         .eq('id', videoId);
@@ -225,15 +221,12 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
       console.log('✅ Video deleted successfully');
       
-      // Remove branch association from localStorage
-      localStorage.removeItem(`video_branch_${videoId}`);
-      
       toast({
         title: "تم بنجاح",
         description: "تم حذف الفيديو بنجاح",
       });
       
-      fetchVideos(); // Refresh the list
+      fetchVideos();
     } catch (error) {
       console.error('Error deleting video:', error);
       toast({
@@ -276,10 +269,37 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       const fileName = `video_${Date.now()}.${fileExt}`;
       const filePath = `${accountId}/${fileName}`;
       
-      const { error: uploadError } = await supabase.storage.from('videos').upload(filePath, file);
-      if (uploadError) throw uploadError;
+      // Create bucket if it doesn't exist
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const videosBucket = buckets?.find(bucket => bucket.name === 'videos');
       
-      const { data: urlData } = supabase.storage.from('videos').getPublicUrl(filePath);
+      if (!videosBucket) {
+        console.log('📦 Creating videos bucket...');
+        const { error: bucketError } = await supabase.storage.createBucket('videos', {
+          public: true,
+          fileSizeLimit: 104857600, // 100MB
+          allowedMimeTypes: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm', 'video/mkv']
+        });
+        
+        if (bucketError) {
+          console.error('❌ Error creating bucket:', bucketError);
+          throw bucketError;
+        }
+      }
+      
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(filePath, file);
+        
+      if (uploadError) {
+        console.error('❌ Upload error:', uploadError);
+        throw uploadError;
+      }
+      
+      const { data: urlData } = supabase.storage
+        .from('videos')
+        .getPublicUrl(filePath);
+        
       setNewVideoUrl(urlData.publicUrl);
       
       console.log('✅ Video file uploaded successfully:', urlData.publicUrl);
@@ -302,21 +322,23 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
   // Filter videos based on branch
   const filteredVideos = videos.filter(video => {
-    const videoBranchId = localStorage.getItem(`video_branch_${video.id}`);
     if (branchId) {
-      return videoBranchId === branchId;
+      return video.branch_id === branchId;
     } else {
-      return !videoBranchId || videoBranchId === '';
+      return !video.branch_id;
     }
   });
 
   if (loading) {
-    return <div className="flex items-center justify-center p-8">
+    return (
+      <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>;
+      </div>
+    );
   }
 
-  return <div className="space-y-6">
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -330,12 +352,23 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="video-title">عنوان الفيديو</Label>
-            <Input id="video-title" value={newVideoTitle} onChange={e => setNewVideoTitle(e.target.value)} placeholder="أدخل عنوان الفيديو" />
+            <Input
+              id="video-title"
+              value={newVideoTitle}
+              onChange={(e) => setNewVideoTitle(e.target.value)}
+              placeholder="أدخل عنوان الفيديو"
+            />
           </div>
           
           <div>
             <Label htmlFor="video-url">رابط الفيديو</Label>
-            <Input id="video-url" value={newVideoUrl} onChange={e => setNewVideoUrl(e.target.value)} placeholder="https://example.com/video.mp4" type="url" />
+            <Input
+              id="video-url"
+              value={newVideoUrl}
+              onChange={(e) => setNewVideoUrl(e.target.value)}
+              placeholder="https://example.com/video.mp4"
+              type="url"
+            />
           </div>
 
           <div className="flex items-center gap-2">
@@ -345,7 +378,14 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
                 <Upload className="h-4 w-4" />
                 {uploadingFile ? 'جاري الرفع...' : 'رفع ملف فيديو'}
               </div>
-              <Input id="video-file" type="file" accept="video/*" className="hidden" onChange={handleFileUpload} disabled={uploadingFile} />
+              <Input
+                id="video-file"
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={uploadingFile}
+              />
             </Label>
           </div>
 
@@ -363,11 +403,15 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
           {!branchId && <span className="text-sm text-muted-foreground ml-2">(الحساب الرئيسي)</span>}
         </h3>
         
-        {filteredVideos.length === 0 ? <Card>
+        {filteredVideos.length === 0 ? (
+          <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
               لا توجد فيديوهات. أضف فيديو جديد للبدء.
             </CardContent>
-          </Card> : filteredVideos.map(video => <Card key={video.id}>
+          </Card>
+        ) : (
+          filteredVideos.map((video) => (
+            <Card key={video.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -386,11 +430,19 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditingVideo(video)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingVideo(video)}
+                    >
                       <Edit className="h-4 w-4" />
                     </Button>
                     
-                    <Button size="sm" variant={video.is_active ? "destructive" : "default"} onClick={() => toggleVideoStatus(video.id, video.is_active)}>
+                    <Button
+                      size="sm"
+                      variant={video.is_active ? "destructive" : "default"}
+                      onClick={() => toggleVideoStatus(video.id, video.is_active)}
+                    >
                       {video.is_active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                     </Button>
                     
@@ -409,7 +461,10 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => deleteVideo(video.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          <AlertDialogAction
+                            onClick={() => deleteVideo(video.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
                             حذف
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -418,11 +473,14 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
                   </div>
                 </div>
               </CardContent>
-            </Card>)}
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Edit Video Dialog */}
-      {editingVideo && <AlertDialog open={!!editingVideo} onOpenChange={() => setEditingVideo(null)}>
+      {editingVideo && (
+        <AlertDialog open={!!editingVideo} onOpenChange={() => setEditingVideo(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>تعديل الفيديو</AlertDialogTitle>
@@ -430,17 +488,26 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
             <div className="space-y-4 py-4">
               <div>
                 <Label htmlFor="edit-video-title">عنوان الفيديو</Label>
-                <Input id="edit-video-title" value={editingVideo.title} onChange={e => setEditingVideo({
-              ...editingVideo,
-              title: e.target.value
-            })} />
+                <Input
+                  id="edit-video-title"
+                  value={editingVideo.title}
+                  onChange={(e) => setEditingVideo({
+                    ...editingVideo,
+                    title: e.target.value
+                  })}
+                />
               </div>
               <div>
                 <Label htmlFor="edit-video-url">رابط الفيديو</Label>
-                <Input id="edit-video-url" value={editingVideo.video_url} onChange={e => setEditingVideo({
-              ...editingVideo,
-              video_url: e.target.value
-            })} type="url" />
+                <Input
+                  id="edit-video-url"
+                  value={editingVideo.video_url}
+                  onChange={(e) => setEditingVideo({
+                    ...editingVideo,
+                    video_url: e.target.value
+                  })}
+                  type="url"
+                />
               </div>
             </div>
             <AlertDialogFooter>
@@ -450,8 +517,10 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>}
-    </div>;
+        </AlertDialog>
+      )}
+    </div>
+  );
 };
 
 export default VideoManager;
