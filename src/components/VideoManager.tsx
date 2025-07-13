@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -253,9 +252,19 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     }
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    console.log('📤 Uploading video file:', file.name, 'Size:', formatFileSize(file.size));
 
     // Check file type
     if (!file.type.startsWith('video/')) {
@@ -267,11 +276,12 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       return;
     }
 
-    // Check file size (max 100MB)
-    if (file.size > 100 * 1024 * 1024) {
+    // Check file size (increase limit to 200MB for better user experience)
+    const maxSizeBytes = 200 * 1024 * 1024; // 200MB
+    if (file.size > maxSizeBytes) {
       toast({
         title: "خطأ",
-        description: "حجم الملف كبير جداً. الحد الأقصى 100 ميجابايت",
+        description: `حجم الملف كبير جداً (${formatFileSize(file.size)}). الحد الأقصى ${formatFileSize(maxSizeBytes)}`,
         variant: "destructive"
       });
       return;
@@ -279,36 +289,43 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
     
     try {
       setUploadingFile(true);
-      console.log('📤 Uploading video file:', file.name);
       
       const fileExt = file.name.split('.').pop();
       const fileName = `video_${Date.now()}.${fileExt}`;
       const filePath = `${accountId}/${fileName}`;
       
-      // Create bucket if it doesn't exist
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const videosBucket = buckets?.find(bucket => bucket.name === 'videos');
+      // Try to upload the file directly first
+      console.log('📤 Starting upload to path:', filePath);
       
-      if (!videosBucket) {
-        console.log('📦 Creating videos bucket...');
-        const { error: bucketError } = await supabase.storage.createBucket('videos', {
-          public: true,
-          fileSizeLimit: 104857600, // 100MB
-          allowedMimeTypes: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm', 'video/mkv']
-        });
-        
-        if (bucketError) {
-          console.error('❌ Error creating bucket:', bucketError);
-          throw bucketError;
-        }
-      }
-      
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError, data: uploadData } = await supabase.storage
         .from('videos')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
         
       if (uploadError) {
         console.error('❌ Upload error:', uploadError);
+        
+        // Handle specific error cases
+        if (uploadError.message.includes('exceeded the maximum allowed size')) {
+          toast({
+            title: "خطأ",
+            description: `حجم الملف كبير جداً (${formatFileSize(file.size)}). يرجى اختيار ملف أصغر من ${formatFileSize(maxSizeBytes)}`,
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        if (uploadError.message.includes('Bucket not found')) {
+          toast({
+            title: "خطأ",
+            description: "مساحة التخزين غير متوفرة. يرجى المحاولة لاحقاً",
+            variant: "destructive"
+          });
+          return;
+        }
+        
         throw uploadError;
       }
       
@@ -328,11 +345,15 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       console.error('Error uploading video:', error);
       toast({
         title: "خطأ",
-        description: "حدث خطأ في رفع الفيديو",
+        description: "حدث خطأ في رفع الفيديو. يرجى المحاولة مرة أخرى",
         variant: "destructive"
       });
     } finally {
       setUploadingFile(false);
+      // Reset file input
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 
@@ -362,7 +383,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
             إضافة فيديو جديد
           </CardTitle>
           <CardDescription>
-            أضف فيديو جديد ليتم عرضه على الشاشات بملء الشاشة
+            أضف فيديو جديد ليتم عرضه على الشاشات بملء الشاشة (الحد الأقصى 200 ميجابايت)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -392,7 +413,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
             <Label htmlFor="video-file" className="cursor-pointer">
               <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-accent">
                 <Upload className="h-4 w-4" />
-                {uploadingFile ? 'جاري الرفع...' : 'رفع ملف فيديو'}
+                {uploadingFile ? 'جاري الرفع...' : 'رفع ملف فيديو (حتى 200 ميجا)'}
               </div>
               <Input
                 id="video-file"
