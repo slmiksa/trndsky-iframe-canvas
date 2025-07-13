@@ -56,15 +56,31 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const fetchBranches = async () => {
     try {
-      // Use direct SQL query since the table isn't in the generated types yet
+      console.log('🔍 Fetching branches for account:', accountId);
+      
       const { data, error } = await supabase
-        .from('account_branches' as any)
-        .select('*')
-        .eq('account_id', accountId)
-        .order('created_at', { ascending: true });
+        .rpc('get_account_branches', { account_id_param: accountId });
 
-      if (error) throw error;
-      setBranches((data as unknown as Branch[]) || []);
+      if (error) {
+        console.error('❌ Error fetching branches via RPC:', error);
+        // Fallback to direct query
+        const { data: directData, error: directError } = await supabase
+          .from('account_branches')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('created_at', { ascending: true });
+        
+        if (directError) {
+          console.error('❌ Error fetching branches directly:', directError);
+          throw directError;
+        }
+        
+        console.log('✅ Branches fetched via direct query:', directData);
+        setBranches(directData || []);
+      } else {
+        console.log('✅ Branches fetched via RPC:', data);
+        setBranches(data || []);
+      }
     } catch (error) {
       console.error('Error fetching branches:', error);
       toast({
@@ -88,22 +104,63 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     }
 
     try {
-      const { data, error } = await supabase
-        .from('account_branches' as any)
-        .insert([
-          {
+      console.log('➕ Adding new branch:', {
+        accountId,
+        branch_name: newBranchName.trim(),
+        branch_path: newBranchPath.trim(),
+      });
+
+      // Check current user authentication
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('👤 Current user:', user?.id);
+
+      // Try using the RPC function first
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('create_account_branch', {
+          account_id_param: accountId,
+          branch_name_param: newBranchName.trim(),
+          branch_path_param: newBranchPath.trim()
+        });
+
+      if (rpcError) {
+        console.error('❌ Error creating branch via RPC:', rpcError);
+        
+        // Fallback to direct insert
+        const { data: insertData, error: insertError } = await supabase
+          .from('account_branches')
+          .insert({
             account_id: accountId,
             branch_name: newBranchName.trim(),
             branch_path: newBranchPath.trim(),
             is_active: true,
-          },
-        ])
-        .select()
-        .single();
+          })
+          .select()
+          .single();
 
-      if (error) throw error;
+        if (insertError) {
+          console.error('❌ Error creating branch via direct insert:', insertError);
+          throw insertError;
+        }
 
-      setBranches([...branches, data as unknown as Branch]);
+        console.log('✅ Branch created via direct insert:', insertData);
+        setBranches([...branches, insertData]);
+      } else {
+        console.log('✅ Branch created via RPC, ID:', rpcData);
+        // Fetch the created branch details
+        const { data: newBranch, error: fetchError } = await supabase
+          .from('account_branches')
+          .select('*')
+          .eq('id', rpcData)
+          .single();
+        
+        if (!fetchError && newBranch) {
+          setBranches([...branches, newBranch]);
+        } else {
+          // Refetch all branches if we can't get the specific one
+          fetchBranches();
+        }
+      }
+
       setNewBranchName('');
       setNewBranchPath('');
       setIsAddDialogOpen(false);
@@ -127,18 +184,34 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
     try {
       const { data, error } = await supabase
-        .from('account_branches' as any)
-        .update({
-          branch_name: newBranchName.trim(),
-          branch_path: newBranchPath.trim(),
-        })
-        .eq('id', editingBranch.id)
-        .select()
-        .single();
+        .rpc('update_account_branch', {
+          branch_id_param: editingBranch.id,
+          branch_name_param: newBranchName.trim(),
+          branch_path_param: newBranchPath.trim(),
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error updating branch via RPC:', error);
+        
+        // Fallback to direct update
+        const { data: updateData, error: updateError } = await supabase
+          .from('account_branches')
+          .update({
+            branch_name: newBranchName.trim(),
+            branch_path: newBranchPath.trim(),
+          })
+          .eq('id', editingBranch.id)
+          .select()
+          .single();
 
-      setBranches(branches.map(b => b.id === editingBranch.id ? data as unknown as Branch : b));
+        if (updateError) throw updateError;
+        
+        setBranches(branches.map(b => b.id === editingBranch.id ? updateData : b));
+      } else {
+        // Refetch branches after RPC update
+        fetchBranches();
+      }
+
       setEditingBranch(null);
       setNewBranchName('');
       setNewBranchPath('');
@@ -159,12 +232,20 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const handleDeleteBranch = async (branchId: string) => {
     try {
-      const { error } = await supabase
-        .from('account_branches' as any)
-        .delete()
-        .eq('id', branchId);
+      const { error: rpcError } = await supabase
+        .rpc('delete_account_branch', { branch_id_param: branchId });
 
-      if (error) throw error;
+      if (rpcError) {
+        console.error('❌ Error deleting branch via RPC:', rpcError);
+        
+        // Fallback to direct delete
+        const { error: deleteError } = await supabase
+          .from('account_branches')
+          .delete()
+          .eq('id', branchId);
+
+        if (deleteError) throw deleteError;
+      }
 
       setBranches(branches.filter(b => b.id !== branchId));
       
@@ -184,16 +265,30 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const toggleBranchStatus = async (branchId: string, currentStatus: boolean) => {
     try {
-      const { data, error } = await supabase
-        .from('account_branches' as any)
-        .update({ is_active: !currentStatus })
-        .eq('id', branchId)
-        .select()
-        .single();
+      const { error: rpcError } = await supabase
+        .rpc('toggle_branch_status', {
+          branch_id_param: branchId,
+          new_status: !currentStatus
+        });
 
-      if (error) throw error;
+      if (rpcError) {
+        console.error('❌ Error toggling branch status via RPC:', rpcError);
+        
+        // Fallback to direct update
+        const { data, error: updateError } = await supabase
+          .from('account_branches')
+          .update({ is_active: !currentStatus })
+          .eq('id', branchId)
+          .select()
+          .single();
 
-      setBranches(branches.map(b => b.id === branchId ? data as unknown as Branch : b));
+        if (updateError) throw updateError;
+        
+        setBranches(branches.map(b => b.id === branchId ? data : b));
+      } else {
+        // Refetch branches after RPC update
+        fetchBranches();
+      }
       
       toast({
         title: t('success'),
