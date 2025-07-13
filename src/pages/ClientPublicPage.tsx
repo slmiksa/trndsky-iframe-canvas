@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,12 +17,17 @@ const ClientPublicPage: React.FC = () => {
   const [hasWebsites, setHasWebsites] = useState(false);
   const [activeWebsite, setActiveWebsite] = useState<any>(null);
 
-  // Parse branch ID from URL path - only if it's actually a branch path
-  const branchId = branchPath && branchPath.trim() && branchPath !== accountId ? branchPath : null;
+  // Parse branch ID from URL path - improved logic
+  const branchId = branchPath && branchPath.trim() && branchPath !== accountId && branchPath !== 'undefined' ? branchPath : null;
 
   // Get account ID from URL or localStorage for TV mode
   const currentAccountId = accountId || localStorage.getItem('tv_account_id');
   const currentBranchId = branchId || localStorage.getItem('tv_branch_id');
+
+  // Clear undefined branch from localStorage if it exists
+  if (localStorage.getItem('tv_branch_id') === 'undefined' || localStorage.getItem('tv_branch_id') === 'null') {
+    localStorage.removeItem('tv_branch_id');
+  }
 
   console.log('🏪 Client Public Page - Account:', currentAccountId, 'Branch:', currentBranchId);
   console.log('🔍 URL branchPath:', branchPath, 'Parsed branchId:', branchId);
@@ -33,7 +37,7 @@ const ClientPublicPage: React.FC = () => {
     if (currentAccountId) {
       localStorage.setItem('tv_account_id', currentAccountId);
     }
-    if (currentBranchId) {
+    if (currentBranchId && currentBranchId !== 'undefined') {
       localStorage.setItem('tv_branch_id', currentBranchId);
     } else {
       localStorage.removeItem('tv_branch_id');
@@ -65,7 +69,7 @@ const ClientPublicPage: React.FC = () => {
       let hasActiveWebsite = false;
       
       if (data && data.length > 0) {
-        if (currentBranchId) {
+        if (currentBranchId && currentBranchId !== 'undefined') {
           // Looking for branch-specific content
           console.log('🔍 Looking for websites assigned to branch:', currentBranchId);
           
@@ -88,7 +92,7 @@ const ClientPublicPage: React.FC = () => {
             const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
             console.log(`Website ${website.id} (${website.website_title}) branch assignment:`, websiteBranchId);
             
-            if (!websiteBranchId || websiteBranchId === '' || websiteBranchId === 'null') {
+            if (!websiteBranchId || websiteBranchId === '' || websiteBranchId === 'null' || websiteBranchId === 'undefined') {
               activeWebsiteData = website;
               hasActiveWebsite = true;
               console.log('✅ Found main account website:', website.website_title);
@@ -171,8 +175,8 @@ const ClientPublicPage: React.FC = () => {
             <h2 className="text-white text-xl font-semibold">{activeWebsite.website_title || 'موقع ويب'}</h2>
             <div className="text-white/80 text-sm">
               <p>موقع نشط</p>
-              {currentBranchId && <p className="text-xs text-blue-300">فرع: {currentBranchId}</p>}
-              {!currentBranchId && <p className="text-xs text-green-300">الحساب الرئيسي</p>}
+              {currentBranchId && currentBranchId !== 'undefined' && <p className="text-xs text-blue-300">فرع: {currentBranchId}</p>}
+              {(!currentBranchId || currentBranchId === 'undefined') && <p className="text-xs text-green-300">الحساب الرئيسي</p>}
             </div>
           </div>
         </div>
@@ -181,7 +185,7 @@ const ClientPublicPage: React.FC = () => {
       {!hasWebsites && hasVideos && (
         <VideoDisplay 
           accountId={currentAccountId}
-          branchId={currentBranchId}
+          branchId={currentBranchId && currentBranchId !== 'undefined' ? currentBranchId : null}
           onActivityChange={handleVideoActivity}
         />
       )}
@@ -189,7 +193,7 @@ const ClientPublicPage: React.FC = () => {
       {!hasWebsites && !hasVideos && hasSlideshows && (
         <SlideshowDisplay 
           accountId={currentAccountId}
-          branchId={currentBranchId}
+          branchId={currentBranchId && currentBranchId !== 'undefined' ? currentBranchId : null}
           onActivityChange={handleSlideshowActivity}
         />
       )}
@@ -197,7 +201,7 @@ const ClientPublicPage: React.FC = () => {
       {!hasWebsites && !hasVideos && !hasSlideshows && hasBreakTimer && (
         <BreakTimerDisplayContainer 
           accountId={currentAccountId}
-          branchId={currentBranchId}
+          branchId={currentBranchId && currentBranchId !== 'undefined' ? currentBranchId : null}
           onActivityChange={handleBreakTimerActivity}
         />
       )}
@@ -206,7 +210,7 @@ const ClientPublicPage: React.FC = () => {
       {hasNotifications && (
         <NotificationDisplay 
           accountId={currentAccountId}
-          branchId={currentBranchId}
+          branchId={currentBranchId && currentBranchId !== 'undefined' ? currentBranchId : null}
           onActivityChange={handleNotificationActivity}
         />
       )}
@@ -214,7 +218,7 @@ const ClientPublicPage: React.FC = () => {
       {hasNewsTicker && (
         <NewsTickerDisplay 
           accountId={currentAccountId}
-          branchId={currentBranchId}
+          branchId={currentBranchId && currentBranchId !== 'undefined' ? currentBranchId : null}
           onActivityChange={handleNewsTickerActivity}
         />
       )}
@@ -229,20 +233,20 @@ const ClientPublicPage: React.FC = () => {
               </div>
               <h1 className="text-4xl font-bold mb-4">نظام العرض</h1>
               <p className="text-xl text-gray-300 mb-2">جاهز للعرض</p>
-              {currentBranchId && (
+              {currentBranchId && currentBranchId !== 'undefined' && (
                 <p className="text-lg text-blue-300">فرع: {currentBranchId}</p>
               )}
-              {!currentBranchId && (
+              {(!currentBranchId || currentBranchId === 'undefined') && (
                 <p className="text-lg text-green-300">الحساب الرئيسي</p>
               )}
             </div>
             <div className="text-sm text-gray-400">
               <p>معرف الحساب: {currentAccountId}</p>
               <p>في انتظار المحتوى...</p>
-              {currentBranchId && (
+              {currentBranchId && currentBranchId !== 'undefined' && (
                 <p className="text-yellow-300 mt-2">تحقق من تخصيص المحتوى للفرع في لوحة التحكم</p>
               )}
-              {!currentBranchId && (
+              {(!currentBranchId || currentBranchId === 'undefined') && (
                 <p className="text-yellow-300 mt-2">تحقق من تفعيل المحتوى في لوحة التحكم</p>
               )}
             </div>
@@ -254,7 +258,7 @@ const ClientPublicPage: React.FC = () => {
       {process.env.NODE_ENV === 'development' && (
         <div className="fixed bottom-4 left-4 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-xs z-50">
           <div>Account: {currentAccountId}</div>
-          <div>Branch: {currentBranchId || 'Main'}</div>
+          <div>Branch: {(currentBranchId && currentBranchId !== 'undefined') ? currentBranchId : 'Main'}</div>
           <div>URL branchPath: {branchPath || 'None'}</div>
           <div>Parsed branchId: {branchId || 'None'}</div>
           <div>Websites: {hasWebsites ? '✅' : '❌'}</div>
