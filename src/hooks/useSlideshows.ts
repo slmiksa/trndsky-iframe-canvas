@@ -34,15 +34,19 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
         throw error;
       }
 
-      // Filter slideshows based on branch
+      // Filter slideshows based on branch - safely handle missing branch_id
       let filteredSlideshows = data || [];
       
       if (branchId) {
         // If we're in a specific branch, show only that branch's content
-        filteredSlideshows = filteredSlideshows.filter(slide => slide.branch_id === branchId);
+        filteredSlideshows = filteredSlideshows.filter(slide => 
+          slide.branch_id === branchId
+        );
       } else {
         // If we're in main account view, show only global content (no branch_id)
-        filteredSlideshows = filteredSlideshows.filter(slide => !slide.branch_id);
+        filteredSlideshows = filteredSlideshows.filter(slide => 
+          !slide.branch_id
+        );
       }
 
       console.log('✅ Slideshows fetched for branch:', branchId || 'main', 'count:', filteredSlideshows.length);

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -37,7 +38,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId, branch
         return;
       }
 
-      // Filter news based on branch
+      // Filter news based on branch - safely handle missing branch_id
       let filteredNews = data || [];
       
       if (branchId) {
