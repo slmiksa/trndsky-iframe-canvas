@@ -25,20 +25,27 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching notifications for account:', accountId, 'branch:', branchId);
       
-      // Build the query with proper typing by avoiding reassignments
-      const { data, error } = branchId
-        ? await supabase
-            .from('notifications')
-            .select('*')
-            .eq('account_id', accountId)
-            .eq('branch_id', branchId)
-            .order('created_at', { ascending: false })
-        : await supabase
-            .from('notifications')
-            .select('*')
-            .eq('account_id', accountId)
-            .is('branch_id', null)
-            .order('created_at', { ascending: false });
+      let data, error;
+      
+      if (branchId) {
+        const response = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('account_id', accountId)
+          .eq('branch_id', branchId)
+          .order('created_at', { ascending: false });
+        data = response.data;
+        error = response.error;
+      } else {
+        const response = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('account_id', accountId)
+          .is('branch_id', null)
+          .order('created_at', { ascending: false });
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) {
         console.error('❌ Error fetching notifications:', error);
@@ -58,22 +65,29 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching active notifications for account:', accountId, 'branch:', branchId);
       
-      // Build the query with proper typing by avoiding reassignments
-      const { data, error } = branchId
-        ? await supabase
-            .from('notifications')
-            .select('*')
-            .eq('account_id', accountId)
-            .eq('is_active', true)
-            .eq('branch_id', branchId)
-            .order('created_at', { ascending: false })
-        : await supabase
-            .from('notifications')
-            .select('*')
-            .eq('account_id', accountId)
-            .eq('is_active', true)
-            .is('branch_id', null)
-            .order('created_at', { ascending: false });
+      let data, error;
+      
+      if (branchId) {
+        const response = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('account_id', accountId)
+          .eq('is_active', true)
+          .eq('branch_id', branchId)
+          .order('created_at', { ascending: false });
+        data = response.data;
+        error = response.error;
+      } else {
+        const response = await supabase
+          .from('notifications')
+          .select('*')
+          .eq('account_id', accountId)
+          .eq('is_active', true)
+          .is('branch_id', null)
+          .order('created_at', { ascending: false });
+        data = response.data;
+        error = response.error;
+      }
 
       if (error) {
         console.error('❌ Error fetching active notifications:', error);
