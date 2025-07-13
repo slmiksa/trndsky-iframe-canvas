@@ -7,12 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle, FileText, Eye, EyeOff, KeyRound, Building2 } from 'lucide-react';
+import { Plus, Users, Globe, Settings, Clock, Calendar, AlertCircle, FileText, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { hashPassword } from '@/utils/authUtils';
 import NotificationManager from '@/components/NotificationManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
-import BranchManager from '@/components/BranchManager';
 
 interface Account {
   id: string;
@@ -44,7 +43,7 @@ const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers' | 'subscription-requests' | 'branches'>('accounts');
+  const [activeTab, setActiveTab] = useState<'accounts' | 'notifications' | 'timers' | 'subscription-requests'>('accounts');
   const [editingActivation, setEditingActivation] = useState<string | null>(null);
   const [showingPassword, setShowingPassword] = useState<string | null>(null);
   const [editingPassword, setEditingPassword] = useState<string | null>(null);
@@ -566,17 +565,6 @@ const SuperAdminDashboard = () => {
               الحسابات
             </button>
             <button
-              onClick={() => setActiveTab('branches')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'branches'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Building2 className="h-4 w-4 inline mr-2" />
-              الفروع
-            </button>
-            <button
               onClick={() => setActiveTab('subscription-requests')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'subscription-requests'
@@ -612,8 +600,8 @@ const SuperAdminDashboard = () => {
           </div>
         </div>
 
-        {/* Account Selector for Notifications, Timers, and Branches */}
-        {(activeTab === 'notifications' || activeTab === 'timers' || activeTab === 'branches') && (
+        {/* Account Selector for Notifications and Timers */}
+        {(activeTab === 'notifications' || activeTab === 'timers') && (
           <div className="mb-6">
             <Card>
               <CardContent className="p-4">
@@ -935,22 +923,6 @@ const SuperAdminDashboard = () => {
                   ))
                 )}
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {activeTab === 'branches' && selectedAccount && (
-          <BranchManager 
-            accountId={selectedAccount} 
-            accountName={accounts.find(acc => acc.id === selectedAccount)?.name || 'الحساب المحدد'}
-          />
-        )}
-
-        {activeTab === 'branches' && !selectedAccount && (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">يرجى اختيار حساب لإدارة الفروع</p>
             </CardContent>
           </Card>
         )}
