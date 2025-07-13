@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +5,7 @@ import SuperAdminDashboard from './SuperAdminDashboard';
 import ClientDashboard from './ClientDashboard';
 
 const Dashboard = () => {
-  const { user, userRole, loading } = useAuth();
+  const { user, userRole, loading, accountId } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -14,6 +13,14 @@ const Dashboard = () => {
       navigate('/login');
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    // For account users, redirect to their specific dashboard with account ID
+    if (!loading && user && userRole === 'account_user' && accountId) {
+      console.log('🔄 Redirecting account user to specific dashboard:', `/dashboard/${accountId}`);
+      navigate(`/dashboard/${accountId}`, { replace: true });
+    }
+  }, [user, userRole, loading, accountId, navigate]);
 
   if (loading) {
     return (
@@ -32,7 +39,8 @@ const Dashboard = () => {
 
   if (userRole === 'super_admin') {
     return <SuperAdminDashboard />;
-  } else if (userRole === 'account_user') {
+  } else if (userRole === 'account_user' && accountId) {
+    // This should not be reached due to the redirect above, but keeping as fallback
     return <ClientDashboard />;
   }
 

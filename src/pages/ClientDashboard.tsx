@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,14 +40,23 @@ interface Branch {
 
 const ClientDashboard: React.FC = () => {
   const { accountId } = useParams<{ accountId: string }>();
+  const { user, userRole, loading: authLoading } = useAuth();
   const [account, setAccount] = useState<Account | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if user is authenticated and has the right role
   useEffect(() => {
-    if (accountId) {
+    if (!authLoading && (!user || userRole !== 'account_user')) {
+      console.log('❌ Unauthorized access to dashboard');
+    }
+  }, [user, userRole, authLoading]);
+
+  useEffect(() => {
+    if (accountId && !authLoading && user && userRole === 'account_user') {
+      console.log('🔍 Loading dashboard for account:', accountId);
       loadAccountData();
       loadBranches();
       
@@ -57,7 +66,7 @@ const ClientDashboard: React.FC = () => {
         setSelectedBranchId(savedBranchId);
       }
     }
-  }, [accountId]);
+  }, [accountId, authLoading, user, userRole]);
 
   const loadAccountData = async () => {
     try {
@@ -143,7 +152,7 @@ const ClientDashboard: React.FC = () => {
     window.open(url, '_blank');
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -152,6 +161,10 @@ const ClientDashboard: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  if (!user || userRole !== 'account_user') {
+    return <Navigate to="/login" replace />;
   }
 
   if (error || !account) {
