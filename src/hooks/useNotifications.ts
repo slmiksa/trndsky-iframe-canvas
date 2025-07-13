@@ -13,10 +13,9 @@ interface Notification {
   display_duration: number;
   created_at: string;
   updated_at: string;
-  branch_id?: string | null;
 }
 
-export const useNotifications = (accountId?: string, branchId?: string | null) => {
+export const useNotifications = (accountId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,30 +23,13 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     if (!accountId) return;
 
     try {
-      console.log('🔍 Fetching notifications for account:', accountId, 'branch:', branchId);
+      console.log('🔍 Fetching notifications for account:', accountId);
       
-      // Build completely separate queries to avoid deep type instantiation
-      let result: any;
-      
-      if (branchId) {
-        result = await supabase
-          .from('notifications')
-          .select('*')
-          .match({ 
-            account_id: accountId, 
-            branch_id: branchId 
-          })
-          .order('created_at', { ascending: false });
-      } else {
-        result = await supabase
-          .from('notifications')
-          .select('*')
-          .match({ account_id: accountId })
-          .is('branch_id', null)
-          .order('created_at', { ascending: false });
-      }
-      
-      const { data, error } = result;
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching notifications:', error);
@@ -63,36 +45,16 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     }
   };
 
-  const fetchActiveNotifications = async (accountId: string, branchId?: string | null) => {
+  const fetchActiveNotifications = async (accountId: string) => {
     try {
-      console.log('🔍 Fetching active notifications for account:', accountId, 'branch:', branchId);
+      console.log('🔍 Fetching active notifications for account:', accountId);
       
-      // Build completely separate queries to avoid deep type instantiation
-      let result: any;
-      
-      if (branchId) {
-        result = await supabase
-          .from('notifications')
-          .select('*')
-          .match({ 
-            account_id: accountId, 
-            is_active: true,
-            branch_id: branchId 
-          })
-          .order('created_at', { ascending: false });
-      } else {
-        result = await supabase
-          .from('notifications')
-          .select('*')
-          .match({ 
-            account_id: accountId, 
-            is_active: true 
-          })
-          .is('branch_id', null)
-          .order('created_at', { ascending: false });
-      }
-      
-      const { data, error } = result;
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('account_id', accountId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching active notifications:', error);
@@ -225,7 +187,7 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
 
   useEffect(() => {
     fetchNotifications();
-  }, [accountId, branchId]);
+  }, [accountId]);
 
   return {
     notifications,

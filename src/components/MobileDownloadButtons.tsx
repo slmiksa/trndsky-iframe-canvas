@@ -1,9 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useLanguage } from '@/hooks/useLanguage';
 const MobileDownloadButtons = () => {
-  const { t } = useLanguage();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [isPWA, setIsPWA] = React.useState(false);
   React.useEffect(() => {
@@ -37,19 +35,19 @@ const MobileDownloadButtons = () => {
   return <>
       <div className="flex justify-center gap-4">
         
-        <Button onClick={handleDownloadClick} variant="secondary" size="lg" className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6 text-xl">{t('downloadButtonText')}</Button>
+        <Button onClick={handleDownloadClick} variant="secondary" size="lg" className="bg-white/90 backdrop-blur-sm hover:bg-white text-slate-800 font-semibold rounded-xl shadow-lg px-6 text-xl">أبل / أندرويد</Button>
       </div>
 
       <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('addToHomeScreen')}</AlertDialogTitle>
+            <AlertDialogTitle>إضافة إلى الشاشة الرئيسية</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('addToHomeScreenInstructions')}
+              لإضافة هذا الموقع إلى شاشتك الرئيسية كتطبيق، اتبع الخطوات الخاصة بمتصفحك. على أجهزة آيفون، اضغط على زر المشاركة ثم 'إضافة إلى الشاشة الرئيسية'. على أجهزة أندرويد، اضغط على قائمة الخيارات (ثلاث نقاط) ثم 'تثبيت التطبيق' أو 'إضافة إلى الشاشة الرئيسية'.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction>{t('understood')}</AlertDialogAction>
+            <AlertDialogAction>فهمت</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

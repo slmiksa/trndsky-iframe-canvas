@@ -19,16 +19,14 @@ interface BreakTimer {
   is_active: boolean;
   position: string;
   created_at: string;
-  branch_id?: string | null;
 }
 
 interface BreakTimerManagerProps {
   accountId: string;
-  branchId?: string | null;
 }
 
-const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branchId }) => {
-  console.log('🔍 BreakTimerManager rendered with accountId:', accountId, 'branchId:', branchId);
+const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
+  console.log('🔍 BreakTimerManager rendered with accountId:', accountId);
   
   const {
     timers,
@@ -47,23 +45,11 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter timers by branch if branchId is provided
-  const filteredTimers = branchId 
-    ? timers.filter(timer => {
-        const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
-        return timerBranchId === branchId;
-      })
-    : timers.filter(timer => {
-        const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
-        return !timerBranchId;
-      });
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     console.log('📝 Starting timer creation with data:', {
       accountId,
-      branchId,
       title: newTimer.title,
       start_time: newTimer.start_time,
       end_time: newTimer.end_time,
@@ -117,7 +103,6 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
         end_time: newTimer.end_time,
         is_active: true,
         position: newTimer.position,
-        branch_id: branchId,
       };
 
       console.log('💾 Creating timer with data:', timerData);
@@ -172,7 +157,6 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
   const handleDeleteTimer = async (id: string) => {
     try {
       await deleteTimer(id);
-      
       toast({
         title: "تم حذف المؤقت",
         description: "تم حذف المؤقت بنجاح",
@@ -205,7 +189,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            إدارة مؤقتات البريك ({filteredTimers.length})
+            إدارة مؤقتات البريك ({timers.length})
           </CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
@@ -288,7 +272,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
         </div>
       </CardHeader>
       <CardContent>
-        {filteredTimers.length === 0 ? (
+        {timers.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">لا توجد مؤقتات بعد</p>
@@ -296,7 +280,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredTimers.map((timer) => (
+            {timers.map((timer) => (
               <div
                 key={timer.id}
                 className="border rounded-lg p-4 hover:bg-gray-50"

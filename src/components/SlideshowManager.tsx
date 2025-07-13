@@ -1,424 +1,580 @@
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit2, Trash2, Image, Play, Pause, Eye } from 'lucide-react';
-import { useSlideshows } from '@/hooks/useSlideshows';
-import { Slider } from '@/components/ui/slider';
-import { useLanguage } from '@/hooks/useLanguage';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { Plus, Images, Eye, EyeOff, Trash2, Upload, RefreshCw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface Slideshow {
   id: string;
-  account_id: string;
   title: string;
   images: string[];
   interval_seconds: number;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
-  branch_id?: string | null;
 }
 
 interface SlideshowManagerProps {
   accountId: string;
-  branchId?: string | null;
 }
 
-const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId }) => {
-  const {
-    slideshows,
-    loading,
-    createSlideshow,
-    updateSlideshow,
-    deleteSlideshow,
-  } = useSlideshows(accountId, branchId);
+const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const { t } = useLanguage();
-
+  const { userRole } = useAuth();
+  const [slideshows, setSlideshows] = useState<Slideshow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedSlideshow, setSelectedSlideshow] = useState<Slideshow | null>(null);
   const [newSlideshow, setNewSlideshow] = useState({
     title: '',
-    images: [] as string[],
-    interval_seconds: 5,
+    images: [] as File[]
   });
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewSlideshow, setPreviewSlideshow] = useState<Slideshow | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [uploading, setUploading] = useState(false);
+
+  const fetchSlideshows = async () => {
+    try {
+      console.log('🔍 Fetching slideshows for account:', accountId);
+      
+      const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
+        p_account_id: accountId
+      });
+
+      if (error) {
+        console.error('❌ Error fetching slideshows:', error);
+        toast({
+          title: 'خطأ في تحميل السلايدات',
+          description: `خطأ: ${error.message}`,
+          variant: "destructive"
+        });
+        setSlideshows([]);
+        return;
+      }
+
+      console.log('✅ Slideshows fetched successfully:', data);
+      setSlideshows(data || []);
+    } catch (error) {
+      console.error('❌ Exception in fetchSlideshows:', error);
+      toast({
+        title: 'خطأ في تحميل السلايدات',
+        description: 'حدث خطأ غير متوقع',
+        variant: "destructive"
+      });
+      setSlideshows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    if (accountId) {
+      console.log('🚀 SlideshowManager mounted for account:', accountId);
+      fetchSlideshows();
+    }
+    
+    const channel = supabase
+      .channel(`slideshows-${accountId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'account_slideshows',
+          filter: `account_id=eq.${accountId}`
+        },
+        async (payload) => {
+          console.log('🎬 Slideshow change detected:', payload);
+          await fetchSlideshows();
+        }
+      )
+      .subscribe();
 
-    if (isPlaying && previewSlideshow) {
-      intervalId = setInterval(() => {
-        setCurrentImageIndex((prevIndex) => (prevIndex + 1) % previewSlideshow.images.length);
-      }, previewSlideshow.interval_seconds * 1000);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [accountId]);
+
+  const uploadImages = async (files: File[]): Promise<string[]> => {
+    const uploadedUrls: string[] = [];
+    
+    for (const file of files) {
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${accountId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        
+        console.log('📤 Uploading file to slideshow-images bucket:', fileName);
+        
+        const { data, error } = await supabase.storage
+          .from('slideshow-images')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          console.error('❌ Error uploading file:', error);
+          throw new Error(`فشل رفع الملف ${file.name}: ${error.message}`);
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('slideshow-images')
+          .getPublicUrl(fileName);
+
+        console.log('✅ File uploaded successfully:', publicUrl);
+        uploadedUrls.push(publicUrl);
+      } catch (error) {
+        console.error('❌ Error in uploadImages:', error);
+        throw error;
+      }
     }
 
-    return () => clearInterval(intervalId);
-  }, [isPlaying, previewSlideshow]);
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setSelectedImages(files);
-
-    // Create preview URLs for display only
-    const previewUrls = files.map(file => URL.createObjectURL(file));
-    setNewSlideshow({ ...newSlideshow, images: previewUrls });
+    return uploadedUrls;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const addSlideshow = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!newSlideshow.title.trim()) {
+    if (newSlideshow.images.length === 0) {
       toast({
-        title: "خطأ",
-        description: 'عنوان السلايدات مطلوب',
-        variant: "destructive",
+        title: 'خطأ',
+        description: 'يرجى اختيار صور للسلايدات',
+        variant: "destructive"
       });
       return;
     }
 
-    if (selectedImages.length === 0) {
-      toast({
-        title: "خطأ",
-        description: 'يرجى رفع صورة واحدة على الأقل',
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
+    setUploading(true);
     try {
-      const slideshowData = {
-        account_id: accountId,
-        title: newSlideshow.title,
-        images: [], // Will be populated after upload
-        interval_seconds: newSlideshow.interval_seconds,
-        is_active: true,
-        branch_id: branchId,
-      };
+      console.log('📤 Starting slideshow creation process for account:', accountId);
+      
+      // رفع الصور أولاً
+      const imageUrls = await uploadImages(newSlideshow.images);
+      console.log('✅ Images uploaded successfully:', imageUrls);
+      
+      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات مع قيمة افتراضية للفترة (15 ثواني)
+      const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
+        p_account_id: accountId,
+        p_title: newSlideshow.title,
+        p_images: imageUrls,
+        p_interval_seconds: 15 // قيمة افتراضية ثابتة
+      });
 
-      // Pass the actual files for upload
-      const result = await createSlideshow(slideshowData, selectedImages);
+      if (error) {
+        console.error('❌ Error creating slideshow:', error);
+        throw new Error(`فشل في إنشاء السلايدات: ${error.message}`);
+      }
+
+      console.log('✅ Slideshow created successfully with ID:', data);
 
       toast({
-        title: "نجح",
-        description: 'تم إضافة السلايدات بنجاح',
+        title: 'تم إضافة السلايدات بنجاح',
+        description: newSlideshow.title
       });
 
-      // Clean up preview URLs
-      newSlideshow.images.forEach(url => {
-        if (url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-
-      setNewSlideshow({
-        title: '',
-        images: [],
-        interval_seconds: 5,
-      });
-      setSelectedImages([]);
+      setNewSlideshow({ title: '', images: [] });
       setShowAddForm(false);
+      
+      await fetchSlideshows();
+      
     } catch (error: any) {
-      console.error('Error creating slideshow:', error);
+      console.error('❌ Error in addSlideshow:', error);
       toast({
-        title: "خطأ",
-        description: `خطأ في إضافة السلايدات: ${error.message || 'خطأ غير معروف'}`,
-        variant: "destructive",
+        title: 'خطأ في إضافة السلايدات',
+        description: error.message || 'حدث خطأ غير متوقع',
+        variant: "destructive"
       });
     } finally {
-      setIsSubmitting(false);
+      setUploading(false);
     }
   };
 
-  const toggleSlideshowStatus = async (slideshow: Slideshow) => {
+  const toggleSlideshowStatus = async (slideshowId: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+
+    // Optimistic UI update for instant feedback. This makes the UI feel responsive.
+    setSlideshows(prevSlideshows =>
+      prevSlideshows.map(slide => {
+        if (newStatus) {
+          // When activating, set this one to true and all others to false.
+          return { ...slide, is_active: slide.id === slideshowId };
+        } else {
+          // When deactivating, just set this one to false.
+          return slide.id === slideshowId ? { ...slide, is_active: false } : slide;
+        }
+      })
+    );
+
     try {
-      await updateSlideshow(slideshow.id, {
-        is_active: !slideshow.is_active,
-      });
+      if (newStatus) {
+        // --- Activating a slideshow ---
+        // This logic replaces the faulty database trigger.
+        
+        // Step 1: Deactivate all slideshows for this account in the database.
+        console.log(`🔵 Deactivating all slideshows for account ${accountId}...`);
+        const { error: deactivateError } = await supabase
+          .from('account_slideshows')
+          .update({ is_active: false })
+          .eq('account_id', accountId);
 
-      toast({
-        title: t('success'),
-        description: `تم ${!slideshow.is_active ? 'تفعيل' : 'إيقاف'} السلايدات`,
-      });
+        if (deactivateError) {
+          console.error('❌ Error deactivating slideshows:', deactivateError);
+          throw new Error(`فشل في إيقاف السلايدات الحالية: ${deactivateError.message}`);
+        }
+        console.log('🟢 All slideshows deactivated.');
+
+        // Step 2: Activate the selected slideshow.
+        console.log(`🔵 Activating slideshow ${slideshowId}...`);
+        const { error: activateError } = await supabase
+          .from('account_slideshows')
+          .update({ is_active: true })
+          .eq('id', slideshowId);
+
+        if (activateError) {
+          console.error('❌ Error activating slideshow:', activateError);
+          throw new Error(`فشل في تشغيل السلايد شو المحدد: ${activateError.message}`);
+        }
+        console.log('🟢 Slideshow activated.');
+
+        toast({
+          title: 'تم تشغيل السلايد شو بنجاح',
+        });
+
+      } else {
+        // --- Deactivating a slideshow ---
+        // This is simpler, we just update the specific slideshow.
+        console.log(`🔵 Deactivating slideshow ${slideshowId}...`);
+        const { error } = await supabase
+          .from('account_slideshows')
+          .update({ is_active: false })
+          .eq('id', slideshowId);
+
+        if (error) {
+          console.error('❌ Error deactivating slideshow:', error);
+          throw new Error(`فشل في إيقاف السلايد شو: ${error.message}`);
+        }
+        console.log('🟢 Slideshow deactivated.');
+
+        toast({
+          title: 'تم إيقاف السلايد شو',
+        });
+      }
+
+      // Finally, refetch everything to ensure the UI is in perfect sync with the database.
+      console.log('✅ Operation successful. Refetching to sync UI with DB.');
+      await fetchSlideshows();
+
     } catch (error: any) {
-      console.error('Error updating slideshow:', error);
+      console.error('❌ Error in toggleSlideshowStatus:', error);
       toast({
-        title: t('error'),
-        description: `خطأ في تحديث السلايدات: ${error.message || 'خطأ غير معروف'}`,
-        variant: "destructive",
+        title: 'خطأ في تحديث السلايد شو',
+        description: error.message,
+        variant: "destructive"
       });
+      // On any error, fetch from DB to revert the optimistic UI changes.
+      await fetchSlideshows();
     }
   };
 
-  const handleDeleteSlideshow = async (id: string) => {
+  const deleteSlideshow = async (slideshowId: string) => {
     try {
-      await deleteSlideshow(id);
+      console.log('🗑️ Deleting slideshow:', slideshowId);
+      
+      const slideshow = slideshows.find(s => s.id === slideshowId);
+      if (slideshow && slideshow.images) {
+        // حذف الصور من التخزين
+        for (const imageUrl of slideshow.images) {
+          try {
+            const urlParts = imageUrl.split('/');
+            const fileName = urlParts[urlParts.length - 1];
+            const folderName = urlParts[urlParts.length - 2];
+            const filePath = `${folderName}/${fileName}`;
+            
+            await supabase.storage
+              .from('slideshow-images')
+              .remove([filePath]);
+          } catch (storageError) {
+            console.warn('⚠️ Could not delete image from storage:', storageError);
+          }
+        }
+      }
 
+      const { error } = await supabase
+        .from('account_slideshows')
+        .delete()
+        .eq('id', slideshowId)
+        .eq('account_id', accountId); // التأكد من أن السلايد شو ينتمي للحساب
+
+      if (error) {
+        console.error('❌ Error deleting slideshow:', error);
+        throw error;
+      }
+
+      console.log('✅ Slideshow deleted successfully');
       toast({
-        title: t('success'),
-        description: 'تم حذف السلايدات',
+        title: 'تم حذف السلايدات',
+        description: 'تم حذف السلايدات بنجاح'
       });
+
+      setSelectedSlideshow(null);
+      await fetchSlideshows();
     } catch (error: any) {
-      console.error('Error deleting slideshow:', error);
+      console.error('❌ Error in deleteSlideshow:', error);
       toast({
-        title: t('error'),
-        description: `خطأ في حذف السلايدات: ${error.message || 'خطأ غير معروف'}`,
-        variant: "destructive",
+        title: 'خطأ في حذف السلايدات',
+        description: error.message,
+        variant: "destructive"
       });
     }
   };
 
-  const handlePreview = (slideshow: Slideshow) => {
-    setPreviewSlideshow(slideshow);
-    setCurrentImageIndex(0);
-    setIsPlaying(true);
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setNewSlideshow(prev => ({ ...prev, images: files }));
+    }
   };
 
-  const handleClosePreview = () => {
-    setPreviewSlideshow(null);
-    setIsPlaying(false);
+  const handleRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    setLoading(true);
+    await fetchSlideshows();
   };
-
-  if (loading) {
-    return <div className="text-center py-8">Loading...</div>;
-  }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle className="flex items-center gap-2">
-            <Image className="h-5 w-5" />
-            السلايدات ({slideshows.length})
-            {branchId && <Badge variant="outline" className="text-xs">فرع: {branchId}</Badge>}
-            {!branchId && <Badge variant="outline" className="text-xs">الحساب الرئيسي</Badge>}
-          </CardTitle>
-          <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                إضافة سلايدات
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>إضافة سلايدات</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="title">عنوان السلايدات</Label>
-                  <Input
-                    id="title"
-                    value={newSlideshow.title}
-                    onChange={(e) => setNewSlideshow({ ...newSlideshow, title: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="images">رفع الصور</Label>
-                  <Input
-                    id="images"
-                    type="file"
-                    multiple
-                    onChange={handleImageUpload}
-                    accept="image/*"
-                    required
-                  />
-                  {selectedImages.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 mb-2">
-                        عدد الصور: {selectedImages.length}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2">
-                        {newSlideshow.images.map((url, index) => (
-                          <img
-                            key={index}
-                            src={url}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-16 object-cover rounded border"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="interval">مدة عرض كل صورة (ثواني)</Label>
-                  <Slider
-                    id="interval"
-                    defaultValue={[newSlideshow.interval_seconds]}
-                    max={30}
-                    min={3}
-                    step={1}
-                    onValueChange={(value) => setNewSlideshow({ ...newSlideshow, interval_seconds: value[0] })}
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    {newSlideshow.interval_seconds} ثواني
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={isSubmitting} className="flex-1">
-                    {isSubmitting ? 'جاري الرفع والحفظ...' : 'إضافة'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      // Clean up preview URLs
-                      newSlideshow.images.forEach(url => {
-                        if (url.startsWith('blob:')) {
-                          URL.revokeObjectURL(url);
-                        }
-                      });
-                      setShowAddForm(false);
-                      setNewSlideshow({
-                        title: '',
-                        images: [],
-                        interval_seconds: 5,
-                      });
-                      setSelectedImages([]);
-                    }}
-                  >
-                    {t('cancel')}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {slideshows.length === 0 ? (
-          <div className="text-center py-8">
-            <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">لا توجد سلايدات بعد</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {slideshows.map((slideshow) => (
-              <div
-                key={slideshow.id}
-                className="border rounded-lg p-4 hover:bg-gray-50"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <Image className="h-4 w-4 text-blue-500" />
-                    <h3 className="font-semibold">{slideshow.title}</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={slideshow.is_active ? "default" : "secondary"}>
-                      {slideshow.is_active ? t('active') : 'متوقف'}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => toggleSlideshowStatus(slideshow)}
-                    >
-                      {slideshow.is_active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handlePreview(slideshow)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            حذف السلايدات
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            هل أنت متأكد من حذف هذه السلايدات؟
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteSlideshow(slideshow.id)}>
-                            حذف
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-                <div className="text-sm text-gray-600">
-                  مدة العرض: {slideshow.interval_seconds} ثواني
-                </div>
-                <div className="text-xs text-gray-500">
-                  {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-
-      {/* Slideshow Preview Dialog */}
-      <Dialog open={previewSlideshow !== null} onOpenChange={(open) => {
-        if (!open) {
-          handleClosePreview();
-        }
-      }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{previewSlideshow?.title || 'معاينة السلايدات'}</DialogTitle>
-          </DialogHeader>
-          {previewSlideshow ? (
-            <div className="relative">
-              <img
-                src={previewSlideshow.images[currentImageIndex]}
-                alt={`Slide ${currentImageIndex + 1}`}
-                className="w-full h-96 object-contain rounded-lg"
-              />
-              <div className="absolute top-2 right-2 flex gap-2">
-                <Badge>{currentImageIndex + 1} / {previewSlideshow.images.length}</Badge>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setIsPlaying(!isPlaying)}
-                >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* قائمة السلايد شوز */}
+      <div>
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>
+                السلايد شوز ({slideshows.length})
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button onClick={handleRefresh} size="sm" variant="outline" disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  تحديث
+                </Button>
+                <Button onClick={() => setShowAddForm(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  إضافة سلايد شو
                 </Button>
               </div>
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <Image className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">اختر سلايدات لمعاينتها</p>
+            
+            <div className="mt-4 text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
+              <p className="font-medium">النظام الحالي:</p>
+              <ul className="mt-2 space-y-1 text-xs list-disc list-inside">
+                <li>يمكن تنشيط سلايد شو واحد فقط في كل مرة.</li>
+                <li>عند تنشيط سلايد شو، سيتم إيقاف أي سلايد شو آخر نشط تلقائياً.</li>
+                <li>كل سلايد شو يعرض صوره بفترة 15 ثواني بين كل صورة.</li>
+                <li>استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو.</li>
+              </ul>
             </div>
-          )}
-          <Button variant="outline" className="mt-4" onClick={handleClosePreview}>
-            إغلاق
-          </Button>
-        </DialogContent>
-      </Dialog>
-    </Card>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                <p className="mt-2 text-gray-600">جاري التحميل...</p>
+              </div>
+            ) : slideshows.length === 0 ? (
+              <div className="text-center py-8">
+                <Images className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-gray-600">لا توجد سلايد شوز حتى الآن</p>
+                <p className="text-sm text-gray-500 mt-2">Account ID: {accountId}</p>
+                <Button 
+                  onClick={handleRefresh} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2"
+                >
+                  تحديث
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {slideshows.map(slideshow => (
+                  <div 
+                    key={slideshow.id} 
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      selectedSlideshow?.id === slideshow.id ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'
+                    }`} 
+                    onClick={() => setSelectedSlideshow(slideshow)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold">{slideshow.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={slideshow.is_active ? "default" : "secondary"}>
+                          {slideshow.is_active ? 'نشط' : 'متوقف'}
+                        </Badge>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSlideshowStatus(slideshow.id, slideshow.is_active);
+                          }}
+                          title={slideshow.is_active ? 'إيقاف السلايد شو' : 'تشغيل السلايد شو'}
+                        >
+                          {slideshow.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSlideshow(slideshow.id);
+                          }}
+                          title="حذف السلايد شو"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <span>{slideshow.images.length} صورة</span>
+                      <span>15 ثانية لكل صورة</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* نموذج إضافة سلايد شو المبسط */}
+            {showAddForm && (
+              <div className="mt-6 border-t pt-6">
+                <form onSubmit={addSlideshow} className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">عنوان السلايد شو</Label>
+                    <Input 
+                      id="title" 
+                      type="text" 
+                      value={newSlideshow.title} 
+                      onChange={(e) => setNewSlideshow({ ...newSlideshow, title: e.target.value })} 
+                      placeholder="اسم السلايد شو" 
+                      required 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="images">رفع الصور</Label>
+                    <Input 
+                      id="images" 
+                      type="file" 
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      required 
+                    />
+                    {newSlideshow.images.length > 0 && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        تم اختيار {newSlideshow.images.length} صورة
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      سيتم عرض كل صورة لمدة 15 ثواني افتراضياً
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={uploading}>
+                      {uploading ? <Upload className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      {uploading ? 'جاري الرفع...' : 'إضافة'}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setShowAddForm(false);
+                        setNewSlideshow({ title: '', images: [] });
+                      }}
+                    >
+                      إلغاء
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* معاينة السلايد شو */}
+      <div>
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>
+              {selectedSlideshow ? selectedSlideshow.title : 'معاينة السلايد شو'}
+            </CardTitle>
+            {selectedSlideshow && (
+              <p className="text-sm text-gray-600">
+                {selectedSlideshow.images.length} صورة - 15 ثواني لكل صورة
+              </p>
+            )}
+          </CardHeader>
+          <CardContent className="h-96 lg:h-[500px]">
+            {selectedSlideshow ? (
+              <SlideshowPreview slideshow={selectedSlideshow} />
+            ) : (
+              <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+                <div className="text-center text-gray-500">
+                  <Images className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                  <p>اختر سلايد شو للمعاينة</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// مكون معاينة السلايدات
+const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  useEffect(() => {
+    if (slideshow.images.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % slideshow.images.length);
+    }, 15000); // استخدام 15 ثواني ثابت
+
+    return () => clearInterval(interval);
+  }, [slideshow.images.length]);
+
+  if (slideshow.images.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
+        <p className="text-gray-500">لا توجد صور</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-full w-full rounded-lg overflow-hidden bg-black">
+      <img 
+        src={slideshow.images[currentImageIndex]} 
+        alt={`Slide ${currentImageIndex + 1}`}
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
+        {slideshow.images.map((_, index) => (
+          <div 
+            key={index} 
+            className={`w-2 h-2 rounded-full ${
+              index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+            }`} 
+          />
+        ))}
+      </div>
+    </div>
   );
 };
 

@@ -10,7 +10,6 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import ClientDashboard from "./pages/ClientDashboard";
 import ClientPublicPage from "./pages/ClientPublicPage";
 import SubscriptionRequest from "./pages/SubscriptionRequest";
 import NotFound from "./pages/NotFound";
@@ -29,9 +28,7 @@ const App: React.FC = () => (
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/dashboard/:accountId" element={<ClientDashboard />} />
               <Route path="/client/:accountId" element={<ClientPublicPage />} />
-              <Route path="/client/:accountId/:branchPath" element={<ClientPublicPage />} />
               <Route path="/tv" element={<ClientPublicPage />} />
               <Route path="/subscription-request" element={<SubscriptionRequest />} />
               <Route path="*" element={<NotFound />} />

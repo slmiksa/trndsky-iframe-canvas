@@ -3,124 +3,162 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Edit2, Trash2, Bell, Play, Pause } from 'lucide-react';
+import { Plus, Eye, EyeOff, Trash2, Upload } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Slider } from '@/components/ui/slider';
-import { useLanguage } from '@/hooks/useLanguage';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Notification {
   id: string;
   account_id: string;
   title: string;
-  message?: string | null;
-  image_url?: string | null;
+  message: string | null;
+  image_url: string | null;
+  is_active: boolean;
   position: string;
   display_duration: number;
-  is_active: boolean;
   created_at: string;
-  updated_at: string;
-  branch_id?: string | null;
 }
 
 interface NotificationManagerProps {
   accountId: string;
-  branchId?: string | null;
 }
 
-const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, branchId }) => {
+const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) => {
+  console.log('🔍 NotificationManager rendered with accountId:', accountId);
+  
+  const { user } = useAuth();
+  
   const {
     notifications,
     loading,
     createNotification,
     updateNotification,
     deleteNotification,
-  } = useNotifications(accountId, branchId);
-  const { t } = useLanguage();
+    uploadImage,
+  } = useNotifications(accountId);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newNotification, setNewNotification] = useState({
     title: '',
     message: '',
-    image_url: '',
     position: 'top-right',
     display_duration: 5,
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedImage(file);
-      const imageUrl = URL.createObjectURL(file);
-      setNewNotification({ ...newNotification, image_url: imageUrl });
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('📝 Starting notification creation with data:', {
+      accountId,
+      title: newNotification.title,
+      message: newNotification.message,
+      position: newNotification.position,
+      display_duration: newNotification.display_duration,
+      hasImage: !!selectedImage,
+      user: user
+    });
 
     if (!newNotification.title.trim()) {
       toast({
         title: "خطأ",
-        description: 'عنوان الإشعار مطلوب',
+        description: "يجب إدخال عنوان الإشعار",
         variant: "destructive",
       });
       return;
     }
 
+    if (!accountId) {
+      console.error('❌ No accountId provided');
+      toast({
+        title: "خطأ",
+        description: "لم يتم العثور على معرف الحساب",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user) {
+      console.error('❌ User not authenticated in custom auth');
+      toast({
+        title: "خطأ في المصادقة",
+        description: "يجب تسجيل الدخول لإنشاء إشعار",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('🔐 User authenticated in custom system:', user);
+
     setIsSubmitting(true);
 
     try {
+      let imageUrl = null;
+      
+      if (selectedImage) {
+        console.log('📸 Uploading image...');
+        imageUrl = await uploadImage(selectedImage, accountId);
+        console.log('✅ Image uploaded successfully:', imageUrl);
+      }
+
+      const durationInMs = newNotification.display_duration * 60 * 1000;
+      console.log('⏱️ Duration converted from', newNotification.display_duration, 'minutes to', durationInMs, 'milliseconds');
+
       const notificationData = {
         account_id: accountId,
         title: newNotification.title,
         message: newNotification.message || null,
-        image_url: newNotification.image_url || null,
-        position: newNotification.position,
-        display_duration: newNotification.display_duration,
+        image_url: imageUrl,
         is_active: true,
-        branch_id: branchId,
+        position: newNotification.position,
+        display_duration: durationInMs,
       };
 
-      await createNotification(notificationData);
+      console.log('💾 Creating notification with data:', notificationData);
 
+      const result = await createNotification(notificationData);
+
+      console.log('✅ Notification created successfully:', result);
       toast({
-        title: "نجح",
-        description: 'تم إضافة الإشعار بنجاح',
+        title: "تم إنشاء الإشعار",
+        description: "تم إنشاء الإشعار بنجاح",
       });
 
+      // Reset form
       setNewNotification({
         title: '',
         message: '',
-        image_url: '',
         position: 'top-right',
         display_duration: 5,
       });
       setSelectedImage(null);
+      setImagePreview(null);
       setShowAddForm(false);
-    } catch (error: any) {
-      console.error('Error creating notification:', error);
+    } catch (error) {
+      console.error('❌ Error creating notification:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
       toast({
-        title: "خطأ",
-        description: `خطأ في إضافة الإشعار: ${error.message || 'خطأ غير معروف'}`,
+        title: "خطأ في إنشاء الإشعار",
+        description: `حدث خطأ أثناء إنشاء الإشعار: ${error.message || 'خطأ غير معروف'}`,
         variant: "destructive",
       });
     } finally {
@@ -135,14 +173,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
       });
 
       toast({
-        title: t('success'),
+        title: "تم تحديث الإشعار",
         description: `تم ${!notification.is_active ? 'تفعيل' : 'إيقاف'} الإشعار`,
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating notification:', error);
       toast({
-        title: t('error'),
-        description: `خطأ في تحديث الإشعار: ${error.message || 'خطأ غير معروف'}`,
+        title: "خطأ في تحديث الإشعار",
         variant: "destructive",
       });
     }
@@ -151,46 +188,38 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
   const handleDeleteNotification = async (id: string) => {
     try {
       await deleteNotification(id);
-
       toast({
-        title: t('success'),
-        description: 'تم حذف الإشعار',
+        title: "تم حذف الإشعار",
+        description: "تم حذف الإشعار بنجاح",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting notification:', error);
       toast({
-        title: t('error'),
-        description: `خطأ في حذف الإشعار: ${error.message || 'خطأ غير معروف'}`,
+        title: "خطأ في حذف الإشعار",
         variant: "destructive",
       });
     }
   };
 
-  const getPositionLabel = (position: string) => {
-    const positions: { [key: string]: string } = {
-      'top-right': 'أعلى يمين',
-      'top-left': 'أعلى يسار',
-      'bottom-right': 'أسفل يمين',
-      'bottom-left': 'أسفل يسار',
-      'center': 'وسط الشاشة',
-    };
-    return positions[position] || position;
+  const formatDuration = (durationMs: number) => {
+    const minutes = Math.round(durationMs / (60 * 1000));
+    return `${minutes} دقيقة`;
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading...</div>;
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+        <p className="mt-2 text-gray-600">جاري التحميل...</p>
+      </div>
+    );
   }
 
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            الإشعارات ({notifications.length})
-            {branchId && <Badge variant="outline" className="text-xs">فرع: {branchId}</Badge>}
-            {!branchId && <Badge variant="outline" className="text-xs">الحساب الرئيسي</Badge>}
-          </CardTitle>
+          <CardTitle>إدارة الإشعارات ({notifications.length})</CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
               <Button size="sm">
@@ -200,80 +229,103 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>إضافة إشعار جديد</DialogTitle>
+                <DialogTitle>إنشاء إشعار جديد</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="title">عنوان الإشعار</Label>
+                  <Label htmlFor="title">عنوان الإشعار *</Label>
                   <Input
                     id="title"
                     value={newNotification.title}
                     onChange={(e) => setNewNotification({ ...newNotification, title: e.target.value })}
+                    placeholder="عنوان الإشعار"
                     required
                   />
                 </div>
+                
                 <div>
                   <Label htmlFor="message">رسالة الإشعار</Label>
                   <Textarea
                     id="message"
                     value={newNotification.message}
                     onChange={(e) => setNewNotification({ ...newNotification, message: e.target.value })}
-                    rows={3}
+                    placeholder="محتوى الرسالة (اختياري) - يمكنك كتابة عدة أسطر"
+                    className="min-h-[100px] resize-none"
+                    rows={4}
                   />
                 </div>
+
                 <div>
-                  <Label htmlFor="image">صورة الإشعار (اختيارية)</Label>
+                  <Label htmlFor="position">موضع الإشعار</Label>
+                  <select
+                    id="position"
+                    value={newNotification.position}
+                    onChange={(e) => setNewNotification({ ...newNotification, position: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="top-right">أعلى اليمين</option>
+                    <option value="top-left">أعلى اليسار</option>
+                    <option value="top-center">أعلى الوسط</option>
+                    <option value="center">المنتصف</option>
+                    <option value="bottom-right">أسفل اليمين</option>
+                    <option value="bottom-left">أسفل اليسار</option>
+                    <option value="bottom-center">أسفل الوسط</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label htmlFor="duration">مدة العرض (بالدقائق)</Label>
                   <Input
-                    id="image"
-                    type="file"
-                    onChange={handleImageUpload}
-                    accept="image/*"
-                  />
-                  {selectedImage && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      تم اختيار: {selectedImage.name}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="position">موقع الإشعار</Label>
-                  <Select value={newNotification.position} onValueChange={(value) => setNewNotification({ ...newNotification, position: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="top-right">أعلى يمين</SelectItem>
-                      <SelectItem value="top-left">أعلى يسار</SelectItem>
-                      <SelectItem value="bottom-right">أسفل يمين</SelectItem>
-                      <SelectItem value="bottom-left">أسفل يسار</SelectItem>
-                      <SelectItem value="center">وسط الشاشة</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="duration">مدة العرض (ثواني)</Label>
-                  <Slider
                     id="duration"
-                    defaultValue={[newNotification.display_duration]}
-                    max={30}
-                    min={3}
-                    step={1}
-                    onValueChange={(value) => setNewNotification({ ...newNotification, display_duration: value[0] })}
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={newNotification.display_duration}
+                    onChange={(e) => setNewNotification({ ...newNotification, display_duration: parseInt(e.target.value) || 1 })}
                   />
-                  <p className="text-sm text-gray-500 mt-1">
-                    {newNotification.display_duration} ثواني
-                  </p>
                 </div>
+
+                <div>
+                  <Label htmlFor="image">صورة الإشعار (اختياري)</Label>
+                  <div className="mt-2">
+                    <input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => document.getElementById('image')?.click()}
+                      className="w-full"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {selectedImage ? 'تغيير الصورة' : 'رفع صورة'}
+                    </Button>
+                    {imagePreview && (
+                      <div className="mt-2">
+                        <img
+                          src={imagePreview}
+                          alt="معاينة"
+                          className="w-full h-32 object-cover rounded-md border"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSubmitting} className="flex-1">
-                    {isSubmitting ? 'جاري الإرسال...' : 'إضافة'}
+                    {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء الإشعار'}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setShowAddForm(false)}
                   >
-                    {t('cancel')}
+                    إلغاء
                   </Button>
                 </div>
               </form>
@@ -284,7 +336,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
       <CardContent>
         {notifications.length === 0 ? (
           <div className="text-center py-8">
-            <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-600">لا توجد إشعارات بعد</p>
           </div>
         ) : (
@@ -295,65 +346,43 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId, br
                 className="border rounded-lg p-4 hover:bg-gray-50"
               >
                 <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-4 w-4 text-blue-500" />
-                    <h3 className="font-semibold">{notification.title}</h3>
-                  </div>
+                  <h3 className="font-semibold">{notification.title}</h3>
                   <div className="flex items-center gap-2">
                     <Badge variant={notification.is_active ? "default" : "secondary"}>
-                      {notification.is_active ? t('active') : 'متوقف'}
+                      {notification.is_active ? 'نشط' : 'متوقف'}
                     </Badge>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => toggleNotificationStatus(notification)}
                     >
-                      {notification.is_active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      {notification.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button size="sm" variant="ghost">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>
-                            حذف الإشعار
-                          </AlertDialogTitle>
-                          <AlertDialogDescription>
-                            هل أنت متأكد من حذف هذا الإشعار؟
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteNotification(notification.id)}>
-                            حذف
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteNotification(notification.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 {notification.message && (
-                  <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
+                  <p className="text-sm text-gray-600 mb-2 whitespace-pre-wrap">{notification.message}</p>
                 )}
-                <div className="text-sm text-gray-500 space-y-1">
-                  <div>الموقع: {getPositionLabel(notification.position)}</div>
-                  <div>مدة العرض: {notification.display_duration} ثواني</div>
-                  {notification.image_url && (
-                    <div className="flex items-center gap-2">
-                      <span>يحتوي على صورة</span>
-                      <img 
-                        src={notification.image_url} 
-                        alt="notification" 
-                        className="w-8 h-8 object-cover rounded"
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="text-xs text-gray-400 mt-2">
-                  {new Date(notification.created_at).toLocaleDateString('ar-SA')}
+                {notification.image_url && (
+                  <div className="mb-2">
+                    <img
+                      src={notification.image_url}
+                      alt={notification.title}
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                  </div>
+                )}
+                <div className="flex gap-4 text-xs text-gray-500">
+                  <span>الموضع: {notification.position}</span>
+                  <span>المدة: {formatDuration(notification.display_duration)}</span>
+                  <span>{new Date(notification.created_at).toLocaleDateString('ar-SA')}</span>
                 </div>
               </div>
             ))}

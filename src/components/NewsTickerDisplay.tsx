@@ -8,29 +8,20 @@ interface NewsItem {
   is_active: boolean;
   display_order: number | null;
   created_at: string;
-  account_id: string;
-  updated_at: string;
-  branch_id?: string | null;
 }
 
 interface NewsTickerDisplayProps {
   accountId: string;
-  branchId?: string | null;
-  onActivityChange?: (isActive: boolean) => void;
 }
 
-const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ 
-  accountId, 
-  branchId, 
-  onActivityChange 
-}) => {
+const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fade, setFade] = useState(true);
 
   const fetchNews = async () => {
     try {
-      console.log('🔍 [NewsTickerDisplay] تحميل الأخبار النشطة للحساب:', accountId, 'الفرع:', branchId);
+      console.log('🔍 [NewsTickerDisplay] تحميل الأخبار النشطة للحساب:', accountId);
       const { data, error } = await supabase
         .from('news_ticker')
         .select('*')
@@ -43,51 +34,31 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
         return;
       }
 
-      // Filter news based on branch - safely handle missing branch_id
-      let filteredNews = data || [];
-      
-      if (branchId) {
-        // If we're in a specific branch, show only that branch's content OR global content (no branch_id)
-        filteredNews = filteredNews.filter(news => 
-          !(news as any).branch_id || (news as any).branch_id === branchId
-        );
-      } else {
-        // If we're in main account view, show only global content (no branch_id)
-        filteredNews = filteredNews.filter(news => !(news as any).branch_id);
-      }
-
-      console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة للفرع:', branchId || 'main', 'عدد:', filteredNews.length);
-      
-      // Notify parent about activity change
-      if (onActivityChange) {
-        onActivityChange(filteredNews.length > 0);
-      }
+      const activeNews = data || [];
+      console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة:', activeNews.length, activeNews);
       
       setNewsItems(prevNews => {
-        if (JSON.stringify(prevNews) !== JSON.stringify(filteredNews)) {
+        if (JSON.stringify(prevNews) !== JSON.stringify(activeNews)) {
           console.log('🔄 [NewsTickerDisplay] تغيير في الأخبار - إعادة ضبط الفهرس');
           
-          if (filteredNews.length === 0) {
-            console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة للفرع:', branchId || 'main');
+          if (activeNews.length === 0) {
+            console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة');
             setCurrentIndex(0);
-            return filteredNews;
+            return activeNews;
           }
           
           setCurrentIndex(prev => {
-            const newIndex = prev >= filteredNews.length ? 0 : prev;
+            const newIndex = prev >= activeNews.length ? 0 : prev;
             console.log('📍 [NewsTickerDisplay] تحديث الفهرس من', prev, 'إلى', newIndex);
             return newIndex;
           });
         }
         
-        return filteredNews;
+        return activeNews;
       });
       
     } catch (error) {
       console.error('❌ [NewsTickerDisplay] خطأ في fetchNews:', error);
-      if (onActivityChange) {
-        onActivityChange(false);
-      }
     }
   };
 
@@ -183,7 +154,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
 
   // عدم عرض أي شيء إذا لم توجد أخبار نشطة
   if (!newsItems.length) {
-    console.log('🚫 [NewsTickerDisplay] لا توجد أخبار نشطة للفرع:', branchId || 'main');
+    console.log('🚫 [NewsTickerDisplay] لا توجد أخبار نشطة - إرجاع null');
     return null;
   }
 
@@ -206,7 +177,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
     ? `${currentNews.title} - ${currentNews.content}` 
     : currentNews.title;
 
-  console.log('📺 [NewsTickerDisplay] عرض الخبر للفرع:', branchId || 'main', {
+  console.log('📺 [NewsTickerDisplay] عرض الخبر:', {
     title: currentNews.title,
     index: safeCurrentIndex,
     total: newsItems.length,
@@ -216,7 +187,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
       <div className="bg-blue-600 text-white w-full">
-        {/* Large screens - full display */}
+        {/* شاشات كبيرة - عرض كامل */}
         <div className="hidden md:block px-8 py-4">
           <div className="flex items-center justify-center">
             <div 
@@ -227,8 +198,6 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
               <div className="news-ticker-static">
                 <span className="bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold ml-2">أخبار</span>
                 {newsText}
-                {branchId && <span className="text-xs text-blue-200 mr-2">(فرع: {branchId})</span>}
-                {!branchId && <span className="text-xs text-green-200 mr-2">(الحساب الرئيسي)</span>}
               </div>
             </div>
           </div>
@@ -247,7 +216,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
           )}
         </div>
 
-        {/* Medium and small screen layouts */}
+        {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
         <div className="block md:hidden px-4 py-3">
           <div className="flex items-center justify-center">
             <div 
@@ -276,7 +245,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({
           )}
         </div>
 
-        {/* Small screens - simple display */}
+        {/* شاشات صغيرة جداً - عرض مُبسَّط */}
         <div className="block sm:hidden">
           <div className="px-3 py-2">
             <div className="flex items-center justify-center">

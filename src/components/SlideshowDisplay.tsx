@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -7,19 +8,14 @@ interface Slideshow {
   images: string[];
   interval_seconds: number;
   is_active: boolean;
-  account_id: string;
-  created_at: string;
-  updated_at: string;
-  branch_id?: string | null;
 }
 
 interface SlideshowDisplayProps {
   accountId: string;
-  branchId?: string | null;
   onActivityChange: (isActive: boolean) => void;
 }
 
-const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId, onActivityChange }) => {
+const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivityChange }) => {
   const [activeSlideshow, setActiveSlideshow] = useState<Slideshow | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -32,7 +28,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
 
   const fetchActiveSlideshow = async () => {
     try {
-      console.log('🎬 Fetching active slideshow for account:', accountId, 'branch:', branchId);
+      console.log('🎬 Fetching active slideshow for:', accountId);
       
       const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
         p_account_id: accountId
@@ -40,40 +36,19 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      // Filter slideshows based on branch - STRICT branch filtering
-      let filteredSlideshows = data || [];
-      
-      if (branchId) {
-        // If we're in a specific branch, show ONLY that branch's content
-        filteredSlideshows = filteredSlideshows.filter(slide => {
-          const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
-          console.log(`🔍 Checking slideshow ${slide.id}: stored branch = ${slideBranchId}, current branch = ${branchId}`);
-          return slideBranchId === branchId;
-        });
-        console.log(`🔍 Branch ${branchId}: Found ${filteredSlideshows.length} branch-specific slideshows`);
-      } else {
-        // If we're in main account view, show only global content (no branch association)
-        filteredSlideshows = filteredSlideshows.filter(slide => {
-          const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
-          console.log(`🔍 Checking slideshow ${slide.id}: stored branch = ${slideBranchId}, showing global only`);
-          return !slideBranchId || slideBranchId === '';
-        });
-        console.log(`🔍 Main account: Found ${filteredSlideshows.length} global slideshows`);
-      }
-
-      const firstActiveSlide = filteredSlideshows.find(slide => slide.is_active) || null;
+      // Logic change: Only ever use the FIRST active slideshow. This disables rotation.
+      const firstActiveSlide = data?.find(slide => slide.is_active) || null;
       const hasActive = !!firstActiveSlide;
 
       if (isActiveRef.current !== hasActive) {
         onActivityChange(hasActive);
         isActiveRef.current = hasActive;
-        console.log(`🎬 Slideshow activity state changed to: ${hasActive} for branch: ${branchId || 'main'}`);
+        console.log(`🎬 Slideshow activity state changed to: ${hasActive}`);
       }
 
       const getSlideshowSignature = (slide: Slideshow | null) => {
         if (!slide) return 'no-active-slides';
-        const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
-        return `${slide.id}:${slide.images.join(',')}:${slideBranchId || 'main'}`;
+        return `${slide.id}:${slide.images.join(',')}`;
       };
 
       setActiveSlideshow(prevSlideshow => {
@@ -108,12 +83,12 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
   useEffect(() => {
     if (!accountId) return;
 
-    console.log('📡 SlideshowDisplay: Setting up internal listeners for account:', accountId, 'branch:', branchId);
+    console.log('📡 SlideshowDisplay: Setting up internal listeners for:', accountId);
     
     fetchActiveSlideshow(); // Initial fetch
     
     const channel = supabase
-      .channel(`slideshow-display-${accountId}-${branchId || 'main'}`)
+      .channel(`slideshow-display-${accountId}`)
       .on(
         'postgres_changes',
         {
@@ -137,7 +112,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       clearInterval(backupInterval);
     };
-  }, [accountId, branchId, onActivityChange]);
+  }, [accountId, onActivityChange]);
 
   const clearAllTimers = () => {
     if (imageIntervalRef.current) {
@@ -189,6 +164,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
       console.error("🔥 Error during image preloading:", error);
     }
   }, [activeSlideshow, imageIndex, loading]);
+
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -256,8 +232,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
           <div className="text-white/80 text-sm">
             <p>الصورة {safeImageIndex + 1} من {activeSlideshow.images.length}</p>
-            {branchId && <p className="text-xs text-blue-300">فرع: {branchId}</p>}
-            {!branchId && <p className="text-xs text-green-300">الحساب الرئيسي</p>}
           </div>
         </div>
 
@@ -287,7 +261,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
             <div>Image: {safeImageIndex + 1}/{activeSlideshow.images.length}</div>
             <div>Title: {activeSlideshow.title}</div>
-            <div>Branch: {branchId || 'Main Account'}</div>
             <div>صور كل: 15 ثانية</div>
             <div>Image Timer: {imageIntervalRef.current ? 'نشط' : 'متوقف'}</div>
             <div>Active Slideshow: {activeSlideshow ? 'Yes' : 'No'}</div>
