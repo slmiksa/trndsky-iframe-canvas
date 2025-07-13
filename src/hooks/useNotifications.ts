@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -25,18 +26,27 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching notifications for account:', accountId, 'branch:', branchId);
       
-      // Build query step by step to avoid deep type instantiation
-      const baseQuery = supabase.from('notifications').select('*');
-      const accountQuery = baseQuery.eq('account_id', accountId);
+      // Build completely separate queries to avoid deep type instantiation
+      let result: any;
       
-      let finalQuery: any;
       if (branchId) {
-        finalQuery = accountQuery.eq('branch_id', branchId);
+        result = await supabase
+          .from('notifications')
+          .select('*')
+          .match({ 
+            account_id: accountId, 
+            branch_id: branchId 
+          })
+          .order('created_at', { ascending: false });
       } else {
-        finalQuery = accountQuery.is('branch_id', null);
+        result = await supabase
+          .from('notifications')
+          .select('*')
+          .match({ account_id: accountId })
+          .is('branch_id', null)
+          .order('created_at', { ascending: false });
       }
       
-      const result = await finalQuery.order('created_at', { ascending: false });
       const { data, error } = result;
 
       if (error) {
@@ -57,19 +67,31 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching active notifications for account:', accountId, 'branch:', branchId);
       
-      // Build query step by step to avoid deep type instantiation
-      const baseQuery = supabase.from('notifications').select('*');
-      const accountQuery = baseQuery.eq('account_id', accountId);
-      const activeQuery = accountQuery.eq('is_active', true);
+      // Build completely separate queries to avoid deep type instantiation
+      let result: any;
       
-      let finalQuery: any;
       if (branchId) {
-        finalQuery = activeQuery.eq('branch_id', branchId);
+        result = await supabase
+          .from('notifications')
+          .select('*')
+          .match({ 
+            account_id: accountId, 
+            is_active: true,
+            branch_id: branchId 
+          })
+          .order('created_at', { ascending: false });
       } else {
-        finalQuery = activeQuery.is('branch_id', null);
+        result = await supabase
+          .from('notifications')
+          .select('*')
+          .match({ 
+            account_id: accountId, 
+            is_active: true 
+          })
+          .is('branch_id', null)
+          .order('created_at', { ascending: false });
       }
       
-      const result = await finalQuery.order('created_at', { ascending: false });
       const { data, error } = result;
 
       if (error) {
