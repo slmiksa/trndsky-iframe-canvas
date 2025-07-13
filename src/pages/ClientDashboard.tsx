@@ -20,6 +20,7 @@ import BranchManager from '@/components/BranchManager';
 import AccountStatusCard from '@/components/AccountStatusCard';
 import LanguageToggle from '@/components/LanguageToggle';
 import Footer from '@/components/Footer';
+
 interface Website {
   id: string;
   website_url: string;
@@ -27,11 +28,13 @@ interface Website {
   is_active: boolean;
   created_at: string;
 }
+
 interface AccountInfo {
   activation_start_date: string | null;
   activation_end_date: string | null;
   status: 'active' | 'suspended' | 'pending';
 }
+
 const ClientDashboard = () => {
   const {
     signOut,
@@ -51,6 +54,7 @@ const ClientDashboard = () => {
   const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
   const [accountName, setAccountName] = useState<string>('');
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 
   // Fetch account information including subscription details
   const fetchAccountInfo = async () => {
@@ -75,6 +79,7 @@ const ClientDashboard = () => {
       console.error('❌ Error in fetchAccountInfo:', error);
     }
   };
+
   const fetchWebsites = async () => {
     if (!accountId) {
       console.log('⚠️ No account ID available for fetching websites');
@@ -104,10 +109,46 @@ const ClientDashboard = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchWebsites();
     fetchAccountInfo();
+    
+    // Load selected branch from localStorage
+    if (accountId) {
+      const savedBranchId = localStorage.getItem(`selected_branch_${accountId}`);
+      if (savedBranchId) {
+        setSelectedBranchId(savedBranchId);
+      }
+    }
   }, [accountId]);
+
+  const handleBranchSelect = (branchId: string | null) => {
+    console.log('🔄 Branch selection changed:', branchId);
+    setSelectedBranchId(branchId);
+    
+    // Refresh content when branch changes
+    fetchWebsites();
+  };
+
+  const getCurrentBranchName = () => {
+    if (!selectedBranchId) return t('main_account');
+    
+    // Try to get branch name from localStorage
+    try {
+      const stored = localStorage.getItem(`branches_${accountId}`);
+      if (stored) {
+        const branches = JSON.parse(stored);
+        const branch = branches.find((b: any) => b.id === selectedBranchId);
+        return branch ? branch.branch_name : t('selected_branch');
+      }
+    } catch (error) {
+      console.error('Error getting branch name:', error);
+    }
+    
+    return t('selected_branch');
+  };
+
   const addWebsite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accountId) {
@@ -159,6 +200,7 @@ const ClientDashboard = () => {
       setLoading(false);
     }
   };
+
   const toggleWebsiteStatus = async (websiteId: string, currentStatus: boolean) => {
     try {
       console.log('🔄 Toggling website status:', {
@@ -203,6 +245,7 @@ const ClientDashboard = () => {
       });
     }
   };
+
   const deleteWebsite = async (websiteId: string) => {
     try {
       console.log('🗑️ Deleting website:', websiteId);
@@ -229,6 +272,7 @@ const ClientDashboard = () => {
       });
     }
   };
+
   const copyPublicLink = () => {
     if (accountName) {
       const publicUrl = `${window.location.origin}/client/${accountName}`;
@@ -239,19 +283,30 @@ const ClientDashboard = () => {
       });
     }
   };
+
   const openPublicPage = () => {
     if (accountName) {
       const publicUrl = `/client/${accountName}`;
       window.open(publicUrl, '_blank');
     }
   };
+
   return <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{t('client_dashboard')}</h1>
-              {accountId && <p className="text-sm text-gray-600">{t('account_id')}: {accountId}</p>}
+              {accountId && (
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-gray-600">{t('account_id')}: {accountId}</p>
+                  {selectedBranchId && (
+                    <Badge variant="secondary" className="text-xs">
+                      {t('current_branch')}: {getCurrentBranchName()}
+                    </Badge>
+                  )}
+                </div>
+              )}
               {accountName && <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-xs">
                     {t('public_page')}: /client/{accountName}
@@ -440,27 +495,33 @@ const ClientDashboard = () => {
           </TabsContent>
 
           <TabsContent value="slideshows">
-            {accountId && <SlideshowManager accountId={accountId} />}
+            {accountId && <SlideshowManager accountId={accountId} branchId={selectedBranchId} />}
           </TabsContent>
 
           <TabsContent value="videos">
-            {accountId && <VideoManager accountId={accountId} />}
+            {accountId && <VideoManager accountId={accountId} branchId={selectedBranchId} />}
           </TabsContent>
 
           <TabsContent value="notifications">
-            {accountId && <NotificationManager accountId={accountId} />}
+            {accountId && <NotificationManager accountId={accountId} branchId={selectedBranchId} />}
           </TabsContent>
 
           <TabsContent value="timers">
-            {accountId && <BreakTimerManager accountId={accountId} />}
+            {accountId && <BreakTimerManager accountId={accountId} branchId={selectedBranchId} />}
           </TabsContent>
 
           <TabsContent value="news">
-            {accountId && <NewsTickerManager accountId={accountId} />}
+            {accountId && <NewsTickerManager accountId={accountId} branchId={selectedBranchId} />}
           </TabsContent>
           
           <TabsContent value="branches">
-            {accountId && <BranchManager accountId={accountId} />}
+            {accountId && (
+              <BranchManager 
+                accountId={accountId} 
+                onBranchSelect={handleBranchSelect}
+                selectedBranchId={selectedBranchId}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </main>
@@ -468,4 +529,5 @@ const ClientDashboard = () => {
       <Footer />
     </div>;
 };
+
 export default ClientDashboard;

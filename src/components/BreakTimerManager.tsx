@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,10 +22,11 @@ interface BreakTimer {
 
 interface BreakTimerManagerProps {
   accountId: string;
+  branchId?: string | null;
 }
 
-const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
-  console.log('🔍 BreakTimerManager rendered with accountId:', accountId);
+const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branchId }) => {
+  console.log('🔍 BreakTimerManager rendered with accountId:', accountId, 'branchId:', branchId);
   
   const {
     timers,
@@ -34,7 +34,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     createTimer,
     updateTimer,
     deleteTimer,
-  } = useBreakTimers(accountId);
+  } = useBreakTimers(accountId, branchId);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTimer, setNewTimer] = useState({
@@ -50,6 +50,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     
     console.log('📝 Starting timer creation with data:', {
       accountId,
+      branchId,
       title: newTimer.title,
       start_time: newTimer.start_time,
       end_time: newTimer.end_time,
@@ -98,6 +99,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     try {
       const timerData = {
         account_id: accountId,
+        branch_id: branchId,
         title: newTimer.title,
         start_time: newTimer.start_time,
         end_time: newTimer.end_time,

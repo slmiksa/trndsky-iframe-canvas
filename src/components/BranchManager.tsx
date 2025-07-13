@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -39,9 +38,10 @@ interface Branch {
 interface BranchManagerProps {
   accountId: string;
   onBranchSelect?: (branchId: string | null) => void;
+  selectedBranchId?: string | null;
 }
 
-const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect }) => {
+const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect, selectedBranchId }) => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
@@ -208,6 +208,23 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     }
   };
 
+  const handleBranchSelect = (branchId: string | null) => {
+    console.log('🔄 Branch selected:', branchId);
+    onBranchSelect?.(branchId);
+    
+    // Store selected branch in localStorage for persistence
+    if (branchId) {
+      localStorage.setItem(`selected_branch_${accountId}`, branchId);
+    } else {
+      localStorage.removeItem(`selected_branch_${accountId}`);
+    }
+    
+    toast({
+      title: t('success'),
+      description: branchId ? t('branch_selected') : t('main_account_selected'),
+    });
+  };
+
   if (loading) {
     return <div className="p-4 text-center">{t('loading')}...</div>;
   }
@@ -218,6 +235,11 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         <CardTitle className="flex items-center gap-2">
           <MapPin className="h-5 w-5" />
           {t('branches_management')}
+          {selectedBranchId && (
+            <Badge variant="secondary" className="ml-2">
+              {branches.find(b => b.id === selectedBranchId)?.branch_name || t('selected')}
+            </Badge>
+          )}
         </CardTitle>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
@@ -258,7 +280,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
       <CardContent>
         <div className="space-y-4">
           {/* Main Account Option */}
-          <Card className="border-primary/20">
+          <Card className={`border-primary/20 ${selectedBranchId === null ? 'ring-2 ring-primary' : ''}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -271,10 +293,10 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                   </div>
                 </div>
                 <Button
-                  variant="outline"
-                  onClick={() => onBranchSelect?.(null)}
+                  variant={selectedBranchId === null ? "default" : "outline"}
+                  onClick={() => handleBranchSelect(null)}
                 >
-                  {t('select')}
+                  {selectedBranchId === null ? t('selected') : t('select')}
                 </Button>
               </div>
             </CardContent>
@@ -282,7 +304,10 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
           {/* Branches List */}
           {branches.map((branch) => (
-            <Card key={branch.id} className={!branch.is_active ? 'opacity-60' : ''}>
+            <Card 
+              key={branch.id} 
+              className={`${!branch.is_active ? 'opacity-60' : ''} ${selectedBranchId === branch.id ? 'ring-2 ring-primary' : ''}`}
+            >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -293,6 +318,11 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                         <Badge variant={branch.is_active ? 'default' : 'secondary'}>
                           {branch.is_active ? t('active') : t('inactive')}
                         </Badge>
+                        {selectedBranchId === branch.id && (
+                          <Badge variant="outline" className="text-primary">
+                            {t('selected')}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         /{branch.branch_path}
@@ -302,11 +332,12 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                   
                   <div className="flex items-center gap-2">
                     <Button
-                      variant="outline"
+                      variant={selectedBranchId === branch.id ? "default" : "outline"}
                       size="sm"
-                      onClick={() => onBranchSelect?.(branch.id)}
+                      onClick={() => handleBranchSelect(branch.id)}
+                      disabled={!branch.is_active}
                     >
-                      {t('select')}
+                      {selectedBranchId === branch.id ? t('selected') : t('select')}
                     </Button>
                     
                     <Button
