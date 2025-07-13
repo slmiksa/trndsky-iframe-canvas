@@ -54,7 +54,7 @@ const BranchManager = ({ accountId, accountName }: BranchManagerProps) => {
       }
       
       console.log('✅ تم تحميل الفروع بنجاح:', data);
-      setBranches(data as Branch[] || []);
+      setBranches((data as unknown as Branch[]) || []);
     } catch (error) {
       console.error('Error fetching branches:', error);
       toast({

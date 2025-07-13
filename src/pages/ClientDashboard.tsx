@@ -118,7 +118,7 @@ const ClientDashboard = () => {
                     </CardTitle>
                   </CardHeader>
                 </Card>
-                <NotificationManager accountId={accountId} branchId={selectedBranch} />
+                <NotificationManager accountId={accountId} />
               </div>
             ) : (
               <Card>
@@ -141,7 +141,7 @@ const ClientDashboard = () => {
                     </CardTitle>
                   </CardHeader>
                 </Card>
-                <SlideshowManager accountId={accountId} branchId={selectedBranch} />
+                <SlideshowManager accountId={accountId} />
               </div>
             ) : (
               <Card>
@@ -164,7 +164,7 @@ const ClientDashboard = () => {
                     </CardTitle>
                   </CardHeader>
                 </Card>
-                <NewsTickerManager accountId={accountId} branchId={selectedBranch} />
+                <NewsTickerManager accountId={accountId} />
               </div>
             ) : (
               <Card>
@@ -187,7 +187,7 @@ const ClientDashboard = () => {
                     </CardTitle>
                   </CardHeader>
                 </Card>
-                <BreakTimerManager accountId={accountId} branchId={selectedBranch} />
+                <BreakTimerManager accountId={accountId} />
               </div>
             ) : (
               <Card>
