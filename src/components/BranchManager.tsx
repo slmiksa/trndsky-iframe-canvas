@@ -62,7 +62,8 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
       console.log('🔍 Loading branches from database for account:', accountId);
       setLoading(true);
       
-      const { data, error } = await supabase
+      // Use type assertion to work around missing types
+      const { data, error } = await (supabase as any)
         .from('account_branches')
         .select('*')
         .eq('account_id', accountId)
@@ -104,7 +105,8 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         branch_path: newBranchPath.trim(),
       });
 
-      const { data, error } = await supabase
+      // Use type assertion to work around missing types
+      const { data, error } = await (supabase as any)
         .from('account_branches')
         .insert({
           account_id: accountId,
@@ -148,7 +150,8 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('✏️ Updating branch in database:', editingBranch.id);
       
-      const { error } = await supabase
+      // Use type assertion to work around missing types
+      const { error } = await (supabase as any)
         .from('account_branches')
         .update({
           branch_name: newBranchName.trim(),
@@ -188,7 +191,8 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('🗑️ Deleting branch from database:', branchId);
       
-      const { error } = await supabase
+      // Use type assertion to work around missing types
+      const { error } = await (supabase as any)
         .from('account_branches')
         .delete()
         .eq('id', branchId);
@@ -220,7 +224,8 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     try {
       console.log('🔄 Toggling branch status in database:', branchId);
       
-      const { error } = await supabase
+      // Use type assertion to work around missing types
+      const { error } = await (supabase as any)
         .from('account_branches')
         .update({
           is_active: !currentStatus,
