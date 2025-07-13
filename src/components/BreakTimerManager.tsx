@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -125,9 +124,9 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
 
       const result = await createTimer(timerData);
 
-      // Store branch association in localStorage
-      if (branchId && result?.id) {
-        localStorage.setItem(`timer_branch_${result.id}`, branchId);
+      // Store branch association in localStorage if result is an array
+      if (branchId && result && Array.isArray(result) && result.length > 0) {
+        localStorage.setItem(`timer_branch_${result[0].id}`, branchId);
       }
 
       console.log('✅ Timer created successfully:', result);

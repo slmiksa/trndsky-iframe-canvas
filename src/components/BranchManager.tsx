@@ -221,7 +221,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     
     toast({
       title: t('success'),
-      description: branchId ? t('branch_selected') : t('main_account_selected'),
+      description: branchId ? 'تم تحديد الفرع' : 'تم تحديد الحساب الرئيسي',
     });
   };
 
@@ -237,7 +237,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
           {t('branches_management')}
           {selectedBranchId && (
             <Badge variant="secondary" className="ml-2">
-              {branches.find(b => b.id === selectedBranchId)?.branch_name || t('selected')}
+              {branches.find(b => b.id === selectedBranchId)?.branch_name || 'محدد'}
             </Badge>
           )}
         </CardTitle>
@@ -296,7 +296,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                   variant={selectedBranchId === null ? "default" : "outline"}
                   onClick={() => handleBranchSelect(null)}
                 >
-                  {selectedBranchId === null ? t('selected') : t('select')}
+                  {selectedBranchId === null ? 'محدد' : t('select')}
                 </Button>
               </div>
             </CardContent>
@@ -320,7 +320,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                         </Badge>
                         {selectedBranchId === branch.id && (
                           <Badge variant="outline" className="text-primary">
-                            {t('selected')}
+                            محدد
                           </Badge>
                         )}
                       </div>
@@ -337,7 +337,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                       onClick={() => handleBranchSelect(branch.id)}
                       disabled={!branch.is_active}
                     >
-                      {selectedBranchId === branch.id ? t('selected') : t('select')}
+                      {selectedBranchId === branch.id ? 'محدد' : t('select')}
                     </Button>
                     
                     <Button
@@ -412,7 +412,7 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
                         <AlertDialogFooter>
                           <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                           <AlertDialogAction onClick={() => handleDeleteBranch(branch.id)}>
-                            {t('delete')}
+                            حذف
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

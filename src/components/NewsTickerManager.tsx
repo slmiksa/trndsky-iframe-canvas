@@ -1,384 +1,410 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
+import { Plus, Edit2, Trash2, Newspaper } from 'lucide-react';
 
-interface NewsItem {
+interface NewsTicker {
   id: string;
-  title: string;
-  content: string | null;
+  account_id: string;
+  text: string;
   is_active: boolean;
-  display_order: number | null;
   created_at: string;
 }
 
 interface NewsTickerManagerProps {
   accountId: string;
+  branchId?: string | null;
 }
 
-const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
-  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branchId }) => {
+  const [newsTickers, setNewsTickers] = useState<NewsTicker[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    display_order: 0
-  });
-
-  // دالة إعادة المحاولة
-  const retryOperation = async (operation: () => Promise<any>, maxRetries = 3, delay = 1000) => {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (error: any) {
-        console.error(`❌ المحاولة ${attempt} فشلت:`, error);
-        
-        if (attempt === maxRetries) {
-          throw error;
-        }
-        
-        // انتظار قبل إعادة المحاولة
-        await new Promise(resolve => setTimeout(resolve, delay * attempt));
-      }
-    }
-  };
-
-  const fetchNewsItems = async () => {
-    try {
-      console.log('🔍 جاري تحميل الأخبار للحساب:', accountId);
-      
-      const result = await retryOperation(async () => {
-        const { data, error } = await supabase
-          .from('news_ticker')
-          .select('*')
-          .eq('account_id', accountId)
-          .order('display_order', { ascending: true });
-
-        if (error) {
-          console.error('❌ خطأ في تحميل الأخبار:', error);
-          throw error;
-        }
-
-        return data;
-      });
-
-      console.log('✅ تم تحميل الأخبار بنجاح:', result);
-      setNewsItems(result || []);
-    } catch (error: any) {
-      console.error('❌ خطأ في fetchNewsItems:', error);
-      toast({
-        title: "خطأ في تحميل الأخبار",
-        description: "تعذر تحميل الأخبار. يرجى المحاولة مرة أخرى.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [newTickerText, setNewTickerText] = useState('');
+  const [editingTicker, setEditingTicker] = useState<NewsTicker | null>(null);
 
   useEffect(() => {
-    fetchNewsItems();
-  }, [accountId]);
+    fetchNewsTickers();
+  }, [accountId, branchId]);
 
-  const resetForm = () => {
-    setFormData({ title: '', content: '', display_order: 0 });
-    setShowAddForm(false);
-    setEditingItem(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.title.trim()) {
-      toast({
-        title: "خطأ في البيانات",
-        description: "يرجى إدخال عنوان الخبر",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setLoading(true);
+  const fetchNewsTickers = async () => {
+    if (!accountId) return;
 
     try {
-      await retryOperation(async () => {
-        if (editingItem) {
-          // تحديث الخبر الموجود
-          console.log('📝 تحديث الخبر:', editingItem.id);
-          const { error } = await supabase
-            .from('news_ticker')
-            .update({
-              title: formData.title.trim(),
-              content: formData.content?.trim() || null,
-              display_order: formData.display_order,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', editingItem.id);
+      setLoading(true);
+      console.log('🔍 Fetching news tickers for account:', accountId, 'branchId:', branchId);
 
-          if (error) throw error;
+      let query = supabase
+        .from('news_tickers')
+        .select('*')
+        .eq('account_id', accountId);
 
-          toast({
-            title: "تم تحديث الخبر بنجاح",
-            description: `تم تحديث: ${formData.title}`
-          });
-        } else {
-          // إضافة خبر جديد
-          console.log('➕ إضافة خبر جديد');
-          const { error } = await supabase
-            .from('news_ticker')
-            .insert({
-              account_id: accountId,
-              title: formData.title.trim(),
-              content: formData.content?.trim() || null,
-              display_order: formData.display_order,
-              is_active: true
-            });
+      // Apply branch filter if branchId is provided
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      } else {
+        // Fetch only main account news tickers (where branch_id is null)
+        query = query.is('branch_id', null);
+      }
 
-          if (error) throw error;
+      const { data, error } = await query.order('created_at', { ascending: false });
 
-          toast({
-            title: "تم إضافة الخبر بنجاح",
-            description: `تم إضافة: ${formData.title}`
-          });
-        }
-      });
-
-      resetForm();
-      fetchNewsItems();
-    } catch (error: any) {
-      console.error('❌ خطأ في حفظ الخبر:', error);
+      if (error) {
+        console.error('❌ Error fetching news tickers:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load news tickers",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ News tickers fetched:', data);
+        setNewsTickers(data || []);
+      }
+    } catch (error) {
+      console.error('❌ Error in fetchNewsTickers:', error);
       toast({
-        title: "خطأ في حفظ الخبر",
-        description: "تعذر حفظ الخبر. يرجى المحاولة مرة أخرى.",
-        variant: "destructive"
+        title: "Error",
+        description: "Failed to load news tickers",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleNewsStatus = async (newsId: string, currentStatus: boolean) => {
-    try {
-      console.log('🔄 تغيير حالة الخبر:', { newsId, currentStatus });
-      
-      await retryOperation(async () => {
-        const { error } = await supabase
-          .from('news_ticker')
-          .update({ 
-            is_active: !currentStatus,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', newsId);
-
-        if (error) throw error;
-      });
-
+  const addNewsTicker = async () => {
+    if (!accountId) {
       toast({
-        title: "تم تحديث حالة الخبر",
-        description: !currentStatus ? 'تم تفعيل الخبر' : 'تم إيقاف الخبر'
+        title: "Error",
+        description: "Account ID not found",
+        variant: "destructive",
       });
-
-      fetchNewsItems();
-    } catch (error: any) {
-      console.error('❌ خطأ في تحديث حالة الخبر:', error);
-      toast({
-        title: "خطأ في تحديث الخبر",
-        description: "تعذر تحديث حالة الخبر. يرجى المحاولة مرة أخرى.",
-        variant: "destructive"
-      });
+      return;
     }
-  };
 
-  const deleteNews = async (newsId: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الخبر؟')) {
+    if (!newTickerText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter news ticker text",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
-      console.log('🗑️ حذف الخبر:', newsId);
-      
-      await retryOperation(async () => {
-        const { error } = await supabase
-          .from('news_ticker')
-          .delete()
-          .eq('id', newsId);
-
-        if (error) throw error;
+      console.log('➕ Adding new news ticker:', {
+        accountId,
+        text: newTickerText,
+        branchId,
       });
 
-      toast({
-        title: "تم حذف الخبر",
-        description: "تم حذف الخبر بنجاح"
-      });
+      const { data, error } = await supabase
+        .from('news_tickers')
+        .insert([{
+          account_id: accountId,
+          text: newTickerText,
+          is_active: true,
+          branch_id: branchId || null, // Store branch association
+        }])
+        .select();
 
-      fetchNewsItems();
-    } catch (error: any) {
-      console.error('❌ خطأ في حذف الخبر:', error);
+      if (error) {
+        console.error('❌ Error adding news ticker:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add news ticker",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ News ticker added successfully:', data);
+        toast({
+          title: "Success",
+          description: "News ticker added successfully",
+        });
+        setNewTickerText('');
+        setShowAddForm(false);
+        fetchNewsTickers();
+      }
+    } catch (error) {
+      console.error('❌ Error in addNewsTicker:', error);
       toast({
-        title: "خطأ في حذف الخبر",
-        description: "تعذر حذف الخبر. يرجى المحاولة مرة أخرى.",
-        variant: "destructive"
+        title: "Error",
+        description: "Failed to add news ticker",
+        variant: "destructive",
       });
     }
   };
 
-  const startEdit = (item: NewsItem) => {
-    setEditingItem(item);
-    setFormData({
-      title: item.title,
-      content: item.content || '',
-      display_order: item.display_order || 0
-    });
-    setShowAddForm(true);
+  const updateNewsTicker = async (id: string, text: string) => {
+    try {
+      console.log('🔄 Updating news ticker:', { id, text });
+
+      const { data, error } = await supabase
+        .from('news_tickers')
+        .update({ text })
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        console.error('❌ Error updating news ticker:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update news ticker",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ News ticker updated successfully:', data);
+        toast({
+          title: "Success",
+          description: "News ticker updated successfully",
+        });
+        setEditingTicker(null);
+        fetchNewsTickers();
+      }
+    } catch (error) {
+      console.error('❌ Error in updateNewsTicker:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update news ticker",
+        variant: "destructive",
+      });
+    }
   };
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>إدارة شريط الأخبار ({newsItems.length})</CardTitle>
-            <Button 
-              onClick={() => setShowAddForm(true)} 
-              size="sm"
-              disabled={loading}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              إضافة خبر
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-              <p className="mt-2 text-gray-600">جاري التحميل...</p>
-            </div>
-          ) : newsItems.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">لا توجد أخبار بعد</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {newsItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{item.title}</h3>
-                      {item.content && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {item.content}
-                        </p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-2">
-                        ترتيب العرض: {item.display_order} | تم الإنشاء: {new Date(item.created_at).toLocaleDateString('ar-SA')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <Badge variant={item.is_active ? "default" : "secondary"}>
-                        {item.is_active ? 'نشط' : 'متوقف'}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => toggleNewsStatus(item.id, item.is_active)}
-                        disabled={loading}
-                      >
-                        {item.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => startEdit(item)}
-                        disabled={loading}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteNews(item.id)}
-                        disabled={loading}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+  const toggleNewsTickerStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      console.log('🔄 Toggling news ticker status:', { id, currentStatus });
 
-          {showAddForm && (
-            <div className="mt-6 border-t pt-6">
-              <h3 className="font-semibold mb-4">
-                {editingItem ? 'تحرير الخبر' : 'إضافة خبر جديد'}
-              </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
+      const { data, error } = await supabase
+        .from('news_tickers')
+        .update({ is_active: !currentStatus })
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        console.error('❌ Error updating news ticker status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update news ticker status",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ News ticker status updated successfully:', data);
+        toast({
+          title: "Success",
+          description: `News ticker ${currentStatus ? 'deactivated' : 'activated'}`,
+        });
+        fetchNewsTickers();
+      }
+    } catch (error) {
+      console.error('❌ Error in toggleNewsTickerStatus:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update news ticker status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteNewsTicker = async (id: string) => {
+    try {
+      console.log('🗑️ Deleting news ticker:', id);
+
+      const { data, error } = await supabase
+        .from('news_tickers')
+        .delete()
+        .eq('id', id)
+        .select();
+
+      if (error) {
+        console.error('❌ Error deleting news ticker:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete news ticker",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ News ticker deleted successfully:', data);
+        toast({
+          title: "Success",
+          description: "News ticker deleted successfully",
+        });
+        fetchNewsTickers();
+      }
+    } catch (error) {
+      console.error('❌ Error in deleteNewsTicker:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete news ticker",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle className="flex items-center gap-2">
+            <Newspaper className="h-5 w-5" />
+            News Ticker Management ({newsTickers.length})
+          </CardTitle>
+          <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add News Ticker
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add New News Ticker</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addNewsTicker();
+                }}
+                className="space-y-4"
+              >
                 <div>
-                  <Label htmlFor="title">عنوان الخبر</Label>
+                  <Label htmlFor="text">Text</Label>
                   <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="اكتب عنوان الخبر"
+                    id="text"
+                    value={newTickerText}
+                    onChange={(e) => setNewTickerText(e.target.value)}
+                    placeholder="Enter news ticker text"
                     required
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="content">محتوى الخبر (اختياري)</Label>
-                  <Textarea
-                    id="content"
-                    value={formData.content}
-                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    placeholder="اكتب تفاصيل الخبر"
-                    rows={3}
-                    disabled={loading}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="display_order">ترتيب العرض</Label>
-                  <Input
-                    id="display_order"
-                    type="number"
-                    value={formData.display_order}
-                    onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
-                    placeholder="0"
-                    disabled={loading}
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? 'جاري الحفظ...' : (editingItem ? 'تحديث' : 'إضافة')}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={resetForm}
-                    disabled={loading}
+                  <Button type="submit">Add Ticker</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAddForm(false)}
                   >
-                    إلغاء
+                    Cancel
                   </Button>
                 </div>
               </form>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {newsTickers.length === 0 ? (
+          <div className="text-center py-8">
+            <Newspaper className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-600">No news tickers yet</p>
+            <p className="text-sm text-gray-500">Start by creating a new news ticker</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {newsTickers.map((ticker) => (
+              <div
+                key={ticker.id}
+                className="border rounded-lg p-4 hover:bg-gray-50"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <Newspaper className="h-4 w-4 text-blue-500" />
+                    <p className="text-gray-700">{ticker.text}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={ticker.is_active ? "default" : "secondary"}>
+                      {ticker.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleNewsTickerStatus(ticker.id, ticker.is_active)}
+                    >
+                      {ticker.is_active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                    <Dialog open={editingTicker?.id === ticker.id} onOpenChange={(open) => {
+                      if (!open) {
+                        setEditingTicker(null);
+                      }
+                    }}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingTicker(ticker)}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Edit News Ticker</DialogTitle>
+                        </DialogHeader>
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (editingTicker) {
+                              updateNewsTicker(editingTicker.id, newTickerText);
+                            }
+                          }}
+                          className="space-y-4"
+                        >
+                          <div>
+                            <Label htmlFor="text">Text</Label>
+                            <Input
+                              id="text"
+                              value={newTickerText}
+                              onChange={(e) => setNewTickerText(e.target.value)}
+                              placeholder="Enter news ticker text"
+                              required
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button type="submit">Update</Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setEditingTicker(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => deleteNewsTicker(ticker.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Created at: {new Date(ticker.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
