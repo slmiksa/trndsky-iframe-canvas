@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -12,9 +13,12 @@ import { Plus, Edit2, Trash2, Newspaper } from 'lucide-react';
 interface NewsTicker {
   id: string;
   account_id: string;
-  text: string;
+  title: string;
+  content: string | null;
   is_active: boolean;
+  display_order: number | null;
   created_at: string;
+  updated_at: string;
 }
 
 interface NewsTickerManagerProps {
@@ -26,7 +30,8 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
   const [newsTickers, setNewsTickers] = useState<NewsTicker[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newTickerText, setNewTickerText] = useState('');
+  const [newTickerTitle, setNewTickerTitle] = useState('');
+  const [newTickerContent, setNewTickerContent] = useState('');
   const [editingTicker, setEditingTicker] = useState<NewsTicker | null>(null);
 
   useEffect(() => {
@@ -40,26 +45,17 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
       setLoading(true);
       console.log('🔍 Fetching news tickers for account:', accountId, 'branchId:', branchId);
 
-      let query = supabase
-        .from('news_tickers')
+      const { data, error } = await supabase
+        .from('news_ticker')
         .select('*')
-        .eq('account_id', accountId);
-
-      // Apply branch filter if branchId is provided
-      if (branchId) {
-        query = query.eq('branch_id', branchId);
-      } else {
-        // Fetch only main account news tickers (where branch_id is null)
-        query = query.is('branch_id', null);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Error fetching news tickers:', error);
         toast({
-          title: "Error",
-          description: "Failed to load news tickers",
+          title: "خطأ",
+          description: "فشل في تحميل شريط الأخبار",
           variant: "destructive",
         });
       } else {
@@ -69,8 +65,8 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
     } catch (error) {
       console.error('❌ Error in fetchNewsTickers:', error);
       toast({
-        title: "Error",
-        description: "Failed to load news tickers",
+        title: "خطأ",
+        description: "فشل في تحميل شريط الأخبار",
         variant: "destructive",
       });
     } finally {
@@ -81,17 +77,17 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
   const addNewsTicker = async () => {
     if (!accountId) {
       toast({
-        title: "Error",
-        description: "Account ID not found",
+        title: "خطأ",
+        description: "معرف الحساب غير موجود",
         variant: "destructive",
       });
       return;
     }
 
-    if (!newTickerText.trim()) {
+    if (!newTickerTitle.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter news ticker text",
+        title: "خطأ",
+        description: "يرجى إدخال عنوان شريط الأخبار",
         variant: "destructive",
       });
       return;
@@ -100,78 +96,84 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
     try {
       console.log('➕ Adding new news ticker:', {
         accountId,
-        text: newTickerText,
-        branchId,
+        title: newTickerTitle,
+        content: newTickerContent,
       });
 
       const { data, error } = await supabase
-        .from('news_tickers')
+        .from('news_ticker')
         .insert([{
           account_id: accountId,
-          text: newTickerText,
+          title: newTickerTitle,
+          content: newTickerContent || null,
           is_active: true,
-          branch_id: branchId || null, // Store branch association
         }])
         .select();
 
       if (error) {
         console.error('❌ Error adding news ticker:', error);
         toast({
-          title: "Error",
-          description: "Failed to add news ticker",
+          title: "خطأ",
+          description: "فشل في إضافة شريط الأخبار",
           variant: "destructive",
         });
       } else {
         console.log('✅ News ticker added successfully:', data);
         toast({
-          title: "Success",
-          description: "News ticker added successfully",
+          title: "نجح",
+          description: "تم إضافة شريط الأخبار بنجاح",
         });
-        setNewTickerText('');
+        setNewTickerTitle('');
+        setNewTickerContent('');
         setShowAddForm(false);
         fetchNewsTickers();
       }
     } catch (error) {
       console.error('❌ Error in addNewsTicker:', error);
       toast({
-        title: "Error",
-        description: "Failed to add news ticker",
+        title: "خطأ",
+        description: "فشل في إضافة شريط الأخبار",
         variant: "destructive",
       });
     }
   };
 
-  const updateNewsTicker = async (id: string, text: string) => {
+  const updateNewsTicker = async (id: string, title: string, content: string) => {
     try {
-      console.log('🔄 Updating news ticker:', { id, text });
+      console.log('🔄 Updating news ticker:', { id, title, content });
 
       const { data, error } = await supabase
-        .from('news_tickers')
-        .update({ text })
+        .from('news_ticker')
+        .update({ 
+          title: title,
+          content: content || null
+        })
         .eq('id', id)
         .select();
 
       if (error) {
         console.error('❌ Error updating news ticker:', error);
         toast({
-          title: "Error",
-          description: "Failed to update news ticker",
+          title: "خطأ",
+          description: "فشل في تحديث شريط الأخبار",
           variant: "destructive",
         });
       } else {
         console.log('✅ News ticker updated successfully:', data);
         toast({
-          title: "Success",
-          description: "News ticker updated successfully",
+          title: "نجح",
+          description: "تم تحديث شريط الأخبار بنجاح",
         });
         setEditingTicker(null);
+        setNewTickerTitle('');
+        setNewTickerContent('');
         fetchNewsTickers();
       }
     } catch (error) {
       console.error('❌ Error in updateNewsTicker:', error);
       toast({
-        title: "Error",
-        description: "Failed to update news ticker",
+        title: "خطأ",
+        description: "فشل في تحديث شريط الأخبار",
         variant: "destructive",
       });
     }
@@ -182,7 +184,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
       console.log('🔄 Toggling news ticker status:', { id, currentStatus });
 
       const { data, error } = await supabase
-        .from('news_tickers')
+        .from('news_ticker')
         .update({ is_active: !currentStatus })
         .eq('id', id)
         .select();
@@ -190,23 +192,23 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
       if (error) {
         console.error('❌ Error updating news ticker status:', error);
         toast({
-          title: "Error",
-          description: "Failed to update news ticker status",
+          title: "خطأ",
+          description: "فشل في تحديث حالة شريط الأخبار",
           variant: "destructive",
         });
       } else {
         console.log('✅ News ticker status updated successfully:', data);
         toast({
-          title: "Success",
-          description: `News ticker ${currentStatus ? 'deactivated' : 'activated'}`,
+          title: "نجح",
+          description: `تم ${currentStatus ? 'إلغاء تفعيل' : 'تفعيل'} شريط الأخبار`,
         });
         fetchNewsTickers();
       }
     } catch (error) {
       console.error('❌ Error in toggleNewsTickerStatus:', error);
       toast({
-        title: "Error",
-        description: "Failed to update news ticker status",
+        title: "خطأ",
+        description: "فشل في تحديث حالة شريط الأخبار",
         variant: "destructive",
       });
     }
@@ -217,7 +219,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
       console.log('🗑️ Deleting news ticker:', id);
 
       const { data, error } = await supabase
-        .from('news_tickers')
+        .from('news_ticker')
         .delete()
         .eq('id', id)
         .select();
@@ -225,33 +227,41 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
       if (error) {
         console.error('❌ Error deleting news ticker:', error);
         toast({
-          title: "Error",
-          description: "Failed to delete news ticker",
+          title: "خطأ",
+          description: "فشل في حذف شريط الأخبار",
           variant: "destructive",
         });
       } else {
         console.log('✅ News ticker deleted successfully:', data);
         toast({
-          title: "Success",
-          description: "News ticker deleted successfully",
+          title: "نجح",
+          description: "تم حذف شريط الأخبار بنجاح",
         });
         fetchNewsTickers();
       }
     } catch (error) {
       console.error('❌ Error in deleteNewsTicker:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete news ticker",
+        title: "خطأ",
+        description: "فشل في حذف شريط الأخبار",
         variant: "destructive",
       });
     }
   };
 
+  // Initialize edit form when editing ticker changes
+  useEffect(() => {
+    if (editingTicker) {
+      setNewTickerTitle(editingTicker.title);
+      setNewTickerContent(editingTicker.content || '');
+    }
+  }, [editingTicker]);
+
   if (loading) {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-        <p className="mt-2 text-gray-600">Loading...</p>
+        <p className="mt-2 text-gray-600">جاري التحميل...</p>
       </div>
     );
   }
@@ -262,18 +272,18 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <Newspaper className="h-5 w-5" />
-            News Ticker Management ({newsTickers.length})
+            إدارة شريط الأخبار ({newsTickers.length})
           </CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                Add News Ticker
+                إضافة شريط أخبار
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Add New News Ticker</DialogTitle>
+                <DialogTitle>إضافة شريط أخبار جديد</DialogTitle>
               </DialogHeader>
               <form
                 onSubmit={(e) => {
@@ -283,23 +293,36 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
                 className="space-y-4"
               >
                 <div>
-                  <Label htmlFor="text">Text</Label>
+                  <Label htmlFor="title">العنوان</Label>
                   <Input
-                    id="text"
-                    value={newTickerText}
-                    onChange={(e) => setNewTickerText(e.target.value)}
-                    placeholder="Enter news ticker text"
+                    id="title"
+                    value={newTickerTitle}
+                    onChange={(e) => setNewTickerTitle(e.target.value)}
+                    placeholder="أدخل عنوان شريط الأخبار"
                     required
                   />
                 </div>
+                <div>
+                  <Label htmlFor="content">المحتوى</Label>
+                  <Input
+                    id="content"
+                    value={newTickerContent}
+                    onChange={(e) => setNewTickerContent(e.target.value)}
+                    placeholder="أدخل محتوى شريط الأخبار"
+                  />
+                </div>
                 <div className="flex gap-2">
-                  <Button type="submit">Add Ticker</Button>
+                  <Button type="submit">إضافة</Button>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowAddForm(false)}
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewTickerTitle('');
+                      setNewTickerContent('');
+                    }}
                   >
-                    Cancel
+                    إلغاء
                   </Button>
                 </div>
               </form>
@@ -311,8 +334,8 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
         {newsTickers.length === 0 ? (
           <div className="text-center py-8">
             <Newspaper className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No news tickers yet</p>
-            <p className="text-sm text-gray-500">Start by creating a new news ticker</p>
+            <p className="text-gray-600">لا يوجد أشرطة أخبار حتى الآن</p>
+            <p className="text-sm text-gray-500">ابدأ بإنشاء شريط أخبار جديد</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -322,26 +345,36 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
                 className="border rounded-lg p-4 hover:bg-gray-50"
               >
                 <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     <Newspaper className="h-4 w-4 text-blue-500" />
-                    <p className="text-gray-700">{ticker.text}</p>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-800">{ticker.title}</p>
+                      {ticker.content && (
+                        <p className="text-sm text-gray-600 mt-1">{ticker.content}</p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={ticker.is_active ? "default" : "secondary"}>
-                      {ticker.is_active ? 'Active' : 'Inactive'}
+                      {ticker.is_active ? 'نشط' : 'غير نشط'}
                     </Badge>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => toggleNewsTickerStatus(ticker.id, ticker.is_active)}
                     >
-                      {ticker.is_active ? 'Deactivate' : 'Activate'}
+                      {ticker.is_active ? 'إلغاء التفعيل' : 'تفعيل'}
                     </Button>
-                    <Dialog open={editingTicker?.id === ticker.id} onOpenChange={(open) => {
-                      if (!open) {
-                        setEditingTicker(null);
-                      }
-                    }}>
+                    <Dialog 
+                      open={editingTicker?.id === ticker.id} 
+                      onOpenChange={(open) => {
+                        if (!open) {
+                          setEditingTicker(null);
+                          setNewTickerTitle('');
+                          setNewTickerContent('');
+                        }
+                      }}
+                    >
                       <DialogTrigger asChild>
                         <Button
                           size="sm"
@@ -353,35 +386,48 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
-                          <DialogTitle>Edit News Ticker</DialogTitle>
+                          <DialogTitle>تعديل شريط الأخبار</DialogTitle>
                         </DialogHeader>
                         <form
                           onSubmit={(e) => {
                             e.preventDefault();
                             if (editingTicker) {
-                              updateNewsTicker(editingTicker.id, newTickerText);
+                              updateNewsTicker(editingTicker.id, newTickerTitle, newTickerContent);
                             }
                           }}
                           className="space-y-4"
                         >
                           <div>
-                            <Label htmlFor="text">Text</Label>
+                            <Label htmlFor="edit-title">العنوان</Label>
                             <Input
-                              id="text"
-                              value={newTickerText}
-                              onChange={(e) => setNewTickerText(e.target.value)}
-                              placeholder="Enter news ticker text"
+                              id="edit-title"
+                              value={newTickerTitle}
+                              onChange={(e) => setNewTickerTitle(e.target.value)}
+                              placeholder="أدخل عنوان شريط الأخبار"
                               required
                             />
                           </div>
+                          <div>
+                            <Label htmlFor="edit-content">المحتوى</Label>
+                            <Input
+                              id="edit-content"
+                              value={newTickerContent}
+                              onChange={(e) => setNewTickerContent(e.target.value)}
+                              placeholder="أدخل محتوى شريط الأخبار"
+                            />
+                          </div>
                           <div className="flex gap-2">
-                            <Button type="submit">Update</Button>
+                            <Button type="submit">تحديث</Button>
                             <Button
                               type="button"
                               variant="outline"
-                              onClick={() => setEditingTicker(null)}
+                              onClick={() => {
+                                setEditingTicker(null);
+                                setNewTickerTitle('');
+                                setNewTickerContent('');
+                              }}
                             >
-                              Cancel
+                              إلغاء
                             </Button>
                           </div>
                         </form>
@@ -397,7 +443,7 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId, branch
                   </div>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Created at: {new Date(ticker.created_at).toLocaleDateString()}
+                  تم الإنشاء في: {new Date(ticker.created_at).toLocaleDateString('ar-SA')}
                 </p>
               </div>
             ))}
