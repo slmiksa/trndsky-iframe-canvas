@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -41,17 +40,21 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      // Filter slideshows based on branch - safely handle missing branch_id
+      // Filter slideshows based on branch using localStorage
       let filteredSlideshows = data || [];
       
       if (branchId) {
-        // If we're in a specific branch, show only that branch's content OR global content (no branch_id)
-        filteredSlideshows = filteredSlideshows.filter(slide => 
-          !(slide as any).branch_id || (slide as any).branch_id === branchId
-        );
+        // If we're in a specific branch, show only that branch's content OR global content (no branch association)
+        filteredSlideshows = filteredSlideshows.filter(slide => {
+          const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
+          return !slideBranchId || slideBranchId === branchId;
+        });
       } else {
-        // If we're in main account view, show only global content (no branch_id)
-        filteredSlideshows = filteredSlideshows.filter(slide => !(slide as any).branch_id);
+        // If we're in main account view, show only global content (no branch association)
+        filteredSlideshows = filteredSlideshows.filter(slide => {
+          const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
+          return !slideBranchId;
+        });
       }
 
       const firstActiveSlide = filteredSlideshows.find(slide => slide.is_active) || null;
@@ -65,7 +68,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
 
       const getSlideshowSignature = (slide: Slideshow | null) => {
         if (!slide) return 'no-active-slides';
-        return `${slide.id}:${slide.images.join(',')}:${(slide as any).branch_id || 'main'}`;
+        const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
+        return `${slide.id}:${slide.images.join(',')}:${slideBranchId || 'main'}`;
       };
 
       setActiveSlideshow(prevSlideshow => {

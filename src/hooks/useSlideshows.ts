@@ -35,19 +35,21 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
         throw error;
       }
 
-      // Filter slideshows based on branch - safely handle missing branch_id
+      // Filter slideshows based on branch using localStorage
       let filteredSlideshows = data || [];
       
       if (branchId) {
         // If we're in a specific branch, show only that branch's content
-        filteredSlideshows = filteredSlideshows.filter(slide => 
-          (slide as any).branch_id === branchId
-        );
+        filteredSlideshows = filteredSlideshows.filter(slide => {
+          const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
+          return slideBranchId === branchId;
+        });
       } else {
-        // If we're in main account view, show only global content (no branch_id)
-        filteredSlideshows = filteredSlideshows.filter(slide => 
-          !(slide as any).branch_id
-        );
+        // If we're in main account view, show only global content (no branch association)
+        filteredSlideshows = filteredSlideshows.filter(slide => {
+          const slideBranchId = localStorage.getItem(`slideshow_branch_${slide.id}`);
+          return !slideBranchId;
+        });
       }
 
       console.log('✅ Slideshows fetched for branch:', branchId || 'main', 'count:', filteredSlideshows.length);
@@ -63,9 +65,12 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
     try {
       console.log('➕ Creating slideshow:', slideshowData);
       
+      // Remove branch_id from the data since it's not in the database schema yet
+      const { branch_id, ...dataWithoutBranchId } = slideshowData;
+      
       const { data, error } = await supabase
         .from('account_slideshows')
-        .insert(slideshowData)
+        .insert(dataWithoutBranchId)
         .select();
 
       if (error) {
@@ -74,6 +79,12 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
       }
 
       console.log('✅ Slideshow created successfully:', data);
+      
+      // Store branch association in localStorage if branch_id provided
+      if (branch_id && data && Array.isArray(data) && data.length > 0) {
+        localStorage.setItem(`slideshow_branch_${data[0].id}`, branch_id);
+      }
+      
       fetchSlideshows();
       return data?.[0];
     } catch (error) {
@@ -86,9 +97,12 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
     try {
       console.log('🔄 Updating slideshow:', id, updates);
       
+      // Remove branch_id from updates since it's not in the database schema yet
+      const { branch_id, ...updatesWithoutBranchId } = updates;
+      
       const { error } = await supabase
         .from('account_slideshows')
-        .update(updates)
+        .update(updatesWithoutBranchId)
         .eq('id', id);
 
       if (error) {
@@ -119,6 +133,10 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
       }
 
       console.log('✅ Slideshow deleted successfully');
+      
+      // Remove branch association from localStorage
+      localStorage.removeItem(`slideshow_branch_${id}`);
+      
       fetchSlideshows();
     } catch (error) {
       console.error('❌ Error in deleteSlideshow:', error);
