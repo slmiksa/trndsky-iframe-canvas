@@ -1,11 +1,12 @@
 
+
 -- Create videos storage bucket
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'videos',
   'videos',
   true,
-  104857600, -- 100MB limit
+  10737418240, -- 10GB limit instead of 100MB
   ARRAY['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm', 'video/mkv']
 );
 
@@ -24,3 +25,4 @@ CREATE POLICY "Users can delete their own videos" ON storage.objects
     bucket_id = 'videos' AND
     auth.uid() IS NOT NULL
   );
+

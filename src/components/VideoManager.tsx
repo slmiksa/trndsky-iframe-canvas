@@ -266,7 +266,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
 
     console.log('📤 Uploading video file:', file.name, 'Size:', formatFileSize(file.size));
 
-    // Check file type
+    // Check file type only
     if (!file.type.startsWith('video/')) {
       toast({
         title: "خطأ",
@@ -276,17 +276,6 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       return;
     }
 
-    // Check file size (increase limit to 200MB for better user experience)
-    const maxSizeBytes = 200 * 1024 * 1024; // 200MB
-    if (file.size > maxSizeBytes) {
-      toast({
-        title: "خطأ",
-        description: `حجم الملف كبير جداً (${formatFileSize(file.size)}). الحد الأقصى ${formatFileSize(maxSizeBytes)}`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
     try {
       setUploadingFile(true);
       
@@ -294,7 +283,6 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       const fileName = `video_${Date.now()}.${fileExt}`;
       const filePath = `${accountId}/${fileName}`;
       
-      // Try to upload the file directly first
       console.log('📤 Starting upload to path:', filePath);
       
       const { error: uploadError, data: uploadData } = await supabase.storage
@@ -308,15 +296,6 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
         console.error('❌ Upload error:', uploadError);
         
         // Handle specific error cases
-        if (uploadError.message.includes('exceeded the maximum allowed size')) {
-          toast({
-            title: "خطأ",
-            description: `حجم الملف كبير جداً (${formatFileSize(file.size)}). يرجى اختيار ملف أصغر من ${formatFileSize(maxSizeBytes)}`,
-            variant: "destructive"
-          });
-          return;
-        }
-        
         if (uploadError.message.includes('Bucket not found')) {
           toast({
             title: "خطأ",
@@ -383,7 +362,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
             إضافة فيديو جديد
           </CardTitle>
           <CardDescription>
-            أضف فيديو جديد ليتم عرضه على الشاشات بملء الشاشة (الحد الأقصى 200 ميجابايت)
+            أضف فيديو جديد ليتم عرضه على الشاشات بملء الشاشة (بدون قيود على الحجم)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -413,7 +392,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
             <Label htmlFor="video-file" className="cursor-pointer">
               <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-accent">
                 <Upload className="h-4 w-4" />
-                {uploadingFile ? 'جاري الرفع...' : 'رفع ملف فيديو (حتى 200 ميجا)'}
+                {uploadingFile ? 'جاري الرفع...' : 'رفع ملف فيديو (بدون قيود على الحجم)'}
               </div>
               <Input
                 id="video-file"
