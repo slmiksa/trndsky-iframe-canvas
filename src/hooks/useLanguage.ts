@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 
 export type Language = 'ar' | 'en';
@@ -64,6 +65,21 @@ interface Translations {
   main_account: string;
   controls_all_branches: string;
   please_fill_all_fields: string;
+  
+  // Dashboard
+  dashboard_title: string;
+  subscription_expired: string;
+  expiring_soon: string;
+  subscription_active: string;
+  subscription_inactive: string;
+  expires_on: string;
+  view_public_page: string;
+  
+  // Content Types
+  videos: string;
+  websites: string;
+  news: string;
+  timers: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -129,6 +145,21 @@ const translations: Record<Language, Translations> = {
     main_account: 'الحساب الرئيسي',
     controls_all_branches: 'يتحكم بجميع الفروع',
     please_fill_all_fields: 'الرجاء ملء جميع الحقول',
+    
+    // Dashboard
+    dashboard_title: 'لوحة التحكم',
+    subscription_expired: 'انتهت صلاحية الاشتراك',
+    expiring_soon: 'ينتهي قريباً',
+    subscription_active: 'اشتراك نشط',
+    subscription_inactive: 'اشتراك غير نشط',
+    expires_on: 'ينتهي في',
+    view_public_page: 'عرض الصفحة العامة',
+    
+    // Content Types
+    videos: 'الفيديوهات',
+    websites: 'المواقع',
+    news: 'الأخبار',
+    timers: 'المؤقتات',
   },
   en: {
     welcome: 'WELCOME',
@@ -192,6 +223,21 @@ const translations: Record<Language, Translations> = {
     main_account: 'Main Account',
     controls_all_branches: 'Controls all branches',
     please_fill_all_fields: 'Please fill all fields',
+    
+    // Dashboard
+    dashboard_title: 'Dashboard',
+    subscription_expired: 'Subscription Expired',
+    expiring_soon: 'Expiring Soon',
+    subscription_active: 'Subscription Active',
+    subscription_inactive: 'Subscription Inactive',
+    expires_on: 'Expires on',
+    view_public_page: 'View Public Page',
+    
+    // Content Types
+    videos: 'Videos',
+    websites: 'Websites',
+    news: 'News',
+    timers: 'Timers',
   }
 };
 
