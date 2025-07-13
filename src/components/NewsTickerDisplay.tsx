@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -17,9 +16,14 @@ interface NewsItem {
 interface NewsTickerDisplayProps {
   accountId: string;
   branchId?: string | null;
+  onActivityChange?: (isActive: boolean) => void;
 }
 
-const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId, branchId }) => {
+const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ 
+  accountId, 
+  branchId, 
+  onActivityChange 
+}) => {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fade, setFade] = useState(true);
@@ -54,6 +58,11 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId, branch
 
       console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة للفرع:', branchId || 'main', 'عدد:', filteredNews.length);
       
+      // Notify parent about activity change
+      if (onActivityChange) {
+        onActivityChange(filteredNews.length > 0);
+      }
+      
       setNewsItems(prevNews => {
         if (JSON.stringify(prevNews) !== JSON.stringify(filteredNews)) {
           console.log('🔄 [NewsTickerDisplay] تغيير في الأخبار - إعادة ضبط الفهرس');
@@ -76,6 +85,9 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId, branch
       
     } catch (error) {
       console.error('❌ [NewsTickerDisplay] خطأ في fetchNews:', error);
+      if (onActivityChange) {
+        onActivityChange(false);
+      }
     }
   };
 

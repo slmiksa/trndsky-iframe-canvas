@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import SlideshowDisplay from '@/components/SlideshowDisplay';
 import VideoDisplay from '@/components/VideoDisplay';
 import NotificationDisplay from '@/components/NotificationDisplay';
 import NewsTickerDisplay from '@/components/NewsTickerDisplay';
-import BreakTimerDisplay from '@/components/BreakTimerDisplay';
+import BreakTimerDisplayContainer from '@/components/BreakTimerDisplayContainer';
 
 const ClientPublicPage: React.FC = () => {
   const { accountId, branchPath } = useParams<{ accountId?: string; branchPath?: string }>();
@@ -61,6 +60,17 @@ const ClientPublicPage: React.FC = () => {
     setHasBreakTimer(isActive);
   };
 
+  useEffect(() => {
+    // We need to check if news ticker has content
+    const checkNewsTickerActivity = async () => {
+      // This will be handled by NewsTickerDisplay internally
+      // For now, we'll assume it's active if we have an account
+      setHasNewsTicker(!!currentAccountId);
+    };
+    
+    checkNewsTickerActivity();
+  }, [currentAccountId, currentBranchId]);
+
   if (!currentAccountId) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -92,7 +102,7 @@ const ClientPublicPage: React.FC = () => {
       )}
       
       {!hasVideos && !hasSlideshows && hasBreakTimer && (
-        <BreakTimerDisplay 
+        <BreakTimerDisplayContainer 
           accountId={currentAccountId}
           branchId={currentBranchId}
           onActivityChange={handleBreakTimerActivity}
