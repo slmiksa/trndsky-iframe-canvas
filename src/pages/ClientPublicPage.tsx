@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import SlideshowDisplay from '@/components/SlideshowDisplay';
 import VideoDisplay from '@/components/VideoDisplay';
 import NotificationDisplay from '@/components/NotificationDisplay';
