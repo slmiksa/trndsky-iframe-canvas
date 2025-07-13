@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -338,7 +337,6 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
       if (uploadError) {
         console.error('❌ Upload error details:', {
           message: uploadError.message,
-          statusCode: uploadError.statusCode,
           error: uploadError
         });
         
@@ -355,7 +353,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId, branchId }) => {
             description: "ملف بنفس الاسم موجود. يرجى المحاولة مرة أخرى",
             variant: "destructive"
           });
-        } else if (uploadError.statusCode === 413) {
+        } else if (uploadError.message.includes('payload too large') || uploadError.message.includes('413')) {
           toast({
             title: "خطأ",
             description: "حجم الملف كبير جداً. يرجى اختيار ملف أصغر",
