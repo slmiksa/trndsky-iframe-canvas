@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -26,16 +25,18 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching notifications for account:', accountId, 'branch:', branchId);
       
-      let query = supabase
+      // Build query conditions
+      const baseQuery = supabase
         .from('notifications')
         .select('*')
         .eq('account_id', accountId);
 
-      // Filter by branch_id if provided
+      // Apply branch filter
+      let query;
       if (branchId) {
-        query = query.eq('branch_id', branchId);
+        query = baseQuery.eq('branch_id', branchId);
       } else {
-        query = query.is('branch_id', null);
+        query = baseQuery.is('branch_id', null);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
@@ -58,17 +59,19 @@ export const useNotifications = (accountId?: string, branchId?: string | null) =
     try {
       console.log('🔍 Fetching active notifications for account:', accountId, 'branch:', branchId);
       
-      let query = supabase
+      // Build query conditions
+      const baseQuery = supabase
         .from('notifications')
         .select('*')
         .eq('account_id', accountId)
         .eq('is_active', true);
 
-      // Filter by branch_id if provided
+      // Apply branch filter
+      let query;
       if (branchId) {
-        query = query.eq('branch_id', branchId);
+        query = baseQuery.eq('branch_id', branchId);
       } else {
-        query = query.is('branch_id', null);
+        query = baseQuery.is('branch_id', null);
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
