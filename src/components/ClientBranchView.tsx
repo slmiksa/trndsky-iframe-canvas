@@ -34,7 +34,7 @@ const ClientBranchView = ({ accountId, onSelectBranch, selectedBranch }: ClientB
       console.log(`🔍 جاري تحميل فروع الحساب ${accountId}...`);
       
       const { data, error } = await supabase
-        .from('account_branches')
+        .from('account_branches' as any)
         .select('*')
         .eq('account_id', accountId)
         .eq('is_active', true)
@@ -46,7 +46,7 @@ const ClientBranchView = ({ accountId, onSelectBranch, selectedBranch }: ClientB
       }
       
       console.log('✅ تم تحميل الفروع بنجاح:', data);
-      setBranches(data || []);
+      setBranches(data as Branch[] || []);
     } catch (error) {
       console.error('Error fetching branches:', error);
       toast({

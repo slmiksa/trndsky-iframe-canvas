@@ -43,7 +43,7 @@ const BranchManager = ({ accountId, accountName }: BranchManagerProps) => {
       console.log(`🔍 جاري تحميل فروع الحساب ${accountId}...`);
       
       const { data, error } = await supabase
-        .from('account_branches')
+        .from('account_branches' as any)
         .select('*')
         .eq('account_id', accountId)
         .order('created_at', { ascending: false });
@@ -54,7 +54,7 @@ const BranchManager = ({ accountId, accountName }: BranchManagerProps) => {
       }
       
       console.log('✅ تم تحميل الفروع بنجاح:', data);
-      setBranches(data || []);
+      setBranches(data as Branch[] || []);
     } catch (error) {
       console.error('Error fetching branches:', error);
       toast({
@@ -99,7 +99,7 @@ const BranchManager = ({ accountId, accountName }: BranchManagerProps) => {
       };
 
       const { data: createdBranch, error } = await supabase
-        .from('account_branches')
+        .from('account_branches' as any)
         .insert(branchData)
         .select()
         .single();
@@ -137,7 +137,7 @@ const BranchManager = ({ accountId, accountName }: BranchManagerProps) => {
       console.log(`🔄 جاري تحديث حالة الفرع ${branchId} إلى ${isActive ? 'نشط' : 'معطل'}`);
       
       const { error } = await supabase
-        .from('account_branches')
+        .from('account_branches' as any)
         .update({ is_active: isActive })
         .eq('id', branchId);
 
@@ -173,7 +173,7 @@ const BranchManager = ({ accountId, accountName }: BranchManagerProps) => {
       console.log(`🗑️ جاري حذف الفرع ${branchId}`);
       
       const { error } = await supabase
-        .from('account_branches')
+        .from('account_branches' as any)
         .delete()
         .eq('id', branchId);
 
