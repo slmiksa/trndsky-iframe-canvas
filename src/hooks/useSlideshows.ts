@@ -10,6 +10,7 @@ interface Slideshow {
   interval_seconds: number;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
   branch_id?: string | null;
 }
 

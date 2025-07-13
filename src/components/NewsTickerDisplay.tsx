@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -11,6 +10,7 @@ interface NewsItem {
   created_at: string;
   branch_id?: string | null;
   account_id: string;
+  updated_at: string;
 }
 
 interface NewsTickerDisplayProps {
