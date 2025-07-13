@@ -39,7 +39,7 @@ const ClientPublicPage: React.FC = () => {
     }
   }, [currentAccountId, currentBranchId]);
 
-  // Check for active websites
+  // Check for active websites with proper branch filtering
   const checkActiveWebsites = async () => {
     if (!currentAccountId) return;
 
@@ -57,28 +57,53 @@ const ClientPublicPage: React.FC = () => {
         return;
       }
 
-      // Filter websites based on branch using localStorage
-      let filteredWebsites = data || [];
+      console.log('📊 All active websites:', data);
+
+      // Filter websites based on branch association stored in localStorage
+      let activeWebsiteData = null;
+      let hasActiveWebsite = false;
       
-      if (currentBranchId) {
-        // If we're in a specific branch, show only that branch's content
-        filteredWebsites = filteredWebsites.filter(website => {
-          const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
-          return websiteBranchId === currentBranchId;
-        });
-      } else {
-        // If we're in main account view, show only global content (no branch association)
-        filteredWebsites = filteredWebsites.filter(website => {
-          const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
-          return !websiteBranchId;
-        });
+      if (data && data.length > 0) {
+        if (currentBranchId) {
+          // Looking for branch-specific content
+          console.log('🔍 Looking for websites assigned to branch:', currentBranchId);
+          
+          for (const website of data) {
+            const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
+            console.log(`Website ${website.id} (${website.website_title}) branch assignment:`, websiteBranchId);
+            
+            if (websiteBranchId === currentBranchId) {
+              activeWebsiteData = website;
+              hasActiveWebsite = true;
+              console.log('✅ Found branch-specific website:', website.website_title);
+              break;
+            }
+          }
+        } else {
+          // Looking for main account content (no branch assignment)
+          console.log('🔍 Looking for main account websites (no branch assignment)');
+          
+          for (const website of data) {
+            const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
+            console.log(`Website ${website.id} (${website.website_title}) branch assignment:`, websiteBranchId);
+            
+            if (!websiteBranchId || websiteBranchId === '') {
+              activeWebsiteData = website;
+              hasActiveWebsite = true;
+              console.log('✅ Found main account website:', website.website_title);
+              break;
+            }
+          }
+        }
       }
 
-      const activeWebsiteData = filteredWebsites[0] || null;
       setActiveWebsite(activeWebsiteData);
-      setHasWebsites(!!activeWebsiteData);
+      setHasWebsites(hasActiveWebsite);
       
-      console.log('🌐 Active website for branch:', currentBranchId || 'main', activeWebsiteData?.website_title || 'none');
+      console.log('🌐 Final result - Active website for branch:', currentBranchId || 'main', 
+                  activeWebsiteData ? activeWebsiteData.website_title : 'none');
+      console.log('🌐 Has active websites:', hasActiveWebsite);
+      
     } catch (error) {
       console.error('❌ Error in checkActiveWebsites:', error);
     }
@@ -213,6 +238,9 @@ const ClientPublicPage: React.FC = () => {
             <div className="text-sm text-gray-400">
               <p>معرف الحساب: {currentAccountId}</p>
               <p>في انتظار المحتوى...</p>
+              {currentBranchId && (
+                <p className="text-yellow-300 mt-2">تحقق من تخصيص المحتوى للفرع في لوحة التحكم</p>
+              )}
             </div>
           </div>
         </div>

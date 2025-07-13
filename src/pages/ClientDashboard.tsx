@@ -223,36 +223,77 @@ const ClientDashboard = () => {
     try {
       console.log('🔄 Toggling website status:', {
         websiteId,
-        currentStatus
+        currentStatus,
+        selectedBranchId
       });
+      
       if (!currentStatus) {
-        console.log('🛑 إيقاف جميع المواقع النشطة قبل تفعيل الموقع الجديد');
-        const {
-          error: deactivateError
-        } = await supabase.from('account_websites').update({
-          is_active: false
-        }).eq('account_id', accountId).eq('is_active', true);
-        if (deactivateError) {
-          console.error('❌ خطأ في إيقاف المواقع النشطة:', deactivateError);
-          throw deactivateError;
+        // If activating this website, deactivate others for the same context (branch or main)
+        console.log('🛑 إيقاف جميع المواقع النشطة في نفس السياق قبل تفعيل الموقع الجديد');
+        
+        const { data: allWebsites, error: fetchError } = await supabase
+          .from('account_websites')
+          .select('*')
+          .eq('account_id', accountId)
+          .eq('is_active', true);
+        
+        if (fetchError) throw fetchError;
+        
+        // Filter websites in the same context (branch or main)
+        const sameBranchWebsites = allWebsites?.filter(website => {
+          const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
+          if (selectedBranchId) {
+            return websiteBranchId === selectedBranchId;
+          } else {
+            return !websiteBranchId || websiteBranchId === '';
+          }
+        }) || [];
+        
+        // Deactivate websites in the same context
+        for (const website of sameBranchWebsites) {
+          const { error: deactivateError } = await supabase
+            .from('account_websites')
+            .update({ is_active: false })
+            .eq('id', website.id);
+            
+          if (deactivateError) throw deactivateError;
         }
-        console.log('✅ تم إيقاف جميع المواقع النشطة');
+        
+        console.log('✅ تم إيقاف المواقع النشطة في نفس السياق');
+        
+        // Assign website to current branch if one is selected
+        if (selectedBranchId) {
+          localStorage.setItem(`website_branch_${websiteId}`, selectedBranchId);
+          console.log('📍 Website assigned to branch:', selectedBranchId);
+        } else {
+          // Remove branch assignment for main account
+          localStorage.removeItem(`website_branch_${websiteId}`);
+          console.log('📍 Website assigned to main account');
+        }
       }
-      const {
-        error
-      } = await supabase.from('account_websites').update({
-        is_active: !currentStatus
-      }).eq('id', websiteId);
+      
+      const { error } = await supabase
+        .from('account_websites')
+        .update({ is_active: !currentStatus })
+        .eq('id', websiteId);
+        
       if (error) {
         console.error('❌ Error updating website status:', error);
         throw error;
       }
+      
       console.log('✅ Website status updated successfully');
-      const statusMessage = !currentStatus ? t('website_activated_others_stopped') : t('website_stopped');
+      
+      const branchContext = selectedBranchId ? `فرع ${getCurrentBranchName()}` : 'الحساب الرئيسي';
+      const statusMessage = !currentStatus 
+        ? `تم تفعيل الموقع في ${branchContext} وإيقاف المواقع الأخرى في نفس السياق`
+        : `تم إيقاف الموقع في ${branchContext}`;
+        
       toast({
         title: t('website_status_updated'),
         description: statusMessage
       });
+      
       fetchWebsites();
     } catch (error: any) {
       console.error('❌ Error in toggleWebsiteStatus:', error);
