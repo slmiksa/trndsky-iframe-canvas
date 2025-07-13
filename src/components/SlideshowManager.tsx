@@ -28,7 +28,7 @@ interface Slideshow {
   account_id: string;
   title: string;
   images: string[];
-  interval: number;
+  interval_seconds: number;
   is_active: boolean;
   created_at: string;
 }
@@ -52,7 +52,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
   const [newSlideshow, setNewSlideshow] = useState({
     title: '',
     images: [] as string[],
-    interval: 5,
+    interval_seconds: 5,
   });
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,7 +66,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
     if (isPlaying && previewSlideshow) {
       intervalId = setInterval(() => {
         setCurrentImageIndex((prevIndex) => (prevIndex + 1) % previewSlideshow.images.length);
-      }, previewSlideshow.interval * 1000);
+      }, previewSlideshow.interval_seconds * 1000);
     }
 
     return () => clearInterval(intervalId);
@@ -108,7 +108,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
         account_id: accountId,
         title: newSlideshow.title,
         images: newSlideshow.images,
-        interval: newSlideshow.interval,
+        interval_seconds: newSlideshow.interval_seconds,
         is_active: true,
       };
 
@@ -122,7 +122,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
       setNewSlideshow({
         title: '',
         images: [],
-        interval: 5,
+        interval_seconds: 5,
       });
       setSelectedImages([]);
       setShowAddForm(false);
@@ -240,14 +240,14 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                   <Label htmlFor="interval">مدة عرض كل صورة (ثواني)</Label>
                   <Slider
                     id="interval"
-                    defaultValue={[newSlideshow.interval]}
+                    defaultValue={[newSlideshow.interval_seconds]}
                     max={30}
                     min={3}
                     step={1}
-                    onValueChange={(value) => setNewSlideshow({ ...newSlideshow, interval: value[0] })}
+                    onValueChange={(value) => setNewSlideshow({ ...newSlideshow, interval_seconds: value[0] })}
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    {newSlideshow.interval} ثواني
+                    {newSlideshow.interval_seconds} ثواني
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -329,7 +329,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
                   </div>
                 </div>
                 <div className="text-sm text-gray-600">
-                  مدة العرض: {slideshow.interval} ثواني
+                  مدة العرض: {slideshow.interval_seconds} ثواني
                 </div>
                 <div className="text-xs text-gray-500">
                   {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}

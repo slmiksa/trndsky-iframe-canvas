@@ -7,7 +7,7 @@ interface Slideshow {
   account_id: string;
   title: string;
   images: string[];
-  interval: number;
+  interval_seconds: number;
   is_active: boolean;
   created_at: string;
 }
