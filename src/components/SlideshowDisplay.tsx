@@ -8,10 +8,10 @@ interface Slideshow {
   images: string[];
   interval_seconds: number;
   is_active: boolean;
-  branch_id?: string | null;
   account_id: string;
   created_at: string;
   updated_at: string;
+  branch_id?: string | null;
 }
 
 interface SlideshowDisplayProps {
@@ -47,11 +47,11 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
       if (branchId) {
         // If we're in a specific branch, show only that branch's content OR global content (no branch_id)
         filteredSlideshows = filteredSlideshows.filter(slide => 
-          !slide.branch_id || slide.branch_id === branchId
+          !(slide as any).branch_id || (slide as any).branch_id === branchId
         );
       } else {
         // If we're in main account view, show only global content (no branch_id)
-        filteredSlideshows = filteredSlideshows.filter(slide => !slide.branch_id);
+        filteredSlideshows = filteredSlideshows.filter(slide => !(slide as any).branch_id);
       }
 
       const firstActiveSlide = filteredSlideshows.find(slide => slide.is_active) || null;
@@ -65,7 +65,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId
 
       const getSlideshowSignature = (slide: Slideshow | null) => {
         if (!slide) return 'no-active-slides';
-        return `${slide.id}:${slide.images.join(',')}:${slide.branch_id || 'main'}`;
+        return `${slide.id}:${slide.images.join(',')}:${(slide as any).branch_id || 'main'}`;
       };
 
       setActiveSlideshow(prevSlideshow => {

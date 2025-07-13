@@ -30,6 +30,8 @@ interface Slideshow {
   interval_seconds: number;
   is_active: boolean;
   created_at: string;
+  updated_at: string;
+  branch_id?: string | null;
 }
 
 interface SlideshowManagerProps {
@@ -383,6 +385,55 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
       </Dialog>
     </Card>
   );
+};
+
+const toggleSlideshowStatus = async (slideshow: Slideshow) => {
+  try {
+    await updateSlideshow(slideshow.id, {
+      is_active: !slideshow.is_active,
+    });
+
+    toast({
+      title: 'success',
+      description: `Slideshow ${slideshow.is_active ? 'disabled' : 'enabled'}`,
+    });
+  } catch (error: any) {
+    console.error('Error updating slideshow:', error);
+    toast({
+      title: 'Error',
+      description: `Failed to update slideshow: ${error.message || 'Unknown error'}`,
+      variant: "destructive",
+    });
+  }
+};
+
+const handleDeleteSlideshow = async (id: string) => {
+  try {
+    await deleteSlideshow(id);
+
+    toast({
+      title: 'success',
+      description: 'Slideshow deleted',
+    });
+  } catch (error: any) {
+    console.error('Error deleting slideshow:', error);
+    toast({
+      title: 'Error',
+      description: `Failed to delete slideshow: ${error.message || 'Unknown error'}`,
+      variant: "destructive",
+    });
+  }
+};
+
+const handlePreview = (slideshow: Slideshow) => {
+  setPreviewSlideshow(slideshow);
+  setCurrentImageIndex(0);
+  setIsPlaying(true);
+};
+
+const handleClosePreview = () => {
+  setPreviewSlideshow(null);
+  setIsPlaying(false);
 };
 
 export default SlideshowManager;

@@ -41,12 +41,12 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
       if (branchId) {
         // If we're in a specific branch, show only that branch's content
         filteredSlideshows = filteredSlideshows.filter(slide => 
-          slide.branch_id === branchId
+          (slide as any).branch_id === branchId
         );
       } else {
         // If we're in main account view, show only global content (no branch_id)
         filteredSlideshows = filteredSlideshows.filter(slide => 
-          !slide.branch_id
+          !(slide as any).branch_id
         );
       }
 
@@ -59,7 +59,7 @@ export const useSlideshows = (accountId?: string, branchId?: string | null) => {
     }
   };
 
-  const createSlideshow = async (slideshowData: Omit<Slideshow, 'id' | 'created_at'>) => {
+  const createSlideshow = async (slideshowData: Omit<Slideshow, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       console.log('➕ Creating slideshow:', slideshowData);
       

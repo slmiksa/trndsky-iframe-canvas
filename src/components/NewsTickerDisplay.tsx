@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -8,9 +9,9 @@ interface NewsItem {
   is_active: boolean;
   display_order: number | null;
   created_at: string;
-  branch_id?: string | null;
   account_id: string;
   updated_at: string;
+  branch_id?: string | null;
 }
 
 interface NewsTickerDisplayProps {
@@ -44,11 +45,11 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId, branch
       if (branchId) {
         // If we're in a specific branch, show only that branch's content OR global content (no branch_id)
         filteredNews = filteredNews.filter(news => 
-          !news.branch_id || news.branch_id === branchId
+          !(news as any).branch_id || (news as any).branch_id === branchId
         );
       } else {
         // If we're in main account view, show only global content (no branch_id)
-        filteredNews = filteredNews.filter(news => !news.branch_id);
+        filteredNews = filteredNews.filter(news => !(news as any).branch_id);
       }
 
       console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة للفرع:', branchId || 'main', 'عدد:', filteredNews.length);
