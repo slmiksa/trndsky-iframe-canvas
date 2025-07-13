@@ -115,12 +115,21 @@ const ClientDashboard = () => {
     if (!accountId) return;
     
     try {
-      const stored = localStorage.getItem(`branches_${accountId}`);
-      if (stored) {
-        const branchesData = JSON.parse(stored);
-        setBranches(branchesData);
-        console.log('✅ Branches loaded from localStorage:', branchesData);
+      console.log('🔍 Loading branches from database for account:', accountId);
+      
+      const { data, error } = await supabase
+        .from('account_branches')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error loading branches:', error);
+        throw error;
       }
+
+      setBranches(data || []);
+      console.log('✅ Branches loaded from database:', data);
     } catch (error) {
       console.error('❌ Error loading branches:', error);
     }
@@ -152,19 +161,9 @@ const ClientDashboard = () => {
   const getCurrentBranchName = () => {
     if (!selectedBranchId) return t('main_account');
     
-    // Try to get branch name from localStorage
-    try {
-      const stored = localStorage.getItem(`branches_${accountId}`);
-      if (stored) {
-        const branches = JSON.parse(stored);
-        const branch = branches.find((b: any) => b.id === selectedBranchId);
-        return branch ? branch.branch_name : t('selected_branch');
-      }
-    } catch (error) {
-      console.error('Error getting branch name:', error);
-    }
-    
-    return t('selected_branch');
+    // Get branch name from the loaded branches data
+    const branch = branches.find((b: any) => b.id === selectedBranchId);
+    return branch ? branch.branch_name : t('selected_branch');
   };
 
   const addWebsite = async (e: React.FormEvent) => {

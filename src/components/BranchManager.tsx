@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -52,37 +53,36 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
   const { t } = useLanguage();
 
   useEffect(() => {
-    // For now, we'll use local storage as a temporary solution
-    // until the account_branches table is properly set up in the database
-    loadBranchesFromStorage();
+    loadBranches();
   }, [accountId]);
 
-  const loadBranchesFromStorage = () => {
+  const loadBranches = async () => {
     try {
-      console.log('🔍 Loading branches from localStorage for account:', accountId);
-      const stored = localStorage.getItem(`branches_${accountId}`);
-      if (stored) {
-        const parsedBranches = JSON.parse(stored);
-        setBranches(parsedBranches);
-        console.log('✅ Branches loaded from localStorage:', parsedBranches);
-      } else {
-        setBranches([]);
-        console.log('ℹ️ No branches found in localStorage for account:', accountId);
+      console.log('🔍 Loading branches from database for account:', accountId);
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('account_branches')
+        .select('*')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error loading branches:', error);
+        throw error;
       }
+
+      setBranches(data || []);
+      console.log('✅ Branches loaded from database:', data);
     } catch (error) {
-      console.error('Error loading branches from localStorage:', error);
-      setBranches([]);
+      console.error('Error loading branches:', error);
+      toast({
+        title: t('error'),
+        description: 'فشل في تحميل الفروع من قاعدة البيانات',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const saveBranchesToStorage = (updatedBranches: Branch[]) => {
-    try {
-      localStorage.setItem(`branches_${accountId}`, JSON.stringify(updatedBranches));
-      console.log('💾 Branches saved to localStorage:', updatedBranches);
-    } catch (error) {
-      console.error('Error saving branches to localStorage:', error);
     }
   };
 
@@ -97,25 +97,30 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     }
 
     try {
-      console.log('➕ Adding new branch:', {
+      console.log('➕ Adding new branch to database:', {
         accountId,
         branch_name: newBranchName.trim(),
         branch_path: newBranchPath.trim(),
       });
 
-      const newBranch: Branch = {
-        id: `branch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        account_id: accountId,
-        branch_name: newBranchName.trim(),
-        branch_path: newBranchPath.trim(),
-        is_active: true,
-        created_at: new Date().toISOString(),
-      };
+      const { data, error } = await supabase
+        .from('account_branches')
+        .insert({
+          account_id: accountId,
+          branch_name: newBranchName.trim(),
+          branch_path: newBranchPath.trim(),
+          is_active: true,
+        })
+        .select()
+        .single();
 
-      const updatedBranches = [...branches, newBranch];
-      setBranches(updatedBranches);
-      saveBranchesToStorage(updatedBranches);
+      if (error) {
+        console.error('❌ Error adding branch:', error);
+        throw error;
+      }
 
+      console.log('✅ Branch added successfully:', data);
+      
       setNewBranchName('');
       setNewBranchPath('');
       setIsAddDialogOpen(false);
@@ -124,11 +129,13 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         title: t('success'),
         description: t('branch_added_successfully'),
       });
-    } catch (error) {
+      
+      loadBranches(); // Reload branches from database
+    } catch (error: any) {
       console.error('Error adding branch:', error);
       toast({
         title: t('error'),
-        description: t('failed_to_add_branch'),
+        description: error.message || t('failed_to_add_branch'),
         variant: 'destructive',
       });
     }
@@ -138,15 +145,24 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
     if (!editingBranch || !newBranchName.trim() || !newBranchPath.trim()) return;
 
     try {
-      const updatedBranches = branches.map(b => 
-        b.id === editingBranch.id 
-          ? { ...b, branch_name: newBranchName.trim(), branch_path: newBranchPath.trim() }
-          : b
-      );
+      console.log('✏️ Updating branch in database:', editingBranch.id);
       
-      setBranches(updatedBranches);
-      saveBranchesToStorage(updatedBranches);
+      const { error } = await supabase
+        .from('account_branches')
+        .update({
+          branch_name: newBranchName.trim(),
+          branch_path: newBranchPath.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingBranch.id);
 
+      if (error) {
+        console.error('❌ Error updating branch:', error);
+        throw error;
+      }
+
+      console.log('✅ Branch updated successfully');
+      
       setEditingBranch(null);
       setNewBranchName('');
       setNewBranchPath('');
@@ -155,11 +171,13 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
         title: t('success'),
         description: t('branch_updated_successfully'),
       });
-    } catch (error) {
+      
+      loadBranches(); // Reload branches from database
+    } catch (error: any) {
       console.error('Error updating branch:', error);
       toast({
         title: t('error'),
-        description: t('failed_to_update_branch'),
+        description: error.message || t('failed_to_update_branch'),
         variant: 'destructive',
       });
     }
@@ -167,19 +185,31 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const handleDeleteBranch = async (branchId: string) => {
     try {
-      const updatedBranches = branches.filter(b => b.id !== branchId);
-      setBranches(updatedBranches);
-      saveBranchesToStorage(updatedBranches);
+      console.log('🗑️ Deleting branch from database:', branchId);
+      
+      const { error } = await supabase
+        .from('account_branches')
+        .delete()
+        .eq('id', branchId);
+
+      if (error) {
+        console.error('❌ Error deleting branch:', error);
+        throw error;
+      }
+
+      console.log('✅ Branch deleted successfully');
       
       toast({
         title: t('success'),
         description: t('branch_deleted_successfully'),
       });
-    } catch (error) {
+      
+      loadBranches(); // Reload branches from database
+    } catch (error: any) {
       console.error('Error deleting branch:', error);
       toast({
         title: t('error'),
-        description: t('failed_to_delete_branch'),
+        description: error.message || t('failed_to_delete_branch'),
         variant: 'destructive',
       });
     }
@@ -187,22 +217,34 @@ const BranchManager: React.FC<BranchManagerProps> = ({ accountId, onBranchSelect
 
   const toggleBranchStatus = async (branchId: string, currentStatus: boolean) => {
     try {
-      const updatedBranches = branches.map(b => 
-        b.id === branchId ? { ...b, is_active: !currentStatus } : b
-      );
+      console.log('🔄 Toggling branch status in database:', branchId);
       
-      setBranches(updatedBranches);
-      saveBranchesToStorage(updatedBranches);
+      const { error } = await supabase
+        .from('account_branches')
+        .update({
+          is_active: !currentStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', branchId);
+
+      if (error) {
+        console.error('❌ Error updating branch status:', error);
+        throw error;
+      }
+
+      console.log('✅ Branch status updated successfully');
       
       toast({
         title: t('success'),
         description: t('branch_status_updated'),
       });
-    } catch (error) {
+      
+      loadBranches(); // Reload branches from database
+    } catch (error: any) {
       console.error('Error updating branch status:', error);
       toast({
         title: t('error'),
-        description: t('failed_to_update_branch_status'),
+        description: error.message || t('failed_to_update_branch_status'),
         variant: 'destructive',
       });
     }

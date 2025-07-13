@@ -9,8 +9,7 @@ import { toast } from '@/hooks/use-toast';
 interface Branch {
   id: string;
   branch_name: string;
-  branch_code: string;
-  location?: string;
+  branch_path: string;
   is_active: boolean;
 }
 
@@ -25,17 +24,17 @@ const BranchPublicLinks: React.FC<BranchPublicLinksProps> = ({
   branches, 
   selectedBranchId 
 }) => {
-  const copyBranchLink = (branchCode: string) => {
-    const publicUrl = `${window.location.origin}/client/${accountName}/${branchCode}`;
+  const copyBranchLink = (branchPath: string) => {
+    const publicUrl = `${window.location.origin}/client/${accountName}/${branchPath}`;
     navigator.clipboard.writeText(publicUrl);
     toast({
       title: "تم نسخ الرابط",
-      description: `رابط فرع ${branchCode} تم نسخه`
+      description: `رابط فرع ${branchPath} تم نسخه`
     });
   };
 
-  const openBranchPage = (branchCode: string) => {
-    const publicUrl = `/client/${accountName}/${branchCode}`;
+  const openBranchPage = (branchPath: string) => {
+    const publicUrl = `/client/${accountName}/${branchPath}`;
     window.open(publicUrl, '_blank');
   };
 
@@ -107,24 +106,21 @@ const BranchPublicLinks: React.FC<BranchPublicLinksProps> = ({
                     )}
                   </div>
                   <p className="text-sm text-gray-600 break-all">
-                    /client/{accountName}/{branch.branch_code}
+                    /client/{accountName}/{branch.branch_path}
                   </p>
-                  {branch.location && (
-                    <p className="text-xs text-gray-500">{branch.location}</p>
-                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <Button 
                     size="sm" 
                     variant="ghost" 
-                    onClick={() => copyBranchLink(branch.branch_code)}
+                    onClick={() => copyBranchLink(branch.branch_path)}
                   >
                     <Share2 className="h-3 w-3" />
                   </Button>
                   <Button 
                     size="sm" 
                     variant="ghost" 
-                    onClick={() => openBranchPage(branch.branch_code)}
+                    onClick={() => openBranchPage(branch.branch_path)}
                   >
                     <ExternalLink className="h-3 w-3" />
                   </Button>
