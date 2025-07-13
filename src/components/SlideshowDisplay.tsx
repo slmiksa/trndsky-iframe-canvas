@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -8,14 +7,16 @@ interface Slideshow {
   images: string[];
   interval_seconds: number;
   is_active: boolean;
+  branch_id?: string;
 }
 
 interface SlideshowDisplayProps {
   accountId: string;
+  branchId?: string | null;
   onActivityChange: (isActive: boolean) => void;
 }
 
-const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivityChange }) => {
+const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, branchId, onActivityChange }) => {
   const [activeSlideshow, setActiveSlideshow] = useState<Slideshow | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
   const fetchActiveSlideshow = async () => {
     try {
-      console.log('🎬 Fetching active slideshow for:', accountId);
+      console.log('🎬 Fetching active slideshow for account:', accountId, 'branch:', branchId);
       
       const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
         p_account_id: accountId
@@ -36,19 +37,31 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      // Logic change: Only ever use the FIRST active slideshow. This disables rotation.
-      const firstActiveSlide = data?.find(slide => slide.is_active) || null;
+      // Filter slideshows based on branch
+      let filteredSlideshows = data || [];
+      
+      if (branchId) {
+        // If we're in a specific branch, show only that branch's content OR global content (no branch_id)
+        filteredSlideshows = filteredSlideshows.filter(slide => 
+          !slide.branch_id || slide.branch_id === branchId
+        );
+      } else {
+        // If we're in main account view, show only global content (no branch_id)
+        filteredSlideshows = filteredSlideshows.filter(slide => !slide.branch_id);
+      }
+
+      const firstActiveSlide = filteredSlideshows.find(slide => slide.is_active) || null;
       const hasActive = !!firstActiveSlide;
 
       if (isActiveRef.current !== hasActive) {
         onActivityChange(hasActive);
         isActiveRef.current = hasActive;
-        console.log(`🎬 Slideshow activity state changed to: ${hasActive}`);
+        console.log(`🎬 Slideshow activity state changed to: ${hasActive} for branch: ${branchId || 'main'}`);
       }
 
       const getSlideshowSignature = (slide: Slideshow | null) => {
         if (!slide) return 'no-active-slides';
-        return `${slide.id}:${slide.images.join(',')}`;
+        return `${slide.id}:${slide.images.join(',')}:${slide.branch_id || 'main'}`;
       };
 
       setActiveSlideshow(prevSlideshow => {
@@ -232,6 +245,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
           <div className="text-white/80 text-sm">
             <p>الصورة {safeImageIndex + 1} من {activeSlideshow.images.length}</p>
+            {branchId && <p className="text-xs text-blue-300">فرع: {branchId}</p>}
+            {!branchId && <p className="text-xs text-green-300">الحساب الرئيسي</p>}
           </div>
         </div>
 
@@ -261,6 +276,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
             <div>Image: {safeImageIndex + 1}/{activeSlideshow.images.length}</div>
             <div>Title: {activeSlideshow.title}</div>
+            <div>Branch: {branchId || 'Main Account'}</div>
             <div>صور كل: 15 ثانية</div>
             <div>Image Timer: {imageIntervalRef.current ? 'نشط' : 'متوقف'}</div>
             <div>Active Slideshow: {activeSlideshow ? 'Yes' : 'No'}</div>

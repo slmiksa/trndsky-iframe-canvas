@@ -10,9 +10,10 @@ interface Slideshow {
   interval_seconds: number;
   is_active: boolean;
   created_at: string;
+  branch_id?: string;
 }
 
-export const useSlideshows = (accountId?: string) => {
+export const useSlideshows = (accountId?: string, branchId?: string | null) => {
   const [slideshows, setSlideshows] = useState<Slideshow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,7 +21,7 @@ export const useSlideshows = (accountId?: string) => {
     if (!accountId) return;
 
     try {
-      console.log('🔍 Fetching slideshows for account:', accountId);
+      console.log('🔍 Fetching slideshows for account:', accountId, 'branch:', branchId);
       
       const { data, error } = await supabase
         .from('account_slideshows')
@@ -33,8 +34,19 @@ export const useSlideshows = (accountId?: string) => {
         throw error;
       }
 
-      console.log('✅ Slideshows fetched:', data);
-      setSlideshows(data || []);
+      // Filter slideshows based on branch
+      let filteredSlideshows = data || [];
+      
+      if (branchId) {
+        // If we're in a specific branch, show only that branch's content
+        filteredSlideshows = filteredSlideshows.filter(slide => slide.branch_id === branchId);
+      } else {
+        // If we're in main account view, show only global content (no branch_id)
+        filteredSlideshows = filteredSlideshows.filter(slide => !slide.branch_id);
+      }
+
+      console.log('✅ Slideshows fetched for branch:', branchId || 'main', 'count:', filteredSlideshows.length);
+      setSlideshows(filteredSlideshows);
     } catch (error) {
       console.error('❌ Error in fetchSlideshows:', error);
     } finally {
@@ -111,7 +123,7 @@ export const useSlideshows = (accountId?: string) => {
 
   useEffect(() => {
     fetchSlideshows();
-  }, [accountId]);
+  }, [accountId, branchId]);
 
   return {
     slideshows,

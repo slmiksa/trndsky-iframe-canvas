@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -45,7 +44,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
     createSlideshow,
     updateSlideshow,
     deleteSlideshow,
-  } = useSlideshows(accountId);
+  } = useSlideshows(accountId, branchId);
   const { t } = useLanguage();
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -85,7 +84,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
 
     if (!newSlideshow.title.trim()) {
       toast({
-        title: t('error'),
+        title: "خطأ",
         description: 'عنوان السلايدات مطلوب',
         variant: "destructive",
       });
@@ -94,7 +93,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
 
     if (newSlideshow.images.length === 0) {
       toast({
-        title: t('error'),
+        title: "خطأ",
         description: 'يرجى رفع صورة واحدة على الأقل',
         variant: "destructive",
       });
@@ -110,12 +109,13 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
         images: newSlideshow.images,
         interval_seconds: newSlideshow.interval_seconds,
         is_active: true,
+        branch_id: branchId,
       };
 
       const result = await createSlideshow(slideshowData);
 
       toast({
-        title: t('success'),
+        title: "نجح",
         description: 'تم إضافة السلايدات بنجاح',
       });
 
@@ -129,7 +129,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
     } catch (error: any) {
       console.error('Error creating slideshow:', error);
       toast({
-        title: t('error'),
+        title: "خطأ",
         description: `خطأ في إضافة السلايدات: ${error.message || 'خطأ غير معروف'}`,
         variant: "destructive",
       });
@@ -198,6 +198,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId, branchId
           <CardTitle className="flex items-center gap-2">
             <Image className="h-5 w-5" />
             السلايدات ({slideshows.length})
+            {branchId && <Badge variant="outline" className="text-xs">فرع: {branchId}</Badge>}
+            {!branchId && <Badge variant="outline" className="text-xs">الحساب الرئيسي</Badge>}
           </CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>

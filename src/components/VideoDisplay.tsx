@@ -6,14 +6,16 @@ interface Video {
   title: string;
   video_url: string;
   is_active: boolean;
+  branch_id?: string;
 }
 
 interface VideoDisplayProps {
   accountId: string;
+  branchId?: string | null;
   onActivityChange: (isActive: boolean) => void;
 }
 
-const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, onActivityChange }) => {
+const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, branchId, onActivityChange }) => {
   const [activeVideo, setActiveVideo] = useState<Video | null>(null);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
@@ -25,16 +27,16 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, onActivityChange
 
   const fetchActiveVideo = async () => {
     try {
-      console.log('🎥 Fetching active video for:', accountId);
+      console.log('🎥 Fetching active video for account:', accountId, 'branch:', branchId);
       
-      // مؤقتاً - سيتم تفعيلها لاحقاً عند إعداد قاعدة البيانات
+      // For now, temporarily return null - will be enabled when database is set up
       const videoData = null;
       const hasActive = false;
 
       if (isActiveRef.current !== hasActive) {
         onActivityChange(hasActive);
         isActiveRef.current = hasActive;
-        console.log(`🎥 Video activity state changed to: ${hasActive}`);
+        console.log(`🎥 Video activity state changed to: ${hasActive} for branch: ${branchId || 'main'}`);
       }
 
       setActiveVideo(videoData);
@@ -152,6 +154,8 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, onActivityChange
           <h2 className="text-white text-xl font-semibold">{activeVideo.title}</h2>
           <div className="text-white/80 text-sm">
             <p>فيديو نشط</p>
+            {branchId && <p className="text-xs text-blue-300">فرع: {branchId}</p>}
+            {!branchId && <p className="text-xs text-green-300">الحساب الرئيسي</p>}
           </div>
         </div>
 
@@ -172,6 +176,7 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, onActivityChange
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
             <div>عنوان: {activeVideo.title}</div>
             <div>URL: {activeVideo.video_url}</div>
+            <div>Branch: {branchId || 'Main Account'}</div>
             <div>حالة: نشط وتشغيل تلقائي</div>
           </div>
         )}
