@@ -11,7 +11,8 @@ interface BreakTimer {
   position: string;
   account_id: string;
   is_active: boolean;
-  branch_id?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface BreakTimerDisplayContainerProps {
@@ -32,17 +33,21 @@ const BreakTimerDisplayContainer: React.FC<BreakTimerDisplayContainerProps> = ({
     try {
       const timers = await fetchActiveTimers(accountId);
       
-      // Filter timers based on branch - same logic as other components
+      // Filter timers based on branch using localStorage
       let filteredTimers = timers || [];
       
       if (branchId) {
-        // If we're in a specific branch, show only that branch's content OR global content (no branch_id)
-        filteredTimers = filteredTimers.filter(timer => 
-          !timer.branch_id || timer.branch_id === branchId
-        );
+        // If we're in a specific branch, show only that branch's content
+        filteredTimers = filteredTimers.filter(timer => {
+          const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
+          return timerBranchId === branchId;
+        });
       } else {
-        // If we're in main account view, show only global content (no branch_id)
-        filteredTimers = filteredTimers.filter(timer => !timer.branch_id);
+        // If we're in main account view, show only global content (no branch association)
+        filteredTimers = filteredTimers.filter(timer => {
+          const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
+          return !timerBranchId;
+        });
       }
 
       // Filter by current time to show only active timers
@@ -59,12 +64,12 @@ const BreakTimerDisplayContainer: React.FC<BreakTimerDisplayContainerProps> = ({
         return currentTime >= startTimeSeconds && currentTime < endTimeSeconds;
       });
 
-      console.log('🔍 Active timers for branch:', branchId || 'main', 'count:', currentlyActiveTimers.length);
+      console.log('🔍 Active break timers for branch:', branchId || 'main', 'count:', currentlyActiveTimers.length);
       
       setActiveTimers(currentlyActiveTimers);
       onActivityChange(currentlyActiveTimers.length > 0);
     } catch (error) {
-      console.error('❌ Error fetching active timers:', error);
+      console.error('❌ Error fetching active break timers:', error);
       setActiveTimers([]);
       onActivityChange(false);
     }
