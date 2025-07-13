@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ interface BreakTimer {
   is_active: boolean;
   position: string;
   created_at: string;
+  branch_id?: string | null;
 }
 
 interface BreakTimerManagerProps {
@@ -48,12 +50,10 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
   // Filter timers by branch if branchId is provided
   const filteredTimers = branchId 
     ? timers.filter(timer => {
-        // For localStorage implementation, we'll store branch_id in the timer data
         const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
         return timerBranchId === branchId;
       })
     : timers.filter(timer => {
-        // Show only main account timers (no branch association)
         const timerBranchId = localStorage.getItem(`timer_branch_${timer.id}`);
         return !timerBranchId;
       });
@@ -112,22 +112,17 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
     try {
       const timerData = {
         account_id: accountId,
-        branch_id: branchId,
         title: newTimer.title,
         start_time: newTimer.start_time,
         end_time: newTimer.end_time,
         is_active: true,
         position: newTimer.position,
+        branch_id: branchId,
       };
 
       console.log('💾 Creating timer with data:', timerData);
 
       const result = await createTimer(timerData);
-
-      // Store branch association in localStorage if result is an array
-      if (branchId && result && Array.isArray(result) && result.length > 0) {
-        localStorage.setItem(`timer_branch_${result[0].id}`, branchId);
-      }
 
       console.log('✅ Timer created successfully:', result);
       toast({
@@ -177,9 +172,6 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId, branch
   const handleDeleteTimer = async (id: string) => {
     try {
       await deleteTimer(id);
-      
-      // Remove branch association from localStorage
-      localStorage.removeItem(`timer_branch_${id}`);
       
       toast({
         title: "تم حذف المؤقت",

@@ -12,6 +12,7 @@ interface BreakTimer {
   position: string;
   created_at: string;
   updated_at: string;
+  branch_id?: string | null;
 }
 
 export const useBreakTimers = (accountId?: string) => {
@@ -72,9 +73,12 @@ export const useBreakTimers = (accountId?: string) => {
     try {
       console.log('➕ Creating break timer:', timerData);
       
+      // Remove branch_id from the data since it's not in the database schema yet
+      const { branch_id, ...dataWithoutBranchId } = timerData;
+      
       const { data, error } = await supabase
         .from('break_timers')
-        .insert(timerData)
+        .insert(dataWithoutBranchId)
         .select();
 
       if (error) {
@@ -83,6 +87,12 @@ export const useBreakTimers = (accountId?: string) => {
       }
 
       console.log('✅ Break timer created successfully:', data);
+      
+      // Store branch association in localStorage if branch_id provided
+      if (branch_id && data && Array.isArray(data) && data.length > 0) {
+        localStorage.setItem(`timer_branch_${data[0].id}`, branch_id);
+      }
+      
       await fetchTimers();
       return data;
     } catch (error) {
@@ -95,9 +105,12 @@ export const useBreakTimers = (accountId?: string) => {
     try {
       console.log('🔄 Updating break timer:', id, updates);
       
+      // Remove branch_id from updates since it's not in the database schema yet
+      const { branch_id, ...updatesWithoutBranchId } = updates;
+      
       const { data, error } = await supabase
         .from('break_timers')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ ...updatesWithoutBranchId, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select();
 
@@ -131,6 +144,10 @@ export const useBreakTimers = (accountId?: string) => {
       }
 
       console.log('✅ Break timer deleted successfully:', data);
+      
+      // Remove branch association from localStorage
+      localStorage.removeItem(`timer_branch_${id}`);
+      
       await fetchTimers();
       return data;
     } catch (error) {
