@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Settings, Users, Image, Video, MessageSquare, Clock, MapPin } from 'lucide-react';
+import { ExternalLink, Settings, Users, Image, Video, MessageSquare, Clock, MapPin, Globe } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 // Import managers
@@ -17,6 +17,7 @@ import NewsTickerManager from '@/components/NewsTickerManager';
 import BreakTimerManager from '@/components/BreakTimerManager';
 import BranchManager from '@/components/BranchManager';
 import BranchPublicLinks from '@/components/BranchPublicLinks';
+import WebsiteManager from '@/components/WebsiteManager';
 
 interface Account {
   id: string;
@@ -229,7 +230,7 @@ const ClientDashboard: React.FC = () => {
           {/* Main Content */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="slideshows" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="slideshows" className="flex items-center gap-2">
                   <Image className="h-4 w-4" />
                   العروض
@@ -237,6 +238,10 @@ const ClientDashboard: React.FC = () => {
                 <TabsTrigger value="videos" className="flex items-center gap-2">
                   <Video className="h-4 w-4" />
                   الفيديوهات
+                </TabsTrigger>
+                <TabsTrigger value="websites" className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  المواقع
                 </TabsTrigger>
                 <TabsTrigger value="notifications" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
@@ -261,6 +266,13 @@ const ClientDashboard: React.FC = () => {
 
               <TabsContent value="videos">
                 <VideoManager 
+                  accountId={accountId!} 
+                  branchId={selectedBranchId}
+                />
+              </TabsContent>
+
+              <TabsContent value="websites">
+                <WebsiteManager 
                   accountId={accountId!} 
                   branchId={selectedBranchId}
                 />
