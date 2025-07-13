@@ -18,14 +18,15 @@ const ClientPublicPage: React.FC = () => {
   const [hasWebsites, setHasWebsites] = useState(false);
   const [activeWebsite, setActiveWebsite] = useState<any>(null);
 
-  // Parse branch ID from URL path (e.g., "jed", "ryd", etc.)
-  const branchId = branchPath?.startsWith('/') ? branchPath.slice(1) : branchPath;
+  // Parse branch ID from URL path - only if it's actually a branch path
+  const branchId = branchPath && branchPath.trim() && branchPath !== accountId ? branchPath : null;
 
   // Get account ID from URL or localStorage for TV mode
   const currentAccountId = accountId || localStorage.getItem('tv_account_id');
   const currentBranchId = branchId || localStorage.getItem('tv_branch_id');
 
   console.log('🏪 Client Public Page - Account:', currentAccountId, 'Branch:', currentBranchId);
+  console.log('🔍 URL branchPath:', branchPath, 'Parsed branchId:', branchId);
 
   useEffect(() => {
     // Store current account and branch for TV mode
@@ -59,7 +60,7 @@ const ClientPublicPage: React.FC = () => {
 
       console.log('📊 All active websites:', data);
 
-      // Filter websites based on branch association stored in localStorage
+      // Filter websites based on branch association
       let activeWebsiteData = null;
       let hasActiveWebsite = false;
       
@@ -87,7 +88,7 @@ const ClientPublicPage: React.FC = () => {
             const websiteBranchId = localStorage.getItem(`website_branch_${website.id}`);
             console.log(`Website ${website.id} (${website.website_title}) branch assignment:`, websiteBranchId);
             
-            if (!websiteBranchId || websiteBranchId === '') {
+            if (!websiteBranchId || websiteBranchId === '' || websiteBranchId === 'null') {
               activeWebsiteData = website;
               hasActiveWebsite = true;
               console.log('✅ Found main account website:', website.website_title);
@@ -100,7 +101,7 @@ const ClientPublicPage: React.FC = () => {
       setActiveWebsite(activeWebsiteData);
       setHasWebsites(hasActiveWebsite);
       
-      console.log('🌐 Final result - Active website for branch:', currentBranchId || 'main', 
+      console.log('🌐 Final result - Active website for context:', currentBranchId || 'main', 
                   activeWebsiteData ? activeWebsiteData.website_title : 'none');
       console.log('🌐 Has active websites:', hasActiveWebsite);
       
@@ -241,6 +242,9 @@ const ClientPublicPage: React.FC = () => {
               {currentBranchId && (
                 <p className="text-yellow-300 mt-2">تحقق من تخصيص المحتوى للفرع في لوحة التحكم</p>
               )}
+              {!currentBranchId && (
+                <p className="text-yellow-300 mt-2">تحقق من تفعيل المحتوى في لوحة التحكم</p>
+              )}
             </div>
           </div>
         </div>
@@ -251,6 +255,8 @@ const ClientPublicPage: React.FC = () => {
         <div className="fixed bottom-4 left-4 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-xs z-50">
           <div>Account: {currentAccountId}</div>
           <div>Branch: {currentBranchId || 'Main'}</div>
+          <div>URL branchPath: {branchPath || 'None'}</div>
+          <div>Parsed branchId: {branchId || 'None'}</div>
           <div>Websites: {hasWebsites ? '✅' : '❌'}</div>
           <div>Videos: {hasVideos ? '✅' : '❌'}</div>
           <div>Slideshows: {hasSlideshows ? '✅' : '❌'}</div>
