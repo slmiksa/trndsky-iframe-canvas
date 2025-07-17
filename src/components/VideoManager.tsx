@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Video, Plus, Play, Pause, Trash2, Upload } from 'lucide-react';
+import { Video, Plus, Play, Pause, Trash2, Upload, Link, FileVideo } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -29,10 +29,14 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [uploadMethod, setUploadMethod] = useState<'url' | 'file'>('url');
   const [newVideo, setNewVideo] = useState({
     title: '',
     video_url: ''
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Fetch videos
   const fetchVideos = async () => {
@@ -69,29 +73,130 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
     fetchVideos();
   }, [accountId]);
 
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file type
+      if (!file.type.startsWith('video/')) {
+        toast({
+          title: "نوع ملف غير صحيح",
+          description: "يرجى اختيار ملف فيديو صالح",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Check file size (100MB limit)
+      if (file.size > 100 * 1024 * 1024) {
+        toast({
+          title: "حجم الملف كبير جداً",
+          description: "يجب أن يكون حجم الملف أقل من 100 ميجابايت",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setSelectedFile(file);
+      // Auto-fill title if empty
+      if (!newVideo.title) {
+        setNewVideo(prev => ({ ...prev, title: file.name.replace(/\.[^/.]+$/, "") }));
+      }
+    }
+  };
+
+  // Upload file to Supabase Storage
+  const uploadFile = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${accountId}/${Date.now()}.${fileExt}`;
+    
+    console.log('📤 رفع الملف:', fileName);
+    
+    // Start progress simulation
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 15;
+      });
+    }, 500);
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('account-videos')
+        .upload(fileName, file);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      if (error) {
+        console.error('❌ خطأ في رفع الملف:', error);
+        throw new Error(`فشل في رفع الملف: ${error.message}`);
+      }
+      
+      console.log('✅ تم رفع الملف بنجاح:', data.path);
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('account-videos')
+        .getPublicUrl(data.path);
+      
+      return urlData.publicUrl;
+    } catch (error) {
+      clearInterval(progressInterval);
+      throw error;
+    }
+  };
+
   // Add new video
   const addVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newVideo.title.trim() || !newVideo.video_url.trim()) {
+    if (!newVideo.title.trim()) {
       toast({
         title: "بيانات ناقصة",
-        description: "يرجى ملء جميع الحقول المطلوبة",
+        description: "يرجى إدخال عنوان الفيديو",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (uploadMethod === 'url' && !newVideo.video_url.trim()) {
+      toast({
+        title: "بيانات ناقصة",
+        description: "يرجى إدخال رابط الفيديو",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (uploadMethod === 'file' && !selectedFile) {
+      toast({
+        title: "بيانات ناقصة",
+        description: "يرجى اختيار ملف الفيديو",
         variant: "destructive"
       });
       return;
     }
 
     setLoading(true);
+    setIsUploading(true);
+    
     try {
       console.log('➕ إضافة فيديو جديد:', newVideo);
+      
+      let videoUrl = newVideo.video_url;
+      
+      // Upload file if method is file
+      if (uploadMethod === 'file' && selectedFile) {
+        videoUrl = await uploadFile(selectedFile);
+      }
       
       const { error } = await supabase
         .from('account_videos' as any)
         .insert({
           account_id: accountId,
           title: newVideo.title.trim(),
-          video_url: newVideo.video_url.trim(),
+          video_url: videoUrl,
           is_active: false
         });
 
@@ -106,7 +211,10 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
         description: `تم إضافة الفيديو "${newVideo.title}" بنجاح`
       });
 
+      // Reset form
       setNewVideo({ title: '', video_url: '' });
+      setSelectedFile(null);
+      setUploadProgress(0);
       setShowAddForm(false);
       fetchVideos();
     } catch (error: any) {
@@ -118,6 +226,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
       });
     } finally {
       setLoading(false);
+      setIsUploading(false);
     }
   };
 
@@ -252,25 +361,91 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
                 />
               </div>
               
+              {/* Upload Method Selection */}
               <div>
-                <Label htmlFor="video-url">رابط الفيديو</Label>
-                <Input
-                  id="video-url"
-                  type="url"
-                  value={newVideo.video_url}
-                  onChange={(e) => setNewVideo({ ...newVideo, video_url: e.target.value })}
-                  placeholder="https://example.com/video.mp4"
-                  required
-                />
-                <p className="text-sm text-gray-600 mt-1">
-                  يجب أن يكون رابطاً مباشراً لملف الفيديو (ينتهي بـ .mp4 أو .webm أو .ogv)
-                </p>
+                <Label>طريقة إضافة الفيديو</Label>
+                <div className="flex gap-4 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="uploadMethod"
+                      value="url"
+                      checked={uploadMethod === 'url'}
+                      onChange={(e) => setUploadMethod(e.target.value as 'url' | 'file')}
+                    />
+                    <Link className="h-4 w-4" />
+                    <span>رابط خارجي</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="uploadMethod"
+                      value="file"
+                      checked={uploadMethod === 'file'}
+                      onChange={(e) => setUploadMethod(e.target.value as 'url' | 'file')}
+                    />
+                    <FileVideo className="h-4 w-4" />
+                    <span>رفع من الجهاز</span>
+                  </label>
+                </div>
               </div>
               
+              {uploadMethod === 'url' ? (
+                <div>
+                  <Label htmlFor="video-url">رابط الفيديو</Label>
+                  <Input
+                    id="video-url"
+                    type="url"
+                    value={newVideo.video_url}
+                    onChange={(e) => setNewVideo({ ...newVideo, video_url: e.target.value })}
+                    placeholder="https://example.com/video.mp4"
+                    required
+                  />
+                  <p className="text-sm text-gray-600 mt-1">
+                    يجب أن يكون رابطاً مباشراً لملف الفيديو (ينتهي بـ .mp4 أو .webm أو .ogv)
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="video-file">اختر ملف الفيديو</Label>
+                  <Input
+                    id="video-file"
+                    type="file"
+                    accept="video/*"
+                    onChange={handleFileSelect}
+                    className="cursor-pointer"
+                    required
+                  />
+                  {selectedFile && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                      <p><strong>الملف المختار:</strong> {selectedFile.name}</p>
+                      <p><strong>الحجم:</strong> {(selectedFile.size / (1024 * 1024)).toFixed(2)} ميجابايت</p>
+                    </div>
+                  )}
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="mt-2">
+                      <div className="flex justify-between text-sm text-gray-600">
+                        <span>جاري الرفع...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-600 mt-1">
+                    الصيغ المدعومة: MP4, WebM, OGV، الحد الأقصى: 100 ميجابايت
+                  </p>
+                </div>
+              )}
+              
               <div className="flex gap-2">
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading || isUploading}>
                   <Upload className="h-4 w-4 mr-2" />
-                  إضافة الفيديو
+                  {isUploading ? 'جاري الرفع...' : 'إضافة الفيديو'}
                 </Button>
                 <Button 
                   type="button" 
@@ -278,7 +453,10 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
                   onClick={() => {
                     setShowAddForm(false);
                     setNewVideo({ title: '', video_url: '' });
+                    setSelectedFile(null);
+                    setUploadProgress(0);
                   }}
+                  disabled={isUploading}
                 >
                   إلغاء
                 </Button>
