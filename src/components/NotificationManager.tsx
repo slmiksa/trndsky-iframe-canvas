@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { Plus, Eye, EyeOff, Trash2, Upload } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Notification {
   id: string;
@@ -32,6 +33,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
   console.log('🔍 NotificationManager rendered with accountId:', accountId);
   
   const { user } = useAuth();
+  const { t } = useLanguage();
   
   const {
     notifications,
@@ -80,8 +82,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
 
     if (!newNotification.title.trim()) {
       toast({
-        title: "خطأ",
-        description: "يجب إدخال عنوان الإشعار",
+        title: t('error'),
+        description: t('notification_title'),
         variant: "destructive",
       });
       return;
@@ -90,8 +92,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     if (!accountId) {
       console.error('❌ No accountId provided');
       toast({
-        title: "خطأ",
-        description: "لم يتم العثور على معرف الحساب",
+        title: t('error'),
+        description: t('account_id_not_found'),
         variant: "destructive",
       });
       return;
@@ -100,8 +102,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     if (!user) {
       console.error('❌ User not authenticated in custom auth');
       toast({
-        title: "خطأ في المصادقة",
-        description: "يجب تسجيل الدخول لإنشاء إشعار",
+        title: t('error'),
+        description: t('account_id_not_found'),
         variant: "destructive",
       });
       return;
@@ -139,8 +141,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
 
       console.log('✅ Notification created successfully:', result);
       toast({
-        title: "تم إنشاء الإشعار",
-        description: "تم إنشاء الإشعار بنجاح",
+        title: t('notification_created'),
+        description: t('notification_created'),
       });
 
       // Reset form
@@ -157,8 +159,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       console.error('❌ Error creating notification:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
       toast({
-        title: "خطأ في إنشاء الإشعار",
-        description: `حدث خطأ أثناء إنشاء الإشعار: ${error.message || 'خطأ غير معروف'}`,
+        title: t('error'),
+        description: `${error.message || t('error')}`,
         variant: "destructive",
       });
     } finally {
@@ -173,13 +175,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       });
 
       toast({
-        title: "تم تحديث الإشعار",
-        description: `تم ${!notification.is_active ? 'تفعيل' : 'إيقاف'} الإشعار`,
+        title: t('notification_updated'),
+        description: `${t(!notification.is_active ? 'activated' : 'deactivated')}`,
       });
     } catch (error) {
       console.error('Error updating notification:', error);
       toast({
-        title: "خطأ في تحديث الإشعار",
+        title: t('error'),
         variant: "destructive",
       });
     }
@@ -189,13 +191,13 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     try {
       await deleteNotification(id);
       toast({
-        title: "تم حذف الإشعار",
-        description: "تم حذف الإشعار بنجاح",
+        title: t('notification_deleted'),
+        description: t('notification_deleted'),
       });
     } catch (error) {
       console.error('Error deleting notification:', error);
       toast({
-        title: "خطأ في حذف الإشعار",
+        title: t('error'),
         variant: "destructive",
       });
     }
@@ -203,14 +205,14 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
 
   const formatDuration = (durationMs: number) => {
     const minutes = Math.round(durationMs / (60 * 1000));
-    return `${minutes} دقيقة`;
+    return `${minutes} ${t('minutes')}`;
   };
 
   if (loading) {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-        <p className="mt-2 text-gray-600">جاري التحميل...</p>
+        <p className="mt-2 text-gray-600">{t('loading')}</p>
       </div>
     );
   }
@@ -219,62 +221,62 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <CardTitle>إدارة الإشعارات ({notifications.length})</CardTitle>
+          <CardTitle>{t('notification_management')} ({notifications.length})</CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                إضافة إشعار
+                {t('add_notification')}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>إنشاء إشعار جديد</DialogTitle>
+                <DialogTitle>{t('create_new_notification')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="title">عنوان الإشعار *</Label>
+                  <Label htmlFor="title">{t('notification_title')} *</Label>
                   <Input
                     id="title"
                     value={newNotification.title}
                     onChange={(e) => setNewNotification({ ...newNotification, title: e.target.value })}
-                    placeholder="عنوان الإشعار"
+                    placeholder={t('notification_title')}
                     required
                   />
                 </div>
                 
                 <div>
-                  <Label htmlFor="message">رسالة الإشعار</Label>
+                  <Label htmlFor="message">{t('notification_message')}</Label>
                   <Textarea
                     id="message"
                     value={newNotification.message}
                     onChange={(e) => setNewNotification({ ...newNotification, message: e.target.value })}
-                    placeholder="محتوى الرسالة (اختياري) - يمكنك كتابة عدة أسطر"
+                    placeholder={t('notification_message_placeholder')}
                     className="min-h-[100px] resize-none"
                     rows={4}
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="position">موضع الإشعار</Label>
+                  <Label htmlFor="position">{t('notification_position')}</Label>
                   <select
                     id="position"
                     value={newNotification.position}
                     onChange={(e) => setNewNotification({ ...newNotification, position: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="top-right">أعلى اليمين</option>
-                    <option value="top-left">أعلى اليسار</option>
-                    <option value="top-center">أعلى الوسط</option>
-                    <option value="center">المنتصف</option>
-                    <option value="bottom-right">أسفل اليمين</option>
-                    <option value="bottom-left">أسفل اليسار</option>
-                    <option value="bottom-center">أسفل الوسط</option>
+                    <option value="top-right">{t('position_top_right')}</option>
+                    <option value="top-left">{t('position_top_left')}</option>
+                    <option value="top-center">{t('position_top_center')}</option>
+                    <option value="center">{t('position_center')}</option>
+                    <option value="bottom-right">{t('position_bottom_right')}</option>
+                    <option value="bottom-left">{t('position_bottom_left')}</option>
+                    <option value="bottom-center">{t('position_bottom_center')}</option>
                   </select>
                 </div>
 
                 <div>
-                  <Label htmlFor="duration">مدة العرض (بالدقائق)</Label>
+                  <Label htmlFor="duration">{t('display_duration')}</Label>
                   <Input
                     id="duration"
                     type="number"
@@ -286,7 +288,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                 </div>
 
                 <div>
-                  <Label htmlFor="image">صورة الإشعار (اختياري)</Label>
+                  <Label htmlFor="image">{t('notification_image')}</Label>
                   <div className="mt-2">
                     <input
                       id="image"
@@ -302,7 +304,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                       className="w-full"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      {selectedImage ? 'تغيير الصورة' : 'رفع صورة'}
+                      {selectedImage ? t('change_image') : t('upload_image')}
                     </Button>
                     {imagePreview && (
                       <div className="mt-2">
@@ -318,14 +320,14 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
 
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSubmitting} className="flex-1">
-                    {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء الإشعار'}
+                    {isSubmitting ? t('creating') : t('create_notification')}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setShowAddForm(false)}
                   >
-                    إلغاء
+                    {t('cancel')}
                   </Button>
                 </div>
               </form>
@@ -336,7 +338,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
       <CardContent>
         {notifications.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-600">لا توجد إشعارات بعد</p>
+            <p className="text-gray-600">{t('no_notifications_yet')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -349,7 +351,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                   <h3 className="font-semibold">{notification.title}</h3>
                   <div className="flex items-center gap-2">
                     <Badge variant={notification.is_active ? "default" : "secondary"}>
-                      {notification.is_active ? 'نشط' : 'متوقف'}
+                      {notification.is_active ? t('active') : t('stopped')}
                     </Badge>
                     <Button
                       size="sm"
@@ -380,8 +382,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ accountId }) 
                   </div>
                 )}
                 <div className="flex gap-4 text-xs text-gray-500">
-                  <span>الموضع: {notification.position}</span>
-                  <span>المدة: {formatDuration(notification.display_duration)}</span>
+                  <span>{t('position')}: {notification.position}</span>
+                  <span>{t('duration')}: {formatDuration(notification.display_duration)}</span>
                   <span>{new Date(notification.created_at).toLocaleDateString('ar-SA')}</span>
                 </div>
               </div>

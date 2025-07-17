@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ interface NewsTickerManagerProps {
 }
 
 const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
+  const { t } = useLanguage();
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -246,14 +248,14 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>إدارة شريط الأخبار ({newsItems.length})</CardTitle>
+            <CardTitle>{t('news_ticker_management')} ({newsItems.length})</CardTitle>
             <Button 
               onClick={() => setShowAddForm(true)} 
               size="sm"
               disabled={loading}
             >
               <Plus className="h-4 w-4 mr-2" />
-              إضافة خبر
+              {t('add_news')}
             </Button>
           </div>
         </CardHeader>

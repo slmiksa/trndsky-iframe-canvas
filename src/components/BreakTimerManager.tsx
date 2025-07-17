@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from '@/hooks/use-toast';
 import { Plus, Eye, EyeOff, Trash2, Clock } from 'lucide-react';
 import { useBreakTimers } from '@/hooks/useBreakTimers';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface BreakTimer {
   id: string;
@@ -28,6 +29,7 @@ interface BreakTimerManagerProps {
 const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
   console.log('🔍 BreakTimerManager rendered with accountId:', accountId);
   
+  const { t } = useLanguage();
   const {
     timers,
     loading,
@@ -58,8 +60,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
 
     if (!newTimer.title.trim()) {
       toast({
-        title: "خطأ",
-        description: "يجب إدخال عنوان المؤقت",
+        title: t('error'),
+        description: t('timer_title'),
         variant: "destructive",
       });
       return;
@@ -67,8 +69,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
 
     if (!newTimer.start_time || !newTimer.end_time) {
       toast({
-        title: "خطأ",
-        description: "يجب تحديد وقت البدء والانتهاء",
+        title: t('error'),
+        description: `${t('start_time')} ${t('end_time')}`,
         variant: "destructive",
       });
       return;
@@ -76,8 +78,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
 
     if (newTimer.start_time >= newTimer.end_time) {
       toast({
-        title: "خطأ",
-        description: "وقت البدء يجب أن يكون قبل وقت الانتهاء",
+        title: t('error'),
+        description: `${t('start_time')} ${t('end_time')}`,
         variant: "destructive",
       });
       return;
@@ -86,8 +88,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     if (!accountId) {
       console.error('❌ No accountId provided');
       toast({
-        title: "خطأ",
-        description: "لم يتم العثور على معرف الحساب",
+        title: t('error'),
+        description: t('account_id_not_found'),
         variant: "destructive",
       });
       return;
@@ -111,8 +113,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
 
       console.log('✅ Timer created successfully:', result);
       toast({
-        title: "تم إنشاء المؤقت",
-        description: "تم إنشاء مؤقت البريك بنجاح",
+        title: t('timer_created'),
+        description: t('timer_created_description'),
       });
 
       // Reset form
@@ -126,8 +128,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     } catch (error) {
       console.error('❌ Error creating timer:', error);
       toast({
-        title: "خطأ في إنشاء المؤقت",
-        description: `حدث خطأ أثناء إنشاء المؤقت: ${error.message || 'خطأ غير معروف'}`,
+        title: t('error'),
+        description: `${error.message || t('error')}`,
         variant: "destructive",
       });
     } finally {
@@ -142,13 +144,13 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
       });
 
       toast({
-        title: "تم تحديث المؤقت",
-        description: `تم ${!timer.is_active ? 'تفعيل' : 'إيقاف'} المؤقت`,
+        title: t('timer_updated'),
+        description: `${t(!timer.is_active ? 'activated' : 'deactivated')}`,
       });
     } catch (error) {
       console.error('Error updating timer:', error);
       toast({
-        title: "خطأ في تحديث المؤقت",
+        title: t('error'),
         variant: "destructive",
       });
     }
@@ -158,13 +160,13 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     try {
       await deleteTimer(id);
       toast({
-        title: "تم حذف المؤقت",
-        description: "تم حذف المؤقت بنجاح",
+        title: t('timer_deleted'),
+        description: t('timer_deleted_description'),
       });
     } catch (error) {
       console.error('Error deleting timer:', error);
       toast({
-        title: "خطأ في حذف المؤقت",
+        title: t('error'),
         variant: "destructive",
       });
     }
@@ -178,7 +180,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
     return (
       <div className="text-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-        <p className="mt-2 text-gray-600">جاري التحميل...</p>
+        <p className="mt-2 text-gray-600">{t('loading')}</p>
       </div>
     );
   }
@@ -189,33 +191,33 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            إدارة مؤقتات البريك ({timers.length})
+            {t('break_timer_management')} ({timers.length})
           </CardTitle>
           <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
-                إضافة مؤقت
+                {t('add_timer')}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>إنشاء مؤقت بريك جديد</DialogTitle>
+                <DialogTitle>{t('create_new_timer')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label htmlFor="title">عنوان المؤقت *</Label>
+                  <Label htmlFor="title">{t('timer_title')} *</Label>
                   <Input
                     id="title"
                     value={newTimer.title}
                     onChange={(e) => setNewTimer({ ...newTimer, title: e.target.value })}
-                    placeholder="مثال: مؤقت البريك"
+                    placeholder={t('timer_title_placeholder')}
                     required
                   />
                 </div>
                 
                 <div>
-                  <Label htmlFor="start_time">وقت البدء *</Label>
+                  <Label htmlFor="start_time">{t('start_time')} *</Label>
                   <Input
                     id="start_time"
                     type="time"
@@ -226,7 +228,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
                 </div>
 
                 <div>
-                  <Label htmlFor="end_time">وقت الانتهاء *</Label>
+                  <Label htmlFor="end_time">{t('end_time')} *</Label>
                   <Input
                     id="end_time"
                     type="time"
@@ -237,33 +239,33 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
                 </div>
 
                 <div>
-                  <Label htmlFor="position">موضع المؤقت</Label>
+                  <Label htmlFor="position">{t('timer_position')}</Label>
                   <select
                     id="position"
                     value={newTimer.position}
                     onChange={(e) => setNewTimer({ ...newTimer, position: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="center">المنتصف</option>
-                    <option value="top-right">أعلى اليمين</option>
-                    <option value="top-left">أعلى اليسار</option>
-                    <option value="top-center">أعلى الوسط</option>
-                    <option value="bottom-right">أسفل اليمين</option>
-                    <option value="bottom-left">أسفل اليسار</option>
-                    <option value="bottom-center">أسفل الوسط</option>
+                    <option value="center">{t('position_center')}</option>
+                    <option value="top-right">{t('position_top_right')}</option>
+                    <option value="top-left">{t('position_top_left')}</option>
+                    <option value="top-center">{t('position_top_center')}</option>
+                    <option value="bottom-right">{t('position_bottom_right')}</option>
+                    <option value="bottom-left">{t('position_bottom_left')}</option>
+                    <option value="bottom-center">{t('position_bottom_center')}</option>
                   </select>
                 </div>
 
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isSubmitting} className="flex-1">
-                    {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء المؤقت'}
+                    {isSubmitting ? t('creating') : t('create_timer')}
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setShowAddForm(false)}
                   >
-                    إلغاء
+                    {t('cancel')}
                   </Button>
                 </div>
               </form>
@@ -275,8 +277,8 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
         {timers.length === 0 ? (
           <div className="text-center py-8">
             <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">لا توجد مؤقتات بعد</p>
-            <p className="text-sm text-gray-500">ابدأ بإنشاء مؤقت بريك جديد</p>
+            <p className="text-gray-600">{t('no_timers_yet')}</p>
+            <p className="text-sm text-gray-500">{t('no_timers_description')}</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -292,7 +294,7 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={timer.is_active ? "default" : "secondary"}>
-                      {timer.is_active ? 'نشط' : 'متوقف'}
+                      {timer.is_active ? t('active') : t('stopped')}
                     </Badge>
                     <Button
                       size="sm"
@@ -312,16 +314,16 @@ const BreakTimerManager: React.FC<BreakTimerManagerProps> = ({ accountId }) => {
                 </div>
                 <div className="flex gap-6 text-sm text-gray-600 mb-2">
                   <span className="flex items-center gap-1">
-                    <span className="font-medium">البدء:</span>
+                    <span className="font-medium">{t('start')}:</span>
                     {formatTime(timer.start_time)}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="font-medium">الانتهاء:</span>
+                    <span className="font-medium">{t('end')}:</span>
                     {formatTime(timer.end_time)}
                   </span>
                 </div>
                 <div className="flex gap-4 text-xs text-gray-500">
-                  <span>الموضع: {timer.position}</span>
+                  <span>{t('position')}: {timer.position}</span>
                   <span>{new Date(timer.created_at).toLocaleDateString('ar-SA')}</span>
                 </div>
               </div>

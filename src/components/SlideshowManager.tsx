@@ -351,16 +351,16 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle>
-                السلايد شوز ({slideshows.length})
+                {t('slideshow_management')} ({slideshows.length})
               </CardTitle>
               <div className="flex gap-2">
                 <Button onClick={handleRefresh} size="sm" variant="outline" disabled={loading}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  تحديث
+                  {t('refresh')}
                 </Button>
                 <Button onClick={() => setShowAddForm(true)} size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  إضافة سلايد شو
+                  {t('add_slideshow_btn')}
                 </Button>
               </div>
             </div>
