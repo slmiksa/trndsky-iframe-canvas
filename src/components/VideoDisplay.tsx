@@ -36,6 +36,13 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, onActivityChange
         .limit(1);
 
       if (error) {
+        // Check if the error is due to table not existing
+        if (error.message.includes('does not exist') || error.code === 'PGRST106') {
+          console.warn('⚠️ [VideoDisplay] جدول الفيديوهات غير موجود بعد');
+          setActiveVideo(null);
+          onActivityChange?.(false);
+          return;
+        }
         console.error('❌ [VideoDisplay] خطأ في جلب الفيديو:', error);
         setError('فشل في تحميل الفيديو');
         return;
@@ -52,7 +59,13 @@ const VideoDisplay: React.FC<VideoDisplayProps> = ({ accountId, onActivityChange
       
     } catch (error) {
       console.error('❌ [VideoDisplay] خطأ في fetchActiveVideo:', error);
-      setError('حدث خطأ في تحميل الفيديو');
+      if (error instanceof Error && error.message.includes('does not exist')) {
+        console.warn('⚠️ [VideoDisplay] جدول الفيديوهات غير موجود');
+        setActiveVideo(null);
+        onActivityChange?.(false);
+      } else {
+        setError('حدث خطأ في تحميل الفيديو');
+      }
     } finally {
       setLoading(false);
     }

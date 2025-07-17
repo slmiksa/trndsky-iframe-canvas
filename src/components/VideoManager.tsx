@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Video, Plus, Play, Pause, Trash2, Upload, Link, FileVideo } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import DatabaseSetupGuide from '@/components/DatabaseSetupGuide';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface VideoItem {
@@ -37,6 +38,7 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [tableExists, setTableExists] = useState(true);
 
   // Fetch videos
   const fetchVideos = async () => {
@@ -50,6 +52,13 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
         .order('created_at', { ascending: false });
 
       if (error) {
+        // Check if the error is due to table not existing
+        if (error.message.includes('does not exist') || error.code === 'PGRST106') {
+          console.warn('⚠️ جدول الفيديوهات غير موجود بعد - يحتاج إنشاء');
+          setVideos([]);
+          setTableExists(false);
+          return;
+        }
         console.error('❌ خطأ في جلب الفيديوهات:', error);
         throw error;
       }
@@ -58,11 +67,20 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
       setVideos((data || []) as unknown as VideoItem[]);
     } catch (error: any) {
       console.error('❌ خطأ في fetchVideos:', error);
-      toast({
-        title: "خطأ في تحميل الفيديوهات",
-        description: error.message,
-        variant: "destructive"
-      });
+      if (error.message.includes('does not exist')) {
+        setTableExists(false);
+        toast({
+          title: "جدول الفيديوهات غير موجود",
+          description: "يحتاج إنشاء جدول الفيديوهات في قاعدة البيانات أولاً",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "خطأ في تحميل الفيديوهات",
+          description: error.message,
+          variant: "destructive"
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -317,6 +335,11 @@ const VideoManager: React.FC<VideoManagerProps> = ({ accountId }) => {
       });
     }
   };
+
+  // Show setup guide if table doesn't exist
+  if (!tableExists) {
+    return <DatabaseSetupGuide onSetupComplete={() => window.location.reload()} />;
+  }
 
   return (
     <div className="space-y-6">
