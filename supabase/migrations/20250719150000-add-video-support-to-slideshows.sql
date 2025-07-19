@@ -10,7 +10,7 @@ SET
   file_size_limit = 157286400, -- 150MB للفيديوهات
   allowed_mime_types = ARRAY[
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'video/mp4', 'video/webm', 'video/mov', 'video/avi'
+    'video/mp4', 'video/webm', 'video/mov', 'video/avi', 'video/quicktime'
   ]
 WHERE id = 'slideshow-images';
 
