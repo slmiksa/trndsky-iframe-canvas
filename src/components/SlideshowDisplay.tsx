@@ -237,10 +237,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
       return;
     }
     
-    // إذا كان العنصر الحالي صورة، ننتقل بعد الفترة المحددة
+    // إذا كان العنصر الحالي صورة، ننتقل بعد 3 ثواني
     if (currentMedia.type === 'image') {
-      const intervalTime = (activeSlideshow.interval_seconds || 15) * 1000;
-      console.log(`🖼️ Setting image timer for ${intervalTime}ms`);
+      const intervalTime = 3000; // 3 ثواني ثابتة لسرعة الانتقال
+      console.log(`🖼️ Setting image timer for ${intervalTime}ms (3 seconds)`);
       
       mediaIntervalRef.current = setInterval(() => {
         setMediaIndex(prevIndex => {
