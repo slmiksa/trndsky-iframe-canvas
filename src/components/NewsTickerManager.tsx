@@ -62,14 +62,35 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
       console.log('🔍 جاري تحميل الأخبار للحساب:', accountId);
       
       const result = await retryOperation(async () => {
+        // محاولة تحميل الأخبار مع الألوان
         const { data, error } = await supabase
           .from('news_ticker')
-          .select('*')
+          .select('id, title, content, is_active, display_order, created_at, updated_at, background_color, text_color')
           .eq('account_id', accountId)
           .order('display_order', { ascending: true });
 
         if (error) {
           console.error('❌ خطأ في تحميل الأخبار:', error);
+          
+          // إذا كان الخطأ بسبب عدم وجود حقول الألوان، جرب بدونها
+          if (error.code === '42703' || error.message?.includes('column')) {
+            console.log('⚠️ حقول الألوان غير موجودة، محاولة التحميل بدونها...');
+            const { data: fallbackData, error: fallbackError } = await supabase
+              .from('news_ticker')
+              .select('id, title, content, is_active, display_order, created_at, updated_at')
+              .eq('account_id', accountId)
+              .order('display_order', { ascending: true });
+              
+            if (fallbackError) throw fallbackError;
+            
+            // إضافة الألوان الافتراضية للعناصر المحملة
+            return fallbackData?.map(item => ({
+              ...item,
+              background_color: '#2563eb',
+              text_color: '#ffffff'
+            })) || [];
+          }
+          
           throw error;
         }
 
