@@ -18,6 +18,8 @@ interface NewsItem {
   is_active: boolean;
   display_order: number | null;
   created_at: string;
+  background_color?: string;
+  text_color?: string;
 }
 
 interface NewsTickerManagerProps {
@@ -33,7 +35,9 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    display_order: 0
+    display_order: 0,
+    background_color: '#2563eb', // اللون الأزرق الافتراضي
+    text_color: '#ffffff' // اللون الأبيض الافتراضي
   });
 
   // دالة إعادة المحاولة
@@ -92,7 +96,13 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
   }, [accountId]);
 
   const resetForm = () => {
-    setFormData({ title: '', content: '', display_order: 0 });
+    setFormData({ 
+      title: '', 
+      content: '', 
+      display_order: 0,
+      background_color: '#2563eb',
+      text_color: '#ffffff'
+    });
     setShowAddForm(false);
     setEditingItem(null);
   };
@@ -116,15 +126,17 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
         if (editingItem) {
           // تحديث الخبر الموجود
           console.log('📝 تحديث الخبر:', editingItem.id);
-          const { error } = await supabase
-            .from('news_ticker')
-            .update({
-              title: formData.title.trim(),
-              content: formData.content?.trim() || null,
-              display_order: formData.display_order,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', editingItem.id);
+           const { error } = await supabase
+             .from('news_ticker')
+             .update({
+               title: formData.title.trim(),
+               content: formData.content?.trim() || null,
+               display_order: formData.display_order,
+               background_color: formData.background_color,
+               text_color: formData.text_color,
+               updated_at: new Date().toISOString()
+             })
+             .eq('id', editingItem.id);
 
           if (error) throw error;
 
@@ -135,15 +147,17 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
         } else {
           // إضافة خبر جديد
           console.log('➕ إضافة خبر جديد');
-          const { error } = await supabase
-            .from('news_ticker')
-            .insert({
-              account_id: accountId,
-              title: formData.title.trim(),
-              content: formData.content?.trim() || null,
-              display_order: formData.display_order,
-              is_active: true
-            });
+           const { error } = await supabase
+             .from('news_ticker')
+             .insert({
+               account_id: accountId,
+               title: formData.title.trim(),
+               content: formData.content?.trim() || null,
+               display_order: formData.display_order,
+               background_color: formData.background_color,
+               text_color: formData.text_color,
+               is_active: true
+             });
 
           if (error) throw error;
 
@@ -238,7 +252,9 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
     setFormData({
       title: item.title,
       content: item.content || '',
-      display_order: item.display_order || 0
+      display_order: item.display_order || 0,
+      background_color: item.background_color || '#2563eb',
+      text_color: item.text_color || '#ffffff'
     });
     setShowAddForm(true);
   };
@@ -350,18 +366,74 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                     rows={3}
                     disabled={loading}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="display_order">ترتيب العرض</Label>
-                  <Input
-                    id="display_order"
-                    type="number"
-                    value={formData.display_order}
-                    onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
-                    placeholder="0"
-                    disabled={loading}
-                  />
-                </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <Label htmlFor="background_color">لون خلفية الشريط</Label>
+                     <div className="flex gap-2 items-center">
+                       <input
+                         id="background_color"
+                         type="color"
+                         value={formData.background_color}
+                         onChange={(e) => setFormData({ ...formData, background_color: e.target.value })}
+                         className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                         disabled={loading}
+                       />
+                       <Input
+                         value={formData.background_color}
+                         onChange={(e) => setFormData({ ...formData, background_color: e.target.value })}
+                         placeholder="#2563eb"
+                         className="flex-1"
+                         disabled={loading}
+                       />
+                     </div>
+                   </div>
+                   <div>
+                     <Label htmlFor="text_color">لون النص</Label>
+                     <div className="flex gap-2 items-center">
+                       <input
+                         id="text_color"
+                         type="color"
+                         value={formData.text_color}
+                         onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
+                         className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                         disabled={loading}
+                       />
+                       <Input
+                         value={formData.text_color}
+                         onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
+                         placeholder="#ffffff"
+                         className="flex-1"
+                         disabled={loading}
+                       />
+                     </div>
+                   </div>
+                 </div>
+                 <div>
+                   <Label htmlFor="display_order">ترتيب العرض</Label>
+                   <Input
+                     id="display_order"
+                     type="number"
+                     value={formData.display_order}
+                     onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                     placeholder="0"
+                     disabled={loading}
+                   />
+                 </div>
+                 {/* معاينة الألوان */}
+                 <div>
+                   <Label>معاينة الشريط</Label>
+                   <div 
+                     className="p-4 rounded-lg text-center font-medium"
+                     style={{
+                       backgroundColor: formData.background_color,
+                       color: formData.text_color
+                     }}
+                   >
+                     <span className="bg-white/20 px-2 py-1 rounded text-sm font-bold ml-2">أخبار</span>
+                     {formData.title || 'عنوان الخبر سيظهر هنا'}
+                   </div>
+                 </div>
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading}>
                     {loading ? 'جاري الحفظ...' : (editingItem ? 'تحديث' : 'إضافة')}

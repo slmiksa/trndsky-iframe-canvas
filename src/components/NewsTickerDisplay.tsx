@@ -8,6 +8,8 @@ interface NewsItem {
   is_active: boolean;
   display_order: number | null;
   created_at: string;
+  background_color?: string;
+  text_color?: string;
 }
 
 interface NewsTickerDisplayProps {
@@ -191,6 +193,10 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     ? `${currentNews.title} - ${currentNews.content}` 
     : currentNews.title;
 
+  // استخدام الألوان المخصصة أو الافتراضية
+  const backgroundColor = currentNews.background_color || '#2563eb';
+  const textColor = currentNews.text_color || '#ffffff';
+
   console.log('📺 [NewsTickerDisplay] عرض الخبر:', {
     title: currentNews.title,
     index: safeCurrentIndex,
@@ -200,7 +206,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
-      <div className="bg-blue-600 text-white w-full">
+      <div className="w-full" style={{ backgroundColor, color: textColor }}>
         {/* شاشات كبيرة - عرض كامل */}
         <div className="hidden md:block px-8 py-2">
           <div className="flex items-center justify-center">
@@ -210,7 +216,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               }`}
             >
               <div className="news-ticker-static">
-                <span className="bg-white text-blue-600 px-3 py-1 rounded-md text-sm font-bold ml-2">أخبار</span>
+                <span 
+                  className="px-3 py-1 rounded-md text-sm font-bold ml-2"
+                  style={{ backgroundColor: textColor, color: backgroundColor }}
+                >
+                  أخبار
+                </span>
                 {newsText}
               </div>
             </div>
@@ -221,9 +232,10 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               {newsItems.map((_, index) => (
                 <div
                   key={index}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                    index === safeCurrentIndex ? 'bg-white' : 'bg-white/50'
-                  }`}
+                  className={`w-2 h-2 rounded-full transition-all duration-300`}
+                  style={{
+                    backgroundColor: index === safeCurrentIndex ? textColor : `${textColor}80`
+                  }}
                 />
               ))}
             </div>
@@ -239,7 +251,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               }`}
             >
               <div className="news-ticker-static">
-                <span className="bg-white text-blue-600 px-2 py-1 rounded text-xs font-bold ml-1">أخبار</span>
+                <span 
+                  className="px-2 py-1 rounded text-xs font-bold ml-1"
+                  style={{ backgroundColor: textColor, color: backgroundColor }}
+                >
+                  أخبار
+                </span>
                 {newsText}
               </div>
             </div>
@@ -250,9 +267,10 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               {newsItems.map((_, index) => (
                 <div
                   key={index}
-                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                    index === safeCurrentIndex ? 'bg-white' : 'bg-white/50'
-                  }`}
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300`}
+                  style={{
+                    backgroundColor: index === safeCurrentIndex ? textColor : `${textColor}80`
+                  }}
                 />
               ))}
             </div>
@@ -269,7 +287,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
                 }`}
               >
                 <div className="news-ticker-static">
-                  <span className="bg-white text-blue-600 px-1.5 py-0.5 rounded text-xs font-bold ml-1">أخبار</span>
+                  <span 
+                    className="px-1.5 py-0.5 rounded text-xs font-bold ml-1"
+                    style={{ backgroundColor: textColor, color: backgroundColor }}
+                  >
+                    أخبار
+                  </span>
                   {currentNews.title}
                 </div>
               </div>
