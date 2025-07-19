@@ -7,7 +7,6 @@ import Footer from '@/components/Footer';
 import { useLanguage } from '@/hooks/useLanguage';
 import NewsTickerDisplay from '@/components/NewsTickerDisplay';
 import ActiveBreakTimersDisplay from '@/components/ActiveBreakTimersDisplay';
-import NotificationManager from '@/components/NotificationManager';
 
 const Index = () => {
   const { language, toggleLanguage, t, isRTL } = useLanguage();
@@ -22,9 +21,6 @@ const Index = () => {
       
       {/* مؤقتات الاستراحة النشطة */}
       <ActiveBreakTimersDisplay accountId="demo" />
-      
-      {/* إدارة الإشعارات */}
-      <NotificationManager accountId="demo" />
       
       {/* زر تغيير اللغة */}
       <Button
