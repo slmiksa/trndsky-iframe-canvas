@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Images, Eye, EyeOff, Trash2, Upload, RefreshCw, Video, Play } from 'lucide-react';
+import { Plus, Images, Eye, EyeOff, Trash2, Upload, RefreshCw, Video, Play, Edit } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -32,12 +32,21 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const [slideshows, setSlideshows] = useState<Slideshow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingSlideshow, setEditingSlideshow] = useState<Slideshow | null>(null);
   const [selectedSlideshow, setSelectedSlideshow] = useState<Slideshow | null>(null);
   const [newSlideshow, setNewSlideshow] = useState({
     title: '',
     images: [] as File[],
     videos: [] as File[],
     mediaType: 'images' as 'images' | 'videos' | 'mixed'
+  });
+  const [editSlideshow, setEditSlideshow] = useState({
+    title: '',
+    images: [] as File[],
+    videos: [] as File[],
+    mediaType: 'images' as 'images' | 'videos' | 'mixed',
+    keepExistingMedia: true
   });
   const [uploading, setUploading] = useState(false);
 
@@ -411,6 +420,111 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     }
   };
 
+  // دالة فتح نموذج التعديل
+  const handleEditSlideshow = (slideshow: Slideshow) => {
+    setEditingSlideshow(slideshow);
+    setEditSlideshow({
+      title: slideshow.title,
+      images: [],
+      videos: [],
+      mediaType: slideshow.media_type || 'images',
+      keepExistingMedia: true
+    });
+    setShowEditForm(true);
+    setShowAddForm(false);
+  };
+
+  // دالة تعديل السلايدشو
+  const updateSlideshow = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSlideshow) return;
+
+    if (editSlideshow.images.length === 0 && editSlideshow.videos.length === 0 && !editSlideshow.keepExistingMedia) {
+      toast({
+        title: 'خطأ',
+        description: 'يرجى اختيار صور أو فيديوهات أو الاحتفاظ بالموجود',
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      console.log('🔄 Starting slideshow update process for:', editingSlideshow.id);
+      
+      // رفع الملفات الجديدة إذا وجدت
+      const newImageUrls = editSlideshow.images.length > 0 ? await uploadMedia(editSlideshow.images, 'images') : [];
+      const newVideoUrls = editSlideshow.videos.length > 0 ? await uploadMedia(editSlideshow.videos, 'videos') : [];
+      
+      // تحديد المحتوى النهائي
+      let finalImageUrls = newImageUrls;
+      let finalVideoUrls = newVideoUrls;
+      
+      if (editSlideshow.keepExistingMedia) {
+        finalImageUrls = [...(editingSlideshow.images || []), ...newImageUrls];
+        finalVideoUrls = [...(editingSlideshow.video_urls || []), ...newVideoUrls];
+      }
+      
+      console.log('✅ Media processed successfully:', { finalImageUrls, finalVideoUrls });
+      
+      // تحديث السلايدشو
+      const { error } = await supabase
+        .from('account_slideshows')
+        .update({
+          title: editSlideshow.title,
+          images: finalImageUrls,
+          video_urls: finalVideoUrls,
+          media_type: editSlideshow.mediaType,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingSlideshow.id)
+        .eq('account_id', accountId);
+
+      if (error) {
+        console.error('❌ Error updating slideshow:', error);
+        throw new Error(`فشل في تحديث السلايدات: ${error.message}`);
+      }
+
+      console.log('✅ Slideshow updated successfully');
+
+      toast({
+        title: 'تم تحديث السلايدات بنجاح',
+        description: editSlideshow.title
+      });
+
+      setEditSlideshow({ title: '', images: [], videos: [], mediaType: 'images', keepExistingMedia: true });
+      setShowEditForm(false);
+      setEditingSlideshow(null);
+      
+      await fetchSlideshows();
+      
+    } catch (error: any) {
+      console.error('❌ Error in updateSlideshow:', error);
+      toast({
+        title: 'خطأ في تحديث السلايدات',
+        description: error.message || 'حدث خطأ غير متوقع',
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // دوال اختيار الملفات للتعديل
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setEditSlideshow(prev => ({ ...prev, images: files }));
+    }
+  };
+
+  const handleEditVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setEditSlideshow(prev => ({ ...prev, videos: files }));
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* قائمة السلايد شوز */}
@@ -492,6 +606,17 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                           title={slideshow.is_active ? 'إيقاف السلايد شو' : 'تشغيل السلايد شو'}
                         >
                           {slideshow.is_active ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditSlideshow(slideshow);
+                          }}
+                          title="تعديل السلايد شو"
+                        >
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button 
                           size="sm" 
@@ -604,6 +729,125 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       onClick={() => {
                         setShowAddForm(false);
                         setNewSlideshow({ title: '', images: [], videos: [], mediaType: 'images' });
+                      }}
+                    >
+                      إلغاء
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* نموذج تعديل سلايد شو */}
+            {showEditForm && editingSlideshow && (
+              <div className="mt-6 border-t pt-6">
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-2">تعديل: {editingSlideshow.title}</h4>
+                  <p className="text-sm text-blue-700">
+                    المحتوى الحالي: {editingSlideshow.images?.length || 0} صورة، {editingSlideshow.video_urls?.length || 0} فيديو
+                  </p>
+                </div>
+                
+                <form onSubmit={updateSlideshow} className="space-y-4">
+                  <div>
+                    <Label htmlFor="editTitle">عنوان السلايد شو</Label>
+                    <Input 
+                      id="editTitle" 
+                      type="text" 
+                      value={editSlideshow.title} 
+                      onChange={(e) => setEditSlideshow({ ...editSlideshow, title: e.target.value })} 
+                      placeholder="اسم السلايد شو" 
+                      required 
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="editMediaType">نوع المحتوى</Label>
+                    <Select 
+                      value={editSlideshow.mediaType} 
+                      onValueChange={(value: 'images' | 'videos' | 'mixed') => 
+                        setEditSlideshow({ ...editSlideshow, mediaType: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="images">صور فقط</SelectItem>
+                        <SelectItem value="videos">فيديوهات فقط</SelectItem>
+                        <SelectItem value="mixed">صور وفيديوهات</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="keepExistingMedia"
+                      checked={editSlideshow.keepExistingMedia}
+                      onChange={(e) => setEditSlideshow({ ...editSlideshow, keepExistingMedia: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="keepExistingMedia" className="text-sm">
+                      الاحتفاظ بالمحتوى الحالي وإضافة محتوى جديد
+                    </Label>
+                  </div>
+
+                  {(editSlideshow.mediaType === 'images' || editSlideshow.mediaType === 'mixed') && (
+                    <div>
+                      <Label htmlFor="editImages">
+                        {editSlideshow.keepExistingMedia ? 'إضافة صور جديدة' : 'استبدال جميع الصور'}
+                      </Label>
+                      <Input 
+                        id="editImages" 
+                        type="file" 
+                        multiple
+                        accept="image/*"
+                        onChange={handleEditImageSelect}
+                      />
+                      {editSlideshow.images.length > 0 && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          تم اختيار {editSlideshow.images.length} صورة جديدة
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {(editSlideshow.mediaType === 'videos' || editSlideshow.mediaType === 'mixed') && (
+                    <div>
+                      <Label htmlFor="editVideos">
+                        {editSlideshow.keepExistingMedia ? 'إضافة فيديوهات جديدة' : 'استبدال جميع الفيديوهات'}
+                      </Label>
+                      <Input 
+                        id="editVideos" 
+                        type="file" 
+                        multiple
+                        accept="video/*"
+                        onChange={handleEditVideoSelect}
+                      />
+                      {editSlideshow.videos.length > 0 && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          تم اختيار {editSlideshow.videos.length} فيديو جديد
+                        </p>
+                      )}
+                      <p className="text-xs text-red-500 mt-1">
+                        الحد الأقصى لمدة الفيديو: 3 دقائق
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={uploading}>
+                      {uploading ? <Upload className="h-4 w-4 mr-2 animate-spin" /> : null}
+                      {uploading ? 'جاري التحديث...' : 'تحديث'}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        setShowEditForm(false);
+                        setEditingSlideshow(null);
+                        setEditSlideshow({ title: '', images: [], videos: [], mediaType: 'images', keepExistingMedia: true });
                       }}
                     >
                       إلغاء
