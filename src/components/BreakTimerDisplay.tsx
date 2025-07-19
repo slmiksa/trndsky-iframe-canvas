@@ -73,17 +73,17 @@ const BreakTimerDisplay: React.FC<BreakTimerDisplayProps> = ({ timer, onClose })
       case 'top-right':
         return 'top-4 right-4';
       case 'bottom-left':
-        return 'bottom-4 left-4';
+        return 'bottom-20 left-4'; // رفع المؤقت فوق شريط الأخبار
       case 'bottom-right':
-        return 'bottom-4 right-4';
+        return 'bottom-20 right-4'; // رفع المؤقت فوق شريط الأخبار
       case 'top-center':
         return 'top-4 left-1/2 -translate-x-1/2';
       case 'bottom-center':
-        return 'bottom-4 left-1/2 -translate-x-1/2';
+        return 'bottom-20 left-1/2 -translate-x-1/2'; // رفع المؤقت فوق شريط الأخبار
       case 'center':
-        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+        return 'top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2'; // تحريك المؤقت لأعلى قليلاً
       default:
-        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
+        return 'top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2'; // تحريك المؤقت لأعلى قليلاً
     }
   };
 
