@@ -756,20 +756,19 @@ const ClientPublicPage = () => {
             />
           ) : null}
           
-          {/* Overlays */}
-          {/* Active Notifications */}
-          {activeNotifications.map((notification) => (
-            <NotificationPopup
-              key={notification.id}
-              notification={notification}
-              onClose={() => handleNotificationClose(notification.id)}
-            />
-          ))}
-
         </>
       )}
 
-      {/* Overlays that appear with or without slideshow */}
+      {/* الإشعارات تظهر دائماً سواء كانت السلايدات نشطة أم لا */}
+      {activeNotifications.map((notification) => (
+        <NotificationPopup
+          key={notification.id}
+          notification={notification}
+          onClose={() => handleNotificationClose(notification.id)}
+        />
+      ))}
+
+      {/* العناصر التي تظهر دائماً مع أو بدون السلايدات */}
       <div className="relative z-[60]">
         {/* News Ticker Display */}
         {account?.id && !subscriptionExpired && (
