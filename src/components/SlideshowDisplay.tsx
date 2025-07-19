@@ -297,7 +297,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
                 objectPosition: 'center'
               }}
               autoPlay
-              muted
               controls={false}
               loop
               playsInline
