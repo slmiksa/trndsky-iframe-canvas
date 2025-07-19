@@ -5,6 +5,9 @@ import MobileDownloadButtons from '@/components/MobileDownloadButtons';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import Footer from '@/components/Footer';
 import { useLanguage } from '@/hooks/useLanguage';
+import NewsTickerDisplay from '@/components/NewsTickerDisplay';
+import ActiveBreakTimersDisplay from '@/components/ActiveBreakTimersDisplay';
+import NotificationManager from '@/components/NotificationManager';
 
 const Index = () => {
   const { language, toggleLanguage, t, isRTL } = useLanguage();
@@ -13,6 +16,15 @@ const Index = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-purple-900 to-slate-900 p-4 relative overflow-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* الخلفية المتحركة */}
       <AnimatedBackground />
+      
+      {/* شريط الأخبار */}
+      <NewsTickerDisplay accountId="demo" />
+      
+      {/* مؤقتات الاستراحة النشطة */}
+      <ActiveBreakTimersDisplay accountId="demo" />
+      
+      {/* إدارة الإشعارات */}
+      <NotificationManager accountId="demo" />
       
       {/* زر تغيير اللغة */}
       <Button

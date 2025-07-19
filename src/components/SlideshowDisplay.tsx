@@ -299,6 +299,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
               autoPlay
               muted={false}
               controls={false}
+              loop
+              playsInline
               onEnded={() => {
                 console.log('✅ Video ended:', safeMediaIndex + 1, 'of', allMedia.length);
                 setIsVideoEnded(true);
