@@ -7,6 +7,8 @@ interface Slideshow {
   id: string;
   title: string;
   images: string[];
+  video_urls?: string[];
+  media_type?: 'images' | 'videos' | 'mixed';
   interval_seconds: number;
   is_active: boolean;
 }
@@ -18,14 +20,14 @@ interface SlideshowDisplayProps {
 
 const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivityChange }) => {
   const [activeSlideshow, setActiveSlideshow] = useState<Slideshow | null>(null);
-  const [imageIndex, setImageIndex] = useState(0);
+  const [mediaIndex, setMediaIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState(false);
-  const imageIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isVideoEnded, setIsVideoEnded] = useState(false);
+  const mediaIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
   const isActiveRef = useRef(false);
-
-  const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // تحسين دالة التحميل مع مراقبة الأداء
   const fetchActiveSlideshow = useCallback(async () => {
@@ -39,7 +41,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      // Logic change: Only ever use the FIRST active slideshow. This disables rotation.
       const firstActiveSlide = data?.find(slide => slide.is_active) || null;
       const hasActive = !!firstActiveSlide;
 
@@ -51,7 +52,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
       const getSlideshowSignature = (slide: Slideshow | null) => {
         if (!slide) return 'no-active-slides';
-        return `${slide.id}:${slide.images.join(',')}`;
+        const images = slide.images?.join(',') || '';
+        const videos = slide.video_urls?.join(',') || '';
+        return `${slide.id}:${images}:${videos}`;
       };
 
       setActiveSlideshow(prevSlideshow => {
@@ -64,7 +67,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         }
         
         console.log('🔄 Slideshow has changed, resetting to initial state.');
-        setImageIndex(0);
+        setMediaIndex(0);
+        setIsVideoEnded(false);
         return firstActiveSlide;
       });
 
@@ -84,21 +88,20 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
     }
   }, [accountId, onActivityChange, loading]);
 
-  // إنشاء نسخة محسنة من دالة التحميل
   const debouncedFetch = useCallback(
     debounce(fetchActiveSlideshow, 500),
     [fetchActiveSlideshow]
   );
 
-  // Realtime listener and polling - محسن للأداء
+  // Realtime listener and polling
   useEffect(() => {
     if (!accountId) return;
 
     console.log('📡 SlideshowDisplay: Setting up optimized listeners for:', accountId);
     
-    let isActive = true; // flag لمنع تحديثات غير ضرورية
+    let isActive = true;
     
-    fetchActiveSlideshow(); // Initial fetch
+    fetchActiveSlideshow();
     
     const channel = supabase
       .channel(`slideshow-display-${accountId}`)
@@ -121,7 +124,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
     channelRef.current = channel;
 
-    // تقليل التكرار من كل 10 ثواني إلى كل 30 ثانية لتحسين الأداء
     const backupInterval = setInterval(() => {
       if (isActive) {
         debouncedFetch();
@@ -136,56 +138,97 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
   }, [accountId, onActivityChange]);
 
   const clearAllTimers = () => {
-    if (imageIntervalRef.current) {
-      clearInterval(imageIntervalRef.current);
-      imageIntervalRef.current = null;
+    if (mediaIntervalRef.current) {
+      clearInterval(mediaIntervalRef.current);
+      mediaIntervalRef.current = null;
     }
   };
 
-  // Image rotation within the current slideshow
+  // دمج الصور والفيديوهات في مصفوفة واحدة
+  const getAllMedia = (slideshow: Slideshow) => {
+    const media = [];
+    
+    // إضافة الصور
+    if (slideshow.images) {
+      media.push(...slideshow.images.map(url => ({ url, type: 'image' })));
+    }
+    
+    // إضافة الفيديوهات
+    if (slideshow.video_urls) {
+      media.push(...slideshow.video_urls.map(url => ({ url, type: 'video' })));
+    }
+    
+    return media;
+  };
+
+  // Media rotation within the current slideshow
   useEffect(() => {
     clearAllTimers();
 
-    if (!activeSlideshow || activeSlideshow.images.length <= 1 || loading) {
+    if (!activeSlideshow || loading) {
       return;
     }
 
-    console.log('🎬 Starting image rotation for slideshow:', {
+    const allMedia = getAllMedia(activeSlideshow);
+    
+    if (allMedia.length <= 1) {
+      return;
+    }
+
+    console.log('🎬 Starting media rotation for slideshow:', {
       title: activeSlideshow.title,
-      imagesCount: activeSlideshow.images.length,
-      intervalSeconds: 15
+      totalMedia: allMedia.length,
+      images: activeSlideshow.images?.length || 0,
+      videos: activeSlideshow.video_urls?.length || 0
     });
 
-    imageIntervalRef.current = setInterval(() => {
-      setImageIndex(prevIndex => {
-        const nextImageIndex = (prevIndex + 1) % activeSlideshow.images.length;
-        console.log(`🔄 Image transition: ${prevIndex + 1} -> ${nextImageIndex + 1} (total: ${activeSlideshow.images.length}) in slideshow ${activeSlideshow.title}`);
-        return nextImageIndex;
-      });
-    }, 15000);
+    const currentMedia = allMedia[mediaIndex];
+    
+    // إذا كان العنصر الحالي صورة، ننتقل بعد 15 ثانية
+    if (currentMedia.type === 'image') {
+      mediaIntervalRef.current = setInterval(() => {
+        setMediaIndex(prevIndex => {
+          const nextIndex = (prevIndex + 1) % allMedia.length;
+          console.log(`🔄 Media transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${allMedia.length}) in slideshow ${activeSlideshow.title}`);
+          return nextIndex;
+        });
+      }, 15000);
+    }
+    
+    // إذا كان فيديو وانتهى، ننتقل للعنصر التالي
+    if (currentMedia.type === 'video' && isVideoEnded) {
+      const timeout = setTimeout(() => {
+        setMediaIndex(prevIndex => {
+          const nextIndex = (prevIndex + 1) % allMedia.length;
+          console.log(`🔄 Video ended, transitioning: ${prevIndex + 1} -> ${nextIndex + 1}`);
+          setIsVideoEnded(false);
+          return nextIndex;
+        });
+      }, 1000);
+
+      return () => clearTimeout(timeout);
+    }
 
     return () => clearAllTimers();
-  }, [activeSlideshow, loading]);
+  }, [activeSlideshow, loading, mediaIndex, isVideoEnded]);
 
-  // Preload next image for smooth transition
+  // Preload next media
   useEffect(() => {
     if (!activeSlideshow || loading) return;
 
-    try {
-      if (activeSlideshow.images.length > 1) {
-        const nextImageIndex = (imageIndex + 1) % activeSlideshow.images.length;
-        const nextImageUrl = activeSlideshow.images[nextImageIndex];
-        if (nextImageUrl) {
-          const img = new Image();
-          img.src = nextImageUrl;
-          console.log(`🖼️ Preloading next image: ${nextImageUrl}`);
-        }
+    const allMedia = getAllMedia(activeSlideshow);
+    
+    if (allMedia.length > 1) {
+      const nextMediaIndex = (mediaIndex + 1) % allMedia.length;
+      const nextMedia = allMedia[nextMediaIndex];
+      
+      if (nextMedia.type === 'image') {
+        const img = new Image();
+        img.src = nextMedia.url;
+        console.log(`🖼️ Preloading next image: ${nextMedia.url}`);
       }
-    } catch (error) {
-      console.error("🔥 Error during image preloading:", error);
     }
-  }, [activeSlideshow, imageIndex, loading]);
-
+  }, [activeSlideshow, mediaIndex, loading]);
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -206,43 +249,76 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
     );
   }
 
-  if (!activeSlideshow || activeSlideshow.images.length === 0) {
+  if (!activeSlideshow) {
     return null;
   }
 
-  const safeImageIndex = Math.max(0, Math.min(imageIndex, activeSlideshow.images.length - 1));
-  const currentImage = activeSlideshow.images[safeImageIndex];
+  const allMedia = getAllMedia(activeSlideshow);
+  
+  if (allMedia.length === 0) {
+    return null;
+  }
+
+  const safeMediaIndex = Math.max(0, Math.min(mediaIndex, allMedia.length - 1));
+  const currentMedia = allMedia[safeMediaIndex];
 
   return (
     <div className="fixed inset-0 bg-black z-50">
       <div className="w-full h-full relative overflow-hidden">
         <div className="w-full h-full">
-          <img 
-            key={`${activeSlideshow.id}-${safeImageIndex}`}
-            src={currentImage}
-            alt={`${activeSlideshow.title} - Slide ${safeImageIndex + 1}`}
-            className="w-full h-full object-contain bg-black"
-            style={{
-              maxWidth: '100vw',
-              maxHeight: '100vh',
-              objectFit: 'contain',
-              objectPosition: 'center'
-            }}
-            onLoad={() => console.log('✅ Image loaded:', safeImageIndex + 1, 'of', activeSlideshow.images.length, currentImage)}
-            onError={(e) => {
-              console.error('❌ Image failed to load:', safeImageIndex + 1, currentImage);
-              console.error('Error details:', e);
-            }}
-          />
+          {currentMedia.type === 'image' ? (
+            <img 
+              key={`${activeSlideshow.id}-${safeMediaIndex}`}
+              src={currentMedia.url}
+              alt={`${activeSlideshow.title} - Media ${safeMediaIndex + 1}`}
+              className="w-full h-full object-contain bg-black"
+              style={{
+                maxWidth: '100vw',
+                maxHeight: '100vh',
+                objectFit: 'contain',
+                objectPosition: 'center'
+              }}
+              onLoad={() => console.log('✅ Image loaded:', safeMediaIndex + 1, 'of', allMedia.length, currentMedia.url)}
+              onError={(e) => {
+                console.error('❌ Image failed to load:', safeMediaIndex + 1, currentMedia.url);
+                console.error('Error details:', e);
+              }}
+            />
+          ) : (
+            <video 
+              ref={videoRef}
+              key={`${activeSlideshow.id}-${safeMediaIndex}`}
+              src={currentMedia.url}
+              className="w-full h-full object-contain bg-black"
+              style={{
+                maxWidth: '100vw',
+                maxHeight: '100vh',
+                objectFit: 'contain',
+                objectPosition: 'center'
+              }}
+              autoPlay
+              muted={false}
+              controls={false}
+              onEnded={() => {
+                console.log('✅ Video ended:', safeMediaIndex + 1, 'of', allMedia.length);
+                setIsVideoEnded(true);
+              }}
+              onLoadedData={() => console.log('✅ Video loaded:', safeMediaIndex + 1, 'of', allMedia.length, currentMedia.url)}
+              onError={(e) => {
+                console.error('❌ Video failed to load:', safeMediaIndex + 1, currentMedia.url);
+                console.error('Error details:', e);
+              }}
+            />
+          )}
         </div>
         
-        {activeSlideshow.images.length > 1 && (
+        {allMedia.length > 1 && (
           <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-3">
-            {activeSlideshow.images.map((_, index) => (
+            {allMedia.map((media, index) => (
               <div 
                 key={index} 
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  index === safeImageIndex ? 'bg-white scale-125' : 'bg-white/50'
+                  index === safeMediaIndex ? 'bg-white scale-125' : 'bg-white/50'
                 }`} 
               />
             ))}
@@ -252,7 +328,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
           <div className="text-white/80 text-sm">
-            <p>الصورة {safeImageIndex + 1} من {activeSlideshow.images.length}</p>
+            <p>{currentMedia.type === 'image' ? 'صورة' : 'فيديو'} {safeMediaIndex + 1} من {allMedia.length}</p>
           </div>
         </div>
 
@@ -260,19 +336,19 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
           <div 
             className="h-full bg-gradient-to-r from-blue-500 to-green-500 transition-all duration-300 ease-linear"
             style={{
-              width: `${((safeImageIndex + 1) / activeSlideshow.images.length) * 100}%`
+              width: `${((safeMediaIndex + 1) / allMedia.length) * 100}%`
             }}
           />
         </div>
 
-
         {process.env.NODE_ENV === 'development' && activeSlideshow && (
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
-            <div>Image: {safeImageIndex + 1}/{activeSlideshow.images.length}</div>
+            <div>Media: {safeMediaIndex + 1}/{allMedia.length}</div>
+            <div>Type: {currentMedia.type}</div>
             <div>Title: {activeSlideshow.title}</div>
-            <div>صور كل: 15 ثانية</div>
-            <div>Image Timer: {imageIntervalRef.current ? 'نشط' : 'متوقف'}</div>
-            <div>Active Slideshow: {activeSlideshow ? 'Yes' : 'No'}</div>
+            <div>Images: {activeSlideshow.images?.length || 0}</div>
+            <div>Videos: {activeSlideshow.video_urls?.length || 0}</div>
+            <div>Media Timer: {mediaIntervalRef.current ? 'نشط' : 'متوقف'}</div>
           </div>
         )}
       </div>

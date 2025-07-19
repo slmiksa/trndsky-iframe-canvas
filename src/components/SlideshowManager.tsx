@@ -7,13 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Images, Eye, EyeOff, Trash2, Upload, RefreshCw } from 'lucide-react';
+import { Plus, Images, Eye, EyeOff, Trash2, Upload, RefreshCw, Video, Play } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Slideshow {
   id: string;
   title: string;
   images: string[];
+  video_urls?: string[];
+  media_type?: 'images' | 'videos' | 'mixed';
   interval_seconds: number;
   is_active: boolean;
   created_at: string;
@@ -32,9 +35,32 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const [selectedSlideshow, setSelectedSlideshow] = useState<Slideshow | null>(null);
   const [newSlideshow, setNewSlideshow] = useState({
     title: '',
-    images: [] as File[]
+    images: [] as File[],
+    videos: [] as File[],
+    mediaType: 'images' as 'images' | 'videos' | 'mixed'
   });
   const [uploading, setUploading] = useState(false);
+
+  // دالة للتحقق من مدة الفيديو
+  const validateVideoDuration = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        // التحقق من أن المدة أقل من 3 دقائق (180 ثانية)
+        resolve(video.duration <= 180);
+      };
+      
+      video.onerror = () => {
+        window.URL.revokeObjectURL(video.src);
+        resolve(false);
+      };
+      
+      video.src = URL.createObjectURL(file);
+    });
+  };
 
   const fetchSlideshows = async () => {
     try {
@@ -56,7 +82,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       }
 
       console.log('✅ Slideshows fetched successfully:', data);
-      setSlideshows(data || []);
+      setSlideshows(data?.map(item => ({
+        ...item,
+        video_urls: item.video_urls || [],
+        media_type: item.media_type || 'images'
+      })) || []);
     } catch (error) {
       console.error('❌ Exception in fetchSlideshows:', error);
       toast({
@@ -98,11 +128,19 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     };
   }, [accountId]);
 
-  const uploadImages = async (files: File[]): Promise<string[]> => {
+  const uploadMedia = async (files: File[], mediaType: 'images' | 'videos'): Promise<string[]> => {
     const uploadedUrls: string[] = [];
     
     for (const file of files) {
       try {
+        // التحقق من مدة الفيديو إذا كان فيديو
+        if (mediaType === 'videos') {
+          const isValidDuration = await validateVideoDuration(file);
+          if (!isValidDuration) {
+            throw new Error(`الفيديو ${file.name} يجب أن يكون أقل من 3 دقائق`);
+          }
+        }
+
         const fileExt = file.name.split('.').pop();
         const fileName = `${accountId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         
@@ -127,7 +165,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         console.log('✅ File uploaded successfully:', publicUrl);
         uploadedUrls.push(publicUrl);
       } catch (error) {
-        console.error('❌ Error in uploadImages:', error);
+        console.error('❌ Error in uploadMedia:', error);
         throw error;
       }
     }
@@ -137,10 +175,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
   const addSlideshow = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newSlideshow.images.length === 0) {
+    if (newSlideshow.images.length === 0 && newSlideshow.videos.length === 0) {
       toast({
         title: 'خطأ',
-        description: 'يرجى اختيار صور للسلايدات',
+        description: 'يرجى اختيار صور أو فيديوهات للسلايدات',
         variant: "destructive"
       });
       return;
@@ -150,16 +188,20 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     try {
       console.log('📤 Starting slideshow creation process for account:', accountId);
       
-      // رفع الصور أولاً
-      const imageUrls = await uploadImages(newSlideshow.images);
-      console.log('✅ Images uploaded successfully:', imageUrls);
+      // رفع الصور والفيديوهات
+      const imageUrls = newSlideshow.images.length > 0 ? await uploadMedia(newSlideshow.images, 'images') : [];
+      const videoUrls = newSlideshow.videos.length > 0 ? await uploadMedia(newSlideshow.videos, 'videos') : [];
       
-      // استخدام الدالة الآمنة الجديدة لإنشاء السلايدات مع قيمة افتراضية للفترة (15 ثواني)
+      console.log('✅ Media uploaded successfully:', { imageUrls, videoUrls });
+      
+      // إنشاء السلايدشو
       const { data, error } = await supabase.rpc('create_slideshow_bypass_rls', {
         p_account_id: accountId,
         p_title: newSlideshow.title,
         p_images: imageUrls,
-        p_interval_seconds: 15 // قيمة افتراضية ثابتة
+        p_video_urls: videoUrls,
+        p_media_type: newSlideshow.mediaType,
+        p_interval_seconds: 15
       });
 
       if (error) {
@@ -174,7 +216,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: newSlideshow.title
       });
 
-      setNewSlideshow({ title: '', images: [] });
+      setNewSlideshow({ title: '', images: [], videos: [], mediaType: 'images' });
       setShowAddForm(false);
       
       await fetchSlideshows();
@@ -194,14 +236,11 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   const toggleSlideshowStatus = async (slideshowId: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
 
-    // Optimistic UI update for instant feedback. This makes the UI feel responsive.
     setSlideshows(prevSlideshows =>
       prevSlideshows.map(slide => {
         if (newStatus) {
-          // When activating, set this one to true and all others to false.
           return { ...slide, is_active: slide.id === slideshowId };
         } else {
-          // When deactivating, just set this one to false.
           return slide.id === slideshowId ? { ...slide, is_active: false } : slide;
         }
       })
@@ -209,10 +248,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
 
     try {
       if (newStatus) {
-        // --- Activating a slideshow ---
-        // This logic replaces the faulty database trigger.
-        
-        // Step 1: Deactivate all slideshows for this account in the database.
         console.log(`🔵 Deactivating all slideshows for account ${accountId}...`);
         const { error: deactivateError } = await supabase
           .from('account_slideshows')
@@ -223,9 +258,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
           console.error('❌ Error deactivating slideshows:', deactivateError);
           throw new Error(`فشل في إيقاف السلايدات الحالية: ${deactivateError.message}`);
         }
-        console.log('🟢 All slideshows deactivated.');
 
-        // Step 2: Activate the selected slideshow.
         console.log(`🔵 Activating slideshow ${slideshowId}...`);
         const { error: activateError } = await supabase
           .from('account_slideshows')
@@ -236,15 +269,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
           console.error('❌ Error activating slideshow:', activateError);
           throw new Error(`فشل في تشغيل السلايد شو المحدد: ${activateError.message}`);
         }
-        console.log('🟢 Slideshow activated.');
 
         toast({
           title: 'تم تشغيل السلايد شو بنجاح',
         });
 
       } else {
-        // --- Deactivating a slideshow ---
-        // This is simpler, we just update the specific slideshow.
         console.log(`🔵 Deactivating slideshow ${slideshowId}...`);
         const { error } = await supabase
           .from('account_slideshows')
@@ -255,15 +285,12 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
           console.error('❌ Error deactivating slideshow:', error);
           throw new Error(`فشل في إيقاف السلايد شو: ${error.message}`);
         }
-        console.log('🟢 Slideshow deactivated.');
 
         toast({
           title: 'تم إيقاف السلايد شو',
         });
       }
 
-      // Finally, refetch everything to ensure the UI is in perfect sync with the database.
-      console.log('✅ Operation successful. Refetching to sync UI with DB.');
       await fetchSlideshows();
 
     } catch (error: any) {
@@ -273,7 +300,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         description: error.message,
         variant: "destructive"
       });
-      // On any error, fetch from DB to revert the optimistic UI changes.
       await fetchSlideshows();
     }
   };
@@ -283,20 +309,40 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       console.log('🗑️ Deleting slideshow:', slideshowId);
       
       const slideshow = slideshows.find(s => s.id === slideshowId);
-      if (slideshow && slideshow.images) {
-        // حذف الصور من التخزين
-        for (const imageUrl of slideshow.images) {
-          try {
-            const urlParts = imageUrl.split('/');
-            const fileName = urlParts[urlParts.length - 1];
-            const folderName = urlParts[urlParts.length - 2];
-            const filePath = `${folderName}/${fileName}`;
-            
-            await supabase.storage
-              .from('slideshow-images')
-              .remove([filePath]);
-          } catch (storageError) {
-            console.warn('⚠️ Could not delete image from storage:', storageError);
+      if (slideshow) {
+        // حذف الصور
+        if (slideshow.images) {
+          for (const imageUrl of slideshow.images) {
+            try {
+              const urlParts = imageUrl.split('/');
+              const fileName = urlParts[urlParts.length - 1];
+              const folderName = urlParts[urlParts.length - 2];
+              const filePath = `${folderName}/${fileName}`;
+              
+              await supabase.storage
+                .from('slideshow-images')
+                .remove([filePath]);
+            } catch (storageError) {
+              console.warn('⚠️ Could not delete image from storage:', storageError);
+            }
+          }
+        }
+        
+        // حذف الفيديوهات
+        if (slideshow.video_urls) {
+          for (const videoUrl of slideshow.video_urls) {
+            try {
+              const urlParts = videoUrl.split('/');
+              const fileName = urlParts[urlParts.length - 1];
+              const folderName = urlParts[urlParts.length - 2];
+              const filePath = `${folderName}/${fileName}`;
+              
+              await supabase.storage
+                .from('slideshow-images')
+                .remove([filePath]);
+            } catch (storageError) {
+              console.warn('⚠️ Could not delete video from storage:', storageError);
+            }
           }
         }
       }
@@ -305,7 +351,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         .from('account_slideshows')
         .delete()
         .eq('id', slideshowId)
-        .eq('account_id', accountId); // التأكد من أن السلايد شو ينتمي للحساب
+        .eq('account_id', accountId);
 
       if (error) {
         console.error('❌ Error deleting slideshow:', error);
@@ -337,10 +383,32 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
     }
   };
 
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      setNewSlideshow(prev => ({ ...prev, videos: files }));
+    }
+  };
+
   const handleRefresh = async () => {
     console.log('🔄 Manual refresh triggered');
     setLoading(true);
     await fetchSlideshows();
+  };
+
+  const getTotalMediaCount = (slideshow: Slideshow) => {
+    return (slideshow.images?.length || 0) + (slideshow.video_urls?.length || 0);
+  };
+
+  const getMediaTypeIcon = (mediaType: string) => {
+    switch (mediaType) {
+      case 'videos':
+        return <Video className="h-4 w-4" />;
+      case 'mixed':
+        return <Play className="h-4 w-4" />;
+      default:
+        return <Images className="h-4 w-4" />;
+    }
   };
 
   return (
@@ -369,9 +437,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               <p className="font-medium">النظام الحالي:</p>
               <ul className="mt-2 space-y-1 text-xs list-disc list-inside">
                 <li>يمكن تنشيط سلايد شو واحد فقط في كل مرة.</li>
-                <li>عند تنشيط سلايد شو، سيتم إيقاف أي سلايد شو آخر نشط تلقائياً.</li>
-                <li>كل سلايد شو يعرض صوره بفترة 15 ثواني بين كل صورة.</li>
-                <li>استخدم زر العين لتفعيل/إلغاء تفعيل أي سلايد شو.</li>
+                <li>دعم الصور والفيديوهات مع الصوت.</li>
+                <li>الفيديوهات: حد أقصى 3 دقائق، الصوت مفعل.</li>
+                <li>كل عنصر يعرض لمدة 15 ثواني (الصور) أو كامل المدة (الفيديو).</li>
               </ul>
             </div>
           </CardHeader>
@@ -406,7 +474,10 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                     onClick={() => setSelectedSlideshow(slideshow)}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold">{slideshow.title}</h3>
+                      <div className="flex items-center gap-2">
+                        {getMediaTypeIcon(slideshow.media_type || 'images')}
+                        <h3 className="font-semibold">{slideshow.title}</h3>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={slideshow.is_active ? "default" : "secondary"}>
                           {slideshow.is_active ? 'نشط' : 'متوقف'}
@@ -436,8 +507,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span>{slideshow.images.length} صورة</span>
-                      <span>15 ثانية لكل صورة</span>
+                      <span>{getTotalMediaCount(slideshow)} عنصر</span>
+                      <span>{slideshow.images?.length || 0} صورة</span>
+                      <span>{slideshow.video_urls?.length || 0} فيديو</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
                       {new Date(slideshow.created_at).toLocaleDateString('ar-SA')}
@@ -447,7 +519,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
               </div>
             )}
 
-            {/* نموذج إضافة سلايد شو المبسط */}
+            {/* نموذج إضافة سلايد شو */}
             {showAddForm && (
               <div className="mt-6 border-t pt-6">
                 <form onSubmit={addSlideshow} className="space-y-4">
@@ -462,25 +534,65 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       required 
                     />
                   </div>
+                  
                   <div>
-                    <Label htmlFor="images">رفع الصور</Label>
-                    <Input 
-                      id="images" 
-                      type="file" 
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      required 
-                    />
-                    {newSlideshow.images.length > 0 && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        تم اختيار {newSlideshow.images.length} صورة
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      سيتم عرض كل صورة لمدة 15 ثواني افتراضياً
-                    </p>
+                    <Label htmlFor="mediaType">نوع المحتوى</Label>
+                    <Select 
+                      value={newSlideshow.mediaType} 
+                      onValueChange={(value: 'images' | 'videos' | 'mixed') => 
+                        setNewSlideshow({ ...newSlideshow, mediaType: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="images">صور فقط</SelectItem>
+                        <SelectItem value="videos">فيديوهات فقط</SelectItem>
+                        <SelectItem value="mixed">صور وفيديوهات</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                  {(newSlideshow.mediaType === 'images' || newSlideshow.mediaType === 'mixed') && (
+                    <div>
+                      <Label htmlFor="images">رفع الصور</Label>
+                      <Input 
+                        id="images" 
+                        type="file" 
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                      />
+                      {newSlideshow.images.length > 0 && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          تم اختيار {newSlideshow.images.length} صورة
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {(newSlideshow.mediaType === 'videos' || newSlideshow.mediaType === 'mixed') && (
+                    <div>
+                      <Label htmlFor="videos">رفع الفيديوهات</Label>
+                      <Input 
+                        id="videos" 
+                        type="file" 
+                        multiple
+                        accept="video/*"
+                        onChange={handleVideoSelect}
+                      />
+                      {newSlideshow.videos.length > 0 && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          تم اختيار {newSlideshow.videos.length} فيديو
+                        </p>
+                      )}
+                      <p className="text-xs text-red-500 mt-1">
+                        الحد الأقصى لمدة الفيديو: 3 دقائق
+                      </p>
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button type="submit" disabled={uploading}>
                       {uploading ? <Upload className="h-4 w-4 mr-2 animate-spin" /> : null}
@@ -491,7 +603,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       variant="outline" 
                       onClick={() => {
                         setShowAddForm(false);
-                        setNewSlideshow({ title: '', images: [] });
+                        setNewSlideshow({ title: '', images: [], videos: [], mediaType: 'images' });
                       }}
                     >
                       إلغاء
@@ -513,7 +625,9 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
             </CardTitle>
             {selectedSlideshow && (
               <p className="text-sm text-gray-600">
-                {selectedSlideshow.images.length} صورة - 15 ثواني لكل صورة
+                {getTotalMediaCount(selectedSlideshow)} عنصر - 
+                {selectedSlideshow.images?.length || 0} صورة - 
+                {selectedSlideshow.video_urls?.length || 0} فيديو
               </p>
             )}
           </CardHeader>
@@ -535,44 +649,89 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
   );
 };
 
-// مكون معاينة السلايدات
+// مكون معاينة السلايدات المحدث
 const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [isVideoEnded, setIsVideoEnded] = useState(false);
+
+  // دمج الصور والفيديوهات في مصفوفة واحدة
+  const allMedia = [
+    ...(slideshow.images || []).map(url => ({ url, type: 'image' })),
+    ...(slideshow.video_urls || []).map(url => ({ url, type: 'video' }))
+  ];
 
   useEffect(() => {
-    if (slideshow.images.length <= 1) return;
+    if (allMedia.length <= 1) return;
 
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prev) => (prev + 1) % slideshow.images.length);
-    }, 15000); // استخدام 15 ثواني ثابت
+    const currentMedia = allMedia[currentMediaIndex];
+    
+    // إذا كان العنصر الحالي صورة، ننتقل بعد 15 ثانية
+    if (currentMedia.type === 'image') {
+      const interval = setInterval(() => {
+        setCurrentMediaIndex((prev) => (prev + 1) % allMedia.length);
+      }, 15000);
 
-    return () => clearInterval(interval);
-  }, [slideshow.images.length]);
+      return () => clearInterval(interval);
+    }
+    
+    // إذا كان فيديو، ننتظر انتهاءه
+    if (currentMedia.type === 'video' && isVideoEnded) {
+      const timeout = setTimeout(() => {
+        setCurrentMediaIndex((prev) => (prev + 1) % allMedia.length);
+        setIsVideoEnded(false);
+      }, 1000);
 
-  if (slideshow.images.length === 0) {
+      return () => clearTimeout(timeout);
+    }
+  }, [allMedia.length, currentMediaIndex, isVideoEnded]);
+
+  if (allMedia.length === 0) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
-        <p className="text-gray-500">لا توجد صور</p>
+        <p className="text-gray-500">لا توجد وسائط</p>
       </div>
     );
   }
 
+  const currentMedia = allMedia[currentMediaIndex];
+
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden bg-black">
-      <img 
-        src={slideshow.images[currentImageIndex]} 
-        alt={`Slide ${currentImageIndex + 1}`}
-        className="w-full h-full object-cover"
-      />
+      {currentMedia.type === 'image' ? (
+        <img 
+          src={currentMedia.url} 
+          alt={`Media ${currentMediaIndex + 1}`}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <video 
+          key={currentMedia.url}
+          src={currentMedia.url}
+          className="w-full h-full object-cover"
+          controls={false}
+          autoPlay
+          muted={false}
+          onEnded={() => setIsVideoEnded(true)}
+        />
+      )}
+      
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-        {slideshow.images.map((_, index) => (
+        {allMedia.map((media, index) => (
           <div 
             key={index} 
             className={`w-2 h-2 rounded-full ${
-              index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+              index === currentMediaIndex ? 'bg-white' : 'bg-white/50'
             }`} 
           />
         ))}
+      </div>
+      
+      <div className="absolute top-4 right-4 bg-black/70 rounded-full p-2">
+        {currentMedia.type === 'video' ? (
+          <Video className="h-4 w-4 text-white" />
+        ) : (
+          <Images className="h-4 w-4 text-white" />
+        )}
       </div>
     </div>
   );
