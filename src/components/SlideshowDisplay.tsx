@@ -297,15 +297,28 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
                 objectPosition: 'center'
               }}
               autoPlay
-              muted={false}
+              muted
               controls={false}
               loop
               playsInline
+              preload="auto"
+              onCanPlay={() => {
+                // محاولة تشغيل الفيديو عند جاهزيته
+                if (videoRef.current) {
+                  videoRef.current.play().catch(console.error);
+                }
+              }}
               onEnded={() => {
                 console.log('✅ Video ended:', safeMediaIndex + 1, 'of', allMedia.length);
                 setIsVideoEnded(true);
               }}
-              onLoadedData={() => console.log('✅ Video loaded:', safeMediaIndex + 1, 'of', allMedia.length, currentMedia.url)}
+              onLoadedData={() => {
+                console.log('✅ Video loaded:', safeMediaIndex + 1, 'of', allMedia.length, currentMedia.url);
+                // محاولة تشغيل الفيديو بعد التحميل
+                if (videoRef.current) {
+                  videoRef.current.play().catch(console.error);
+                }
+              }}
               onError={(e) => {
                 console.error('❌ Video failed to load:', safeMediaIndex + 1, currentMedia.url);
                 console.error('Error details:', e);
