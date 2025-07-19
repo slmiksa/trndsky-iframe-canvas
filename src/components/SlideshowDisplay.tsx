@@ -302,9 +302,16 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
               playsInline
               preload="auto"
               onCanPlay={() => {
-                // محاولة تشغيل الفيديو عند جاهزيته
+                // محاولة تشغيل الفيديو بالصوت أولاً
                 if (videoRef.current) {
-                  videoRef.current.play().catch(console.error);
+                  videoRef.current.play().catch(() => {
+                    // إذا فشل تشغيل الفيديو بالصوت، اكتم الصوت وشغله
+                    console.log('تشغيل الفيديو بالصوت فشل، محاولة تشغيله بدون صوت');
+                    if (videoRef.current) {
+                      videoRef.current.muted = true;
+                      videoRef.current.play().catch(console.error);
+                    }
+                  });
                 }
               }}
               onEnded={() => {
