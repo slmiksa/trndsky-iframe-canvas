@@ -249,7 +249,8 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
     );
   }
 
-  if (!activeSlideshow) {
+  // إخفاء المكون تماماً إذا لم يكن هناك slideshow نشط أو إذا كان في حالة تحميل
+  if (!activeSlideshow || loading) {
     return null;
   }
 
