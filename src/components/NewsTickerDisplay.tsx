@@ -188,7 +188,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
       <div className="bg-blue-600 text-white w-full">
         {/* شاشات كبيرة - عرض كامل */}
-        <div className="hidden md:block px-8 py-4">
+        <div className="hidden md:block px-8 py-2">
           <div className="flex items-center justify-center">
             <div 
               className={`text-lg font-semibold transition-opacity duration-300 text-center ${
@@ -217,7 +217,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         </div>
 
         {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
-        <div className="block md:hidden px-4 py-3">
+        <div className="block md:hidden px-4 py-2">
           <div className="flex items-center justify-center">
             <div 
               className={`text-sm font-medium transition-opacity duration-300 text-center ${
@@ -247,7 +247,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
         {/* شاشات صغيرة جداً - عرض مُبسَّط */}
         <div className="block sm:hidden">
-          <div className="px-3 py-2">
+          <div className="px-3 py-1.5">
             <div className="flex items-center justify-center">
               <div 
                 className={`text-xs font-medium transition-opacity duration-300 text-center ${

@@ -254,6 +254,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
             <div className="text-xs text-gray-300">
               {activeSlideshow ? 'سلايد شو نشط' : 'لا يوجد سلايد شو نشط'}
             </div>
+            <div className="text-xs text-blue-300 mt-1">
+              ⏱️ التبديل كل 15 ثانية
+            </div>
           </div>
         </div>
 
