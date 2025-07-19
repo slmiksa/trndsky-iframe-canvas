@@ -68,11 +68,23 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     fetchNews();
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة
+  // الاشتراك في التحديثات المباشرة - محسن للأداء
   useEffect(() => {
     if (!accountId) return;
 
-    console.log('📡 [NewsTickerDisplay] إعداد قناة التحديثات المباشرة');
+    console.log('📡 [NewsTickerDisplay] إعداد قناة التحديثات المباشرة المحسنة');
+    
+    let isActive = true; // flag لمنع تحديثات غير ضرورية
+    let debounceTimeout: NodeJS.Timeout;
+    
+    const debouncedFetch = () => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(() => {
+        if (isActive) {
+          fetchNews();
+        }
+      }, 500); // debounce لمدة 500ms
+    };
     
     const channel = supabase
       .channel(`news_ticker_display_${accountId}_${Date.now()}`)
@@ -85,31 +97,33 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           filter: `account_id=eq.${accountId}`
         },
         (payload) => {
-          console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار:', {
-            event: payload.eventType,
-            new: payload.new,
-            old: payload.old
-          });
-          
-          // إعادة تحميل فورية عند أي تغيير
-          setTimeout(() => {
-            console.log('🔄 [NewsTickerDisplay] إعادة تحميل الأخبار بعد التحديث');
-            fetchNews();
-          }, 100);
+          if (isActive) {
+            console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار:', {
+              event: payload.eventType,
+              new: payload.new,
+              old: payload.old
+            });
+            
+            debouncedFetch();
+          }
         }
       )
       .subscribe((status) => {
         console.log('📡 [NewsTickerDisplay] حالة الاشتراك:', status);
       });
 
-    // تحديث دوري كل 3 ثوان للتأكد
+    // تحديث دوري كل 30 ثانية لتحسين الأداء
     const interval = setInterval(() => {
-      console.log('⏰ [NewsTickerDisplay] تحديث دوري للأخبار');
-      fetchNews();
-    }, 3000);
+      if (isActive) {
+        console.log('⏰ [NewsTickerDisplay] تحديث دوري للأخبار');
+        fetchNews();
+      }
+    }, 30000);
 
     return () => {
       console.log('🧹 [NewsTickerDisplay] تنظيف الموارد');
+      isActive = false;
+      clearTimeout(debounceTimeout);
       clearInterval(interval);
       supabase.removeChannel(channel);
     };

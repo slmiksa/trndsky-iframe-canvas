@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { debounce, performanceMonitor } from '@/utils/performanceOptimization';
 
 interface Slideshow {
   id: string;
@@ -26,8 +27,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
   const isLargeScreen = window.innerWidth >= 1200 || window.screen.width >= 1200;
 
-  const fetchActiveSlideshow = async () => {
+  // تحسين دالة التحميل مع مراقبة الأداء
+  const fetchActiveSlideshow = useCallback(async () => {
     try {
+      performanceMonitor.start('slideshow-fetch');
       console.log('🎬 Fetching active slideshow for:', accountId);
       
       const { data, error } = await supabase.rpc('get_all_slideshows_for_account', {
@@ -66,6 +69,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
       });
 
       setConnectionError(false);
+      performanceMonitor.end('slideshow-fetch');
     } catch (error) {
       console.error('❌ Error fetching slideshow:', error);
       setConnectionError(true);
@@ -74,16 +78,25 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         isActiveRef.current = false;
       }
       setActiveSlideshow(null);
+      performanceMonitor.end('slideshow-fetch');
     } finally {
       if (loading) setLoading(false);
     }
-  };
+  }, [accountId, onActivityChange, loading]);
 
-  // Realtime listener and polling
+  // إنشاء نسخة محسنة من دالة التحميل
+  const debouncedFetch = useCallback(
+    debounce(fetchActiveSlideshow, 500),
+    [fetchActiveSlideshow]
+  );
+
+  // Realtime listener and polling - محسن للأداء
   useEffect(() => {
     if (!accountId) return;
 
-    console.log('📡 SlideshowDisplay: Setting up internal listeners for:', accountId);
+    console.log('📡 SlideshowDisplay: Setting up optimized listeners for:', accountId);
+    
+    let isActive = true; // flag لمنع تحديثات غير ضرورية
     
     fetchActiveSlideshow(); // Initial fetch
     
@@ -98,17 +111,25 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
           filter: `account_id=eq.${accountId}`
         },
         async () => {
-          console.log('📡 Slideshow change detected, re-fetching.');
-          await fetchActiveSlideshow();
+          if (isActive) {
+            console.log('📡 Slideshow change detected, re-fetching.');
+            debouncedFetch();
+          }
         }
       )
       .subscribe();
 
     channelRef.current = channel;
 
-    const backupInterval = setInterval(fetchActiveSlideshow, 10000); // Poll every 10s
+    // تقليل التكرار من كل 10 ثواني إلى كل 30 ثانية لتحسين الأداء
+    const backupInterval = setInterval(() => {
+      if (isActive) {
+        debouncedFetch();
+      }
+    }, 30000);
 
     return () => {
+      isActive = false;
       if (channelRef.current) supabase.removeChannel(channelRef.current);
       clearInterval(backupInterval);
     };

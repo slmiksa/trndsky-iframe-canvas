@@ -351,24 +351,24 @@ const ClientPublicPage = () => {
 
     const channel = setupChannel();
 
-    // Aggressive polling for all devices - 1 second intervals
-    const aggressiveInterval = setInterval(() => {
+    // تحسين التكرار - تقليل من كل ثانية إلى كل 10 ثوان
+    const optimizedInterval = setInterval(() => {
       if (isWindowFocused) {
-        console.log('🔄 Aggressive polling (1s interval)');
+        console.log('🔄 Optimized polling (10s interval)');
         fetchWebsites();
       }
-    }, 1000);
+    }, 10000);
 
-    // Force refresh every 2 seconds as fallback
+    // Force refresh كل 30 ثانية كمساعد
     const forceRefreshInterval = setInterval(() => {
-      console.log('💪 Force refresh (2s fallback)');
+      console.log('💪 Force refresh (30s fallback)');
       fetchWebsites();
-    }, 2000);
+    }, 30000);
 
     return () => {
       console.log('🧹 Cleaning up enhanced listeners');
       clearTimeout(timeoutId);
-      clearInterval(aggressiveInterval);
+      clearInterval(optimizedInterval);
       clearInterval(forceRefreshInterval);
       supabase.removeChannel(channel);
     };
@@ -475,16 +475,19 @@ const ClientPublicPage = () => {
     return () => clearInterval(timerInterval);
   }, [account?.id, fetchActiveTimers, subscriptionExpired]);
 
-  // Enhanced website rotation with error handling
+  // تحسين دوران المواقع مع معالجة أفضل للأخطاء
   useEffect(() => {
-    if (websites.length <= 1 || subscriptionExpired) return;
+    if (websites.length <= 1 || subscriptionExpired || isSlideshowActive) return;
 
+    // تقليل التكرار من 3 ثوان إلى 15 ثانية لتحسين التجربة
     const interval = setInterval(() => {
-      switchToNextWebsite();
-    }, 3000);
+      if (!iframeLoading && !iframeError) { // تجنب التبديل أثناء التحميل أو الخطأ
+        switchToNextWebsite();
+      }
+    }, 15000);
 
     return () => clearInterval(interval);
-  }, [websites.length, subscriptionExpired, failedWebsites]);
+  }, [websites.length, subscriptionExpired, failedWebsites, isSlideshowActive, iframeLoading, iframeError]);
 
   // Auto-retry failed websites
   useEffect(() => {
