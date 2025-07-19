@@ -438,15 +438,15 @@ const ClientPublicPage = () => {
 
       try {
         const timers = await fetchActiveTimers(account.id);
-        const currentActiveTimers = timers.filter(isTimerActive);
-        setActiveTimers(currentActiveTimers);
+        // دع BreakTimerDisplay يتعامل مع فحص الوقت بدلاً من إزالة المؤقتات هنا
+        setActiveTimers(timers);
       } catch (error) {
         console.error('❌ Error fetching timers:', error);
       }
     };
 
     checkTimers();
-    const timerInterval = setInterval(checkTimers, 10000);
+    const timerInterval = setInterval(checkTimers, 30000); // زيادة الفترة إلى 30 ثانية
 
     if (account?.id && !subscriptionExpired) {
       const timerChannel = supabase
