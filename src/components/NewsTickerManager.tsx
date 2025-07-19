@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -124,42 +123,68 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
     try {
       await retryOperation(async () => {
         if (editingItem) {
-          // تحديث الخبر الموجود
+          // تحديث الخبر الموجود مع التحقق من وجود حقول الألوان
           console.log('📝 تحديث الخبر:', editingItem.id);
-           const { error } = await supabase
-             .from('news_ticker')
-             .update({
-               title: formData.title.trim(),
-               content: formData.content?.trim() || null,
-               display_order: formData.display_order,
-               background_color: formData.background_color,
-               text_color: formData.text_color,
-               updated_at: new Date().toISOString()
-             })
-             .eq('id', editingItem.id);
+          
+          // إنشاء كائن التحديث الأساسي
+          const updateData: any = {
+            title: formData.title.trim(),
+            content: formData.content?.trim() || null,
+            display_order: formData.display_order,
+            updated_at: new Date().toISOString()
+          };
+          
+          // إضافة الألوان إذا كانت موجودة
+          if (formData.background_color) {
+            updateData.background_color = formData.background_color;
+          }
+          if (formData.text_color) {
+            updateData.text_color = formData.text_color;
+          }
+          
+          const { error } = await supabase
+            .from('news_ticker')
+            .update(updateData)
+            .eq('id', editingItem.id);
 
-          if (error) throw error;
+          if (error) {
+            console.error('❌ خطأ في التحديث:', error);
+            throw error;
+          }
 
           toast({
             title: "تم تحديث الخبر بنجاح",
             description: `تم تحديث: ${formData.title}`
           });
         } else {
-          // إضافة خبر جديد
+          // إضافة خبر جديد مع التحقق من وجود حقول الألوان
           console.log('➕ إضافة خبر جديد');
-           const { error } = await supabase
-             .from('news_ticker')
-             .insert({
-               account_id: accountId,
-               title: formData.title.trim(),
-               content: formData.content?.trim() || null,
-               display_order: formData.display_order,
-               background_color: formData.background_color,
-               text_color: formData.text_color,
-               is_active: true
-             });
+          
+          // إنشاء كائن الإدراج الأساسي
+          const insertData: any = {
+            account_id: accountId,
+            title: formData.title.trim(),
+            content: formData.content?.trim() || null,
+            display_order: formData.display_order,
+            is_active: true
+          };
+          
+          // إضافة الألوان إذا كانت موجودة
+          if (formData.background_color) {
+            insertData.background_color = formData.background_color;
+          }
+          if (formData.text_color) {
+            insertData.text_color = formData.text_color;
+          }
+          
+          const { error } = await supabase
+            .from('news_ticker')
+            .insert(insertData);
 
-          if (error) throw error;
+          if (error) {
+            console.error('❌ خطأ في الإدراج:', error);
+            throw error;
+          }
 
           toast({
             title: "تم إضافة الخبر بنجاح",
@@ -172,9 +197,50 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
       fetchNewsItems();
     } catch (error: any) {
       console.error('❌ خطأ في حفظ الخبر:', error);
+      
+      // رسالة خطأ مفصلة حسب نوع الخطأ
+      let errorMessage = "تعذر حفظ الخبر. يرجى المحاولة مرة أخرى.";
+      
+      if (error.message?.includes('column') || error.code === '42703') {
+        errorMessage = "هناك مشكلة في إعدادات قاعدة البيانات. سيتم حفظ الخبر بدون الألوان المخصصة.";
+        
+        // محاولة حفظ بدون الألوان
+        try {
+          if (editingItem) {
+            const basicUpdateData = {
+              title: formData.title.trim(),
+              content: formData.content?.trim() || null,
+              display_order: formData.display_order,
+              updated_at: new Date().toISOString()
+            };
+            await supabase.from('news_ticker').update(basicUpdateData).eq('id', editingItem.id);
+          } else {
+            const basicInsertData = {
+              account_id: accountId,
+              title: formData.title.trim(),
+              content: formData.content?.trim() || null,
+              display_order: formData.display_order,
+              is_active: true
+            };
+            await supabase.from('news_ticker').insert(basicInsertData);
+          }
+          
+          toast({
+            title: "تم حفظ الخبر بنجاح",
+            description: "تم حفظ الخبر بالألوان الافتراضية"
+          });
+          
+          resetForm();
+          fetchNewsItems();
+          return;
+        } catch (retryError) {
+          console.error('❌ فشل في إعادة المحاولة:', retryError);
+        }
+      }
+      
       toast({
         title: "خطأ في حفظ الخبر",
-        description: "تعذر حفظ الخبر. يرجى المحاولة مرة أخرى.",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -303,6 +369,20 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                       <p className="text-xs text-gray-500 mt-2">
                         ترتيب العرض: {item.display_order} | تم الإنشاء: {new Date(item.created_at).toLocaleDateString('ar-SA')}
                       </p>
+                      {/* معاينة الألوان */}
+                      {(item.background_color || item.text_color) && (
+                        <div className="mt-2">
+                          <div 
+                            className="inline-block px-3 py-1 rounded text-xs"
+                            style={{
+                              backgroundColor: item.background_color || '#2563eb',
+                              color: item.text_color || '#ffffff'
+                            }}
+                          >
+                            معاينة الألوان
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 ml-4">
                       <Badge variant={item.is_active ? "default" : "secondary"}>
@@ -366,74 +446,74 @@ const NewsTickerManager: React.FC<NewsTickerManagerProps> = ({ accountId }) => {
                     rows={3}
                     disabled={loading}
                   />
-                 </div>
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <Label htmlFor="background_color">لون خلفية الشريط</Label>
-                     <div className="flex gap-2 items-center">
-                       <input
-                         id="background_color"
-                         type="color"
-                         value={formData.background_color}
-                         onChange={(e) => setFormData({ ...formData, background_color: e.target.value })}
-                         className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
-                         disabled={loading}
-                       />
-                       <Input
-                         value={formData.background_color}
-                         onChange={(e) => setFormData({ ...formData, background_color: e.target.value })}
-                         placeholder="#2563eb"
-                         className="flex-1"
-                         disabled={loading}
-                       />
-                     </div>
-                   </div>
-                   <div>
-                     <Label htmlFor="text_color">لون النص</Label>
-                     <div className="flex gap-2 items-center">
-                       <input
-                         id="text_color"
-                         type="color"
-                         value={formData.text_color}
-                         onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
-                         className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
-                         disabled={loading}
-                       />
-                       <Input
-                         value={formData.text_color}
-                         onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
-                         placeholder="#ffffff"
-                         className="flex-1"
-                         disabled={loading}
-                       />
-                     </div>
-                   </div>
-                 </div>
-                 <div>
-                   <Label htmlFor="display_order">ترتيب العرض</Label>
-                   <Input
-                     id="display_order"
-                     type="number"
-                     value={formData.display_order}
-                     onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
-                     placeholder="0"
-                     disabled={loading}
-                   />
-                 </div>
-                 {/* معاينة الألوان */}
-                 <div>
-                   <Label>معاينة الشريط</Label>
-                   <div 
-                     className="p-4 rounded-lg text-center font-medium"
-                     style={{
-                       backgroundColor: formData.background_color,
-                       color: formData.text_color
-                     }}
-                   >
-                     <span className="bg-white/20 px-2 py-1 rounded text-sm font-bold ml-2">أخبار</span>
-                     {formData.title || 'عنوان الخبر سيظهر هنا'}
-                   </div>
-                 </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="background_color">لون خلفية الشريط</Label>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        id="background_color"
+                        type="color"
+                        value={formData.background_color}
+                        onChange={(e) => setFormData({ ...formData, background_color: e.target.value })}
+                        className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                        disabled={loading}
+                      />
+                      <Input
+                        value={formData.background_color}
+                        onChange={(e) => setFormData({ ...formData, background_color: e.target.value })}
+                        placeholder="#2563eb"
+                        className="flex-1"
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="text_color">لون النص</Label>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        id="text_color"
+                        type="color"
+                        value={formData.text_color}
+                        onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
+                        className="w-16 h-10 rounded border border-gray-300 cursor-pointer"
+                        disabled={loading}
+                      />
+                      <Input
+                        value={formData.text_color}
+                        onChange={(e) => setFormData({ ...formData, text_color: e.target.value })}
+                        placeholder="#ffffff"
+                        className="flex-1"
+                        disabled={loading}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="display_order">ترتيب العرض</Label>
+                  <Input
+                    id="display_order"
+                    type="number"
+                    value={formData.display_order}
+                    onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                    disabled={loading}
+                  />
+                </div>
+                {/* معاينة الألوان */}
+                <div>
+                  <Label>معاينة الشريط</Label>
+                  <div 
+                    className="p-4 rounded-lg text-center font-medium"
+                    style={{
+                      backgroundColor: formData.background_color,
+                      color: formData.text_color
+                    }}
+                  >
+                    <span className="bg-white/20 px-2 py-1 rounded text-sm font-bold ml-2">أخبار</span>
+                    {formData.title || 'عنوان الخبر سيظهر هنا'}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Button type="submit" disabled={loading}>
                     {loading ? 'جاري الحفظ...' : (editingItem ? 'تحديث' : 'إضافة')}
