@@ -54,7 +54,7 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
       case 'bottom-center':
         return 'bottom-20 left-1/2 -translate-x-1/2'; // رفع فوق شريط الأخبار
       case 'center':
-        return 'top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2'; // تجنب التداخل مع المحتوى
+        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'; // منتصف الشاشة الحقيقي
       default:
         return 'top-4 right-4';
     }
