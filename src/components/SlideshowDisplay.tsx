@@ -244,21 +244,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
           />
         </div>
 
-        <div className="absolute top-8 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
-          <div className="text-white text-sm">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${connectionError ? 'bg-red-400' : 'bg-green-400'}`}></div>
-              <span>{connectionError ? 'مشكلة اتصال' : 'متصل'}</span>
-              {isLargeScreen && <span className="text-blue-300">📺</span>}
-            </div>
-            <div className="text-xs text-gray-300">
-              {activeSlideshow ? 'سلايد شو نشط' : 'لا يوجد سلايد شو نشط'}
-            </div>
-            <div className="text-xs text-blue-300 mt-1">
-              ⏱️ التبديل كل 15 ثانية
-            </div>
-          </div>
-        </div>
 
         {process.env.NODE_ENV === 'development' && activeSlideshow && (
           <div className="absolute bottom-16 right-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-xs">
