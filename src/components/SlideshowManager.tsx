@@ -84,8 +84,8 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
       console.log('✅ Slideshows fetched successfully:', data);
       setSlideshows(data?.map(item => ({
         ...item,
-        video_urls: item.video_urls || [],
-        media_type: item.media_type || 'images'
+        video_urls: (item as any).video_urls || [],
+        media_type: (item as any).media_type || 'images'
       })) || []);
     } catch (error) {
       console.error('❌ Exception in fetchSlideshows:', error);
@@ -202,7 +202,7 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
         p_video_urls: videoUrls,
         p_media_type: newSlideshow.mediaType,
         p_interval_seconds: 15
-      });
+      } as any);
 
       if (error) {
         console.error('❌ Error creating slideshow:', error);
