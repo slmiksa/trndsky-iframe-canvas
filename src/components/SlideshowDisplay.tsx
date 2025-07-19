@@ -29,7 +29,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
   const isActiveRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // تحسين دالة التحميل مع مراقبة الأداء
+  // تحسين دالة التحميل مع مراقبة الأداء ومعالجة محسنة للأخطاء
   const fetchActiveSlideshow = useCallback(async () => {
     try {
       performanceMonitor.start('slideshow-fetch');
@@ -39,22 +39,39 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         p_account_id: accountId
       });
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
 
+      console.log('📊 Fetched slideshows data:', data?.length || 0, 'slideshows');
+      
       const firstActiveSlide = data?.find(slide => slide.is_active) || null;
       const hasActive = !!firstActiveSlide;
 
+      // التحقق من وجود محتوى في السلايدة النشطة
+      if (firstActiveSlide) {
+        const hasImages = firstActiveSlide.images && firstActiveSlide.images.length > 0;
+        const hasVideos = (firstActiveSlide as any).video_urls && (firstActiveSlide as any).video_urls.length > 0;
+        
+        if (!hasImages && !hasVideos) {
+          console.warn('⚠️ Active slideshow has no media content');
+          firstActiveSlide.is_active = false; // إلغاء تفعيل السلايدة الفارغة
+        }
+      }
+
       if (isActiveRef.current !== hasActive) {
+        console.log(`🎬 Slideshow activity state changing: ${isActiveRef.current} -> ${hasActive}`);
         onActivityChange(hasActive);
         isActiveRef.current = hasActive;
-        console.log(`🎬 Slideshow activity state changed to: ${hasActive}`);
       }
 
       const getSlideshowSignature = (slide: Slideshow | null) => {
         if (!slide) return 'no-active-slides';
         const images = slide.images?.join(',') || '';
         const videos = slide.video_urls?.join(',') || '';
-        return `${slide.id}:${images}:${videos}`;
+        const interval = slide.interval_seconds || 15;
+        return `${slide.id}:${images}:${videos}:${interval}`;
       };
 
       setActiveSlideshow(prevSlideshow => {
@@ -66,25 +83,39 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
           return prevSlideshow;
         }
         
-        console.log('🔄 Slideshow has changed, resetting to initial state.');
+        console.log('🔄 Slideshow content changed, resetting state');
+        console.log('Previous:', prevSignature);
+        console.log('New:', newSignature);
+        
+        // إعادة تعيين جميع المؤشرات والحالات
         setMediaIndex(0);
         setIsVideoEnded(false);
+        
         return firstActiveSlide;
       });
 
       setConnectionError(false);
       performanceMonitor.end('slideshow-fetch');
+      
     } catch (error) {
       console.error('❌ Error fetching slideshow:', error);
       setConnectionError(true);
+      
+      // تنظيف الحالة عند حدوث خطأ
       if (isActiveRef.current) {
         onActivityChange(false);
         isActiveRef.current = false;
       }
       setActiveSlideshow(null);
+      setMediaIndex(0);
+      setIsVideoEnded(false);
+      
       performanceMonitor.end('slideshow-fetch');
     } finally {
-      if (loading) setLoading(false);
+      if (loading) {
+        console.log('🎬 Initial loading completed');
+        setLoading(false);
+      }
     }
   }, [accountId, onActivityChange, loading]);
 
@@ -161,22 +192,38 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
     return media;
   };
 
-  // Media rotation within the current slideshow
+  // Media rotation within the current slideshow - Enhanced reliability
   useEffect(() => {
     clearAllTimers();
 
     if (!activeSlideshow || loading) {
+      console.log('🎬 Media rotation skipped: no slideshow or loading');
       return;
     }
 
     const allMedia = getAllMedia(activeSlideshow);
     
-    if (allMedia.length <= 1) {
+    if (allMedia.length === 0) {
+      console.log('🎬 No media found in slideshow');
+      return;
+    }
+
+    if (allMedia.length === 1) {
+      console.log('🎬 Single media item, no rotation needed');
+      return;
+    }
+
+    // التأكد من أن mediaIndex في النطاق الصحيح
+    const safeIndex = Math.max(0, Math.min(mediaIndex, allMedia.length - 1));
+    if (safeIndex !== mediaIndex) {
+      console.log(`🔧 Correcting media index from ${mediaIndex} to ${safeIndex}`);
+      setMediaIndex(safeIndex);
       return;
     }
 
     console.log('🎬 Starting media rotation for slideshow:', {
       title: activeSlideshow.title,
+      currentIndex: mediaIndex,
       totalMedia: allMedia.length,
       images: activeSlideshow.images?.length || 0,
       videos: activeSlideshow.video_urls?.length || 0
@@ -184,23 +231,33 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
     const currentMedia = allMedia[mediaIndex];
     
-    // إذا كان العنصر الحالي صورة، ننتقل بعد 15 ثانية
+    if (!currentMedia) {
+      console.error('❌ Current media is undefined, resetting to first item');
+      setMediaIndex(0);
+      return;
+    }
+    
+    // إذا كان العنصر الحالي صورة، ننتقل بعد الفترة المحددة
     if (currentMedia.type === 'image') {
+      const intervalTime = (activeSlideshow.interval_seconds || 15) * 1000;
+      console.log(`🖼️ Setting image timer for ${intervalTime}ms`);
+      
       mediaIntervalRef.current = setInterval(() => {
         setMediaIndex(prevIndex => {
           const nextIndex = (prevIndex + 1) % allMedia.length;
-          console.log(`🔄 Media transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${allMedia.length}) in slideshow ${activeSlideshow.title}`);
+          console.log(`🔄 Image timer transition: ${prevIndex + 1} -> ${nextIndex + 1} (total: ${allMedia.length})`);
           return nextIndex;
         });
-      }, 15000);
+      }, intervalTime);
     }
     
     // إذا كان فيديو وانتهى، ننتقل للعنصر التالي
     if (currentMedia.type === 'video' && isVideoEnded) {
+      console.log('🎥 Video ended, transitioning to next media');
       const timeout = setTimeout(() => {
         setMediaIndex(prevIndex => {
           const nextIndex = (prevIndex + 1) % allMedia.length;
-          console.log(`🔄 Video ended, transitioning: ${prevIndex + 1} -> ${nextIndex + 1}`);
+          console.log(`🔄 Video ended transition: ${prevIndex + 1} -> ${nextIndex + 1}`);
           setIsVideoEnded(false);
           return nextIndex;
         });
@@ -209,7 +266,10 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
       return () => clearTimeout(timeout);
     }
 
-    return () => clearAllTimers();
+    return () => {
+      console.log('🧹 Cleaning up media rotation timers');
+      clearAllTimers();
+    };
   }, [activeSlideshow, loading, mediaIndex, isVideoEnded]);
 
   // Preload next media
@@ -283,6 +343,16 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
               onError={(e) => {
                 console.error('❌ Image failed to load:', safeMediaIndex + 1, currentMedia.url);
                 console.error('Error details:', e);
+                // التنقل التلقائي للعنصر التالي في حالة فشل تحميل الصورة
+                setTimeout(() => {
+                  if (allMedia.length > 1) {
+                    setMediaIndex(prevIndex => {
+                      const nextIndex = (prevIndex + 1) % allMedia.length;
+                      console.log(`🔄 Auto-advancing due to image error: ${prevIndex + 1} -> ${nextIndex + 1}`);
+                      return nextIndex;
+                    });
+                  }
+                }, 2000);
               }}
             />
           ) : (
