@@ -29,31 +29,59 @@ const BreakTimerDisplay: React.FC<BreakTimerDisplayProps> = ({ timer, onClose })
   useEffect(() => {
     const calculateTimeRemaining = () => {
       const now = new Date();
-      const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      const currentSeconds = now.getSeconds();
       
-      // Parse end time
+      // حساب الوقت الحالي بالثواني
+      const currentTimeInSeconds = currentHours * 3600 + currentMinutes * 60 + currentSeconds;
+      
+      // استخراج وقت البداية والنهاية
+      const [startHours, startMinutes] = timer.start_time.split(':').map(Number);
       const [endHours, endMinutes] = timer.end_time.split(':').map(Number);
-      const endTimeSeconds = endHours * 3600 + endMinutes * 60;
       
-      let remaining = endTimeSeconds - currentTime;
+      const startTimeInSeconds = startHours * 3600 + startMinutes * 60;
+      const endTimeInSeconds = endHours * 3600 + endMinutes * 60;
       
-      // If negative, timer has ended
-      if (remaining <= 0) {
+      console.log(`⏱️ Timer Calculation:`, {
+        title: timer.title,
+        currentTime: `${currentHours}:${currentMinutes}:${currentSeconds}`,
+        startTime: timer.start_time,
+        endTime: timer.end_time,
+        currentTimeInSeconds,
+        startTimeInSeconds,
+        endTimeInSeconds
+      });
+      
+      // التحقق من أن الوقت الحالي في نطاق المؤقت
+      if (currentTimeInSeconds < startTimeInSeconds) {
+        console.log(`❌ Timer "${timer.title}" قبل وقت البداية`);
         setTimeRemaining(0);
         return;
       }
       
+      if (currentTimeInSeconds >= endTimeInSeconds) {
+        console.log(`❌ Timer "${timer.title}" انتهى وقت البريك`);
+        setTimeRemaining(0);
+        onClose(); // إغلاق المؤقت عند انتهاء الوقت
+        return;
+      }
+      
+      // حساب الوقت المتبقي
+      const remaining = endTimeInSeconds - currentTimeInSeconds;
       setTimeRemaining(remaining);
       
-      // Warning in last 5 minutes (300 seconds)
+      // تحذير في آخر 5 دقائق
       setIsWarning(remaining <= 300);
+      
+      console.log(`✅ Timer "${timer.title}" متبقي: ${Math.floor(remaining/60)} دقيقة و ${remaining%60} ثانية`);
     };
 
     calculateTimeRemaining();
     const interval = setInterval(calculateTimeRemaining, 1000);
 
     return () => clearInterval(interval);
-  }, [timer.end_time]);
+  }, [timer.start_time, timer.end_time, timer.title, onClose]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
