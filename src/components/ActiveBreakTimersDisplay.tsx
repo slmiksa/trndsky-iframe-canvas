@@ -88,21 +88,33 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
   }
 
   // فلترة المؤقتات لعرض المؤقتات التي في وقتها الصحيح
-  const getCurrentTimeInSeconds = () => {
+  const getCurrentTime = () => {
     const now = new Date();
-    return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    return { hours, minutes };
   };
 
-  const currentTimeSeconds = getCurrentTimeInSeconds();
-
-  const visibleTimers = activeTimers.filter(timer => {
+  const isTimerActive = (timer: BreakTimer) => {
+    const currentTime = getCurrentTime();
     const [startHours, startMinutes] = timer.start_time.split(':').map(Number);
     const [endHours, endMinutes] = timer.end_time.split(':').map(Number);
-    const startTimeSeconds = startHours * 3600 + startMinutes * 60;
-    const endTimeSeconds = endHours * 3600 + endMinutes * 60;
+    
+    // تحويل الوقت إلى دقائق للمقارنة السهلة
+    const currentMinutes = currentTime.hours * 60 + currentTime.minutes;
+    const startMinutesTotal = startHours * 60 + startMinutes;
+    const endMinutesTotal = endHours * 60 + endMinutes;
+    
+    console.log(`⏰ Timer "${timer.title}": Current time ${currentTime.hours}:${currentTime.minutes} (${currentMinutes} min), Start: ${startHours}:${startMinutes} (${startMinutesTotal} min), End: ${endHours}:${endMinutes} (${endMinutesTotal} min)`);
+    
+    // التحقق من أن الوقت الحالي في النطاق المطلوب
+    const isActive = currentMinutes >= startMinutesTotal && currentMinutes <= endMinutesTotal;
+    console.log(`⏰ Timer "${timer.title}" is ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    
+    return isActive;
+  };
 
-    return currentTimeSeconds >= startTimeSeconds && currentTimeSeconds <= endTimeSeconds;
-  });
+  const visibleTimers = activeTimers.filter(timer => isTimerActive(timer));
 
   return (
     <>
