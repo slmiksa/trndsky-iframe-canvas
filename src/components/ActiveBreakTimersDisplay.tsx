@@ -159,11 +159,32 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
     return isInTimeRange;
   };
 
-  const visibleTimers = activeTimers.filter(timer => isTimerActive(timer));
+  // فحص دوري كل 30 ثانية لضمان إخفاء المؤقت في الوقت المناسب
+  useEffect(() => {
+    const timeCheckInterval = setInterval(() => {
+      console.log('🔄 فحص دوري لحالة المؤقتات - كل 30 ثانية');
+      setActiveTimers(prev => [...prev]); // إجبار إعادة الرسم
+    }, 30000);
+    
+    return () => {
+      clearInterval(timeCheckInterval);
+    };
+  }, []);
+
+  const visibleTimers = activeTimers.filter(timer => {
+    const shouldShow = isTimerActive(timer);
+    console.log(`🎯 Filter result for "${timer.title}": ${shouldShow ? 'SHOW' : 'HIDE'}`);
+    return shouldShow;
+  });
   
   console.log(`📊 مجموع المؤقتات النشطة: ${activeTimers.length}`);
   console.log(`👁️ المؤقتات المرئية بعد الفلترة: ${visibleTimers.length}`);
   console.log(`🕐 الوقت الحالي الكامل: ${new Date().toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh' })}`);
+  
+  if (visibleTimers.length === 0) {
+    console.log('✅ لا توجد مؤقتات للعرض - إرجاع null');
+    return null;
+  }
 
   return (
     <>
