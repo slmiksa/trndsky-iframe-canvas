@@ -122,29 +122,41 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
     const currentHours = now.getHours();
     const currentMinutes = now.getMinutes();
     
-    const [startHours, startMinutes] = timer.start_time.split(':').map(Number);
-    const [endHours, endMinutes] = timer.end_time.split(':').map(Number);
+    // استخراج الوقت من قاعدة البيانات (إزالة الثواني إذا وجدت)
+    const startTimeParts = timer.start_time.split(':');
+    const endTimeParts = timer.end_time.split(':');
     
-    // تحويل الوقت إلى دقائق للمقارنة السهلة
+    const startHours = parseInt(startTimeParts[0]);
+    const startMinutes = parseInt(startTimeParts[1]);
+    const endHours = parseInt(endTimeParts[0]);
+    const endMinutes = parseInt(endTimeParts[1]);
+    
+    // تحويل الوقت إلى دقائق للمقارنة
     const currentTotalMinutes = currentHours * 60 + currentMinutes;
     const startTotalMinutes = startHours * 60 + startMinutes;
     const endTotalMinutes = endHours * 60 + endMinutes;
     
     console.log(`🔍 Timer Check: "${timer.title}"`);
-    console.log(`📅 Current Time: ${currentHours}:${currentMinutes.toString().padStart(2, '0')} (${currentTotalMinutes} minutes)`);
-    console.log(`🟢 Start Time: ${startHours}:${startMinutes.toString().padStart(2, '0')} (${startTotalMinutes} minutes)`);
-    console.log(`🔴 End Time: ${endHours}:${endMinutes.toString().padStart(2, '0')} (${endTotalMinutes} minutes)`);
+    console.log(`📅 Current Time: ${currentHours}:${currentMinutes.toString().padStart(2, '0')} (${currentTotalMinutes} minutes total)`);
+    console.log(`🟢 Start Time: ${startHours}:${startMinutes.toString().padStart(2, '0')} (${startTotalMinutes} minutes total)`);
+    console.log(`🔴 End Time: ${endHours}:${endMinutes.toString().padStart(2, '0')} (${endTotalMinutes} minutes total)`);
+    console.log(`📊 Database start_time raw: "${timer.start_time}"`);
+    console.log(`📊 Database end_time raw: "${timer.end_time}"`);
     
-    // التحقق من أن الوقت الحالي في النطاق المطلوب (متضمناً الحدود)
-    const isActive = currentTotalMinutes >= startTotalMinutes && currentTotalMinutes < endTotalMinutes;
+    // التحقق الصارم: يجب أن يكون الوقت الحالي بين وقت البداية والنهاية
+    const isInTimeRange = currentTotalMinutes >= startTotalMinutes && currentTotalMinutes < endTotalMinutes;
     
-    console.log(`⏰ Timer "${timer.title}" is ${isActive ? '✅ ACTIVE' : '❌ INACTIVE'} - Reason: ${
-      currentTotalMinutes < startTotalMinutes ? 'قبل وقت البداية' : 
-      currentTotalMinutes >= endTotalMinutes ? 'بعد وقت النهاية' : 
-      'في الوقت المحدد'
-    }`);
+    console.log(`⏰ Timer "${timer.title}" is ${isInTimeRange ? '✅ ACTIVE' : '❌ INACTIVE'}`);
     
-    return isActive;
+    if (!isInTimeRange) {
+      if (currentTotalMinutes < startTotalMinutes) {
+        console.log(`❌ سبب عدم الظهور: الوقت الحالي قبل وقت البداية بـ ${startTotalMinutes - currentTotalMinutes} دقيقة`);
+      } else {
+        console.log(`❌ سبب عدم الظهور: الوقت الحالي بعد وقت النهاية بـ ${currentTotalMinutes - endTotalMinutes} دقيقة`);
+      }
+    }
+    
+    return isInTimeRange;
   };
 
   const visibleTimers = activeTimers.filter(timer => isTimerActive(timer));
