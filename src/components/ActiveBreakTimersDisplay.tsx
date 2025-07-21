@@ -41,6 +41,17 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
       }
 
       console.log('✅ Active break timers fetched:', data);
+      console.log('🔍 تفاصيل المؤقتات المستلمة من قاعدة البيانات:');
+      data?.forEach((timer, index) => {
+        console.log(`Timer ${index + 1}:`, {
+          id: timer.id,
+          title: timer.title,
+          start_time: timer.start_time,
+          end_time: timer.end_time,
+          is_active: timer.is_active,
+          position: timer.position
+        });
+      });
       setActiveTimers(data || []);
     } catch (error) {
       console.error('❌ Error in fetchActiveTimers:', error);
@@ -137,6 +148,10 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
   };
 
   const visibleTimers = activeTimers.filter(timer => isTimerActive(timer));
+  
+  console.log(`📊 مجموع المؤقتات النشطة: ${activeTimers.length}`);
+  console.log(`👁️ المؤقتات المرئية بعد الفلترة: ${visibleTimers.length}`);
+  console.log(`🕐 الوقت الحالي الكامل: ${new Date().toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh' })}`);
 
   return (
     <>
