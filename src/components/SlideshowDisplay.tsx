@@ -21,7 +21,7 @@ interface SlideshowDisplayProps {
 const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivityChange }) => {
   const [activeSlideshow, setActiveSlideshow] = useState<Slideshow | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // بدلاً من true
   const [connectionError, setConnectionError] = useState(false);
   const [isVideoEnded, setIsVideoEnded] = useState(false);
   const mediaIntervalRef = useRef<NodeJS.Timeout | null>(null);
