@@ -51,6 +51,17 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
 
   useEffect(() => {
     fetchActiveTimers();
+    
+    // فحص دوري كل دقيقة لتحديث حالة المؤقتات
+    const timeCheckInterval = setInterval(() => {
+      console.log('🔄 فحص دوري لحالة المؤقتات');
+      // إعادة رسم المكون لتحديث المؤقتات المرئية
+      setActiveTimers(prev => [...prev]);
+    }, 60000); // كل دقيقة
+    
+    return () => {
+      clearInterval(timeCheckInterval);
+    };
   }, [accountId]);
 
   // الاشتراك في التحديثات المباشرة
