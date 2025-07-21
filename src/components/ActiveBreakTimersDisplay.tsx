@@ -63,12 +63,11 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
   useEffect(() => {
     fetchActiveTimers();
     
-    // فحص دوري كل دقيقة لتحديث حالة المؤقتات
+    // فحص دوري كل 30 ثانية لتحديث حالة المؤقتات
     const timeCheckInterval = setInterval(() => {
-      console.log('🔄 فحص دوري لحالة المؤقتات');
-      // إعادة رسم المكون لتحديث المؤقتات المرئية
-      setActiveTimers(prev => [...prev]);
-    }, 60000); // كل دقيقة
+      console.log('🔄 فحص دوري لحالة المؤقتات - كل 30 ثانية');
+      setActiveTimers(prev => [...prev]); // إجبار إعادة الرسم
+    }, 30000);
     
     return () => {
       clearInterval(timeCheckInterval);
@@ -158,18 +157,6 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
     
     return isInTimeRange;
   };
-
-  // فحص دوري كل 30 ثانية لضمان إخفاء المؤقت في الوقت المناسب
-  useEffect(() => {
-    const timeCheckInterval = setInterval(() => {
-      console.log('🔄 فحص دوري لحالة المؤقتات - كل 30 ثانية');
-      setActiveTimers(prev => [...prev]); // إجبار إعادة الرسم
-    }, 30000);
-    
-    return () => {
-      clearInterval(timeCheckInterval);
-    };
-  }, []);
 
   const visibleTimers = activeTimers.filter(timer => {
     const shouldShow = isTimerActive(timer);
