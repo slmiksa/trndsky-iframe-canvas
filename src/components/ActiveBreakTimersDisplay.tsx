@@ -107,20 +107,31 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
   };
 
   const isTimerActive = (timer: BreakTimer) => {
-    const currentTime = getCurrentTime();
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    
     const [startHours, startMinutes] = timer.start_time.split(':').map(Number);
     const [endHours, endMinutes] = timer.end_time.split(':').map(Number);
     
     // تحويل الوقت إلى دقائق للمقارنة السهلة
-    const currentMinutes = currentTime.hours * 60 + currentTime.minutes;
-    const startMinutesTotal = startHours * 60 + startMinutes;
-    const endMinutesTotal = endHours * 60 + endMinutes;
+    const currentTotalMinutes = currentHours * 60 + currentMinutes;
+    const startTotalMinutes = startHours * 60 + startMinutes;
+    const endTotalMinutes = endHours * 60 + endMinutes;
     
-    console.log(`⏰ Timer "${timer.title}": Current time ${currentTime.hours}:${currentTime.minutes} (${currentMinutes} min), Start: ${startHours}:${startMinutes} (${startMinutesTotal} min), End: ${endHours}:${endMinutes} (${endMinutesTotal} min)`);
+    console.log(`🔍 Timer Check: "${timer.title}"`);
+    console.log(`📅 Current Time: ${currentHours}:${currentMinutes.toString().padStart(2, '0')} (${currentTotalMinutes} minutes)`);
+    console.log(`🟢 Start Time: ${startHours}:${startMinutes.toString().padStart(2, '0')} (${startTotalMinutes} minutes)`);
+    console.log(`🔴 End Time: ${endHours}:${endMinutes.toString().padStart(2, '0')} (${endTotalMinutes} minutes)`);
     
-    // التحقق من أن الوقت الحالي في النطاق المطلوب
-    const isActive = currentMinutes >= startMinutesTotal && currentMinutes <= endMinutesTotal;
-    console.log(`⏰ Timer "${timer.title}" is ${isActive ? 'ACTIVE' : 'INACTIVE'}`);
+    // التحقق من أن الوقت الحالي في النطاق المطلوب (متضمناً الحدود)
+    const isActive = currentTotalMinutes >= startTotalMinutes && currentTotalMinutes < endTotalMinutes;
+    
+    console.log(`⏰ Timer "${timer.title}" is ${isActive ? '✅ ACTIVE' : '❌ INACTIVE'} - Reason: ${
+      currentTotalMinutes < startTotalMinutes ? 'قبل وقت البداية' : 
+      currentTotalMinutes >= endTotalMinutes ? 'بعد وقت النهاية' : 
+      'في الوقت المحدد'
+    }`);
     
     return isActive;
   };
