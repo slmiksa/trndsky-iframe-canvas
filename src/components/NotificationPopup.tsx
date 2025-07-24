@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { X } from 'lucide-react';
 
@@ -19,25 +19,69 @@ interface NotificationPopupProps {
 
 const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [shouldRender, setShouldRender] = useState(true);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    // تأكد من أن المكون مازال mounted
+    if (!mountedRef.current) return;
+
     // Trigger animation after mount
-    setTimeout(() => setIsVisible(true), 100);
+    const showTimer = setTimeout(() => {
+      if (mountedRef.current) {
+        setIsVisible(true);
+      }
+    }, 100);
 
     // Auto close after display duration only if duration is set and greater than 0
     if (notification.display_duration > 0) {
-      const timer = setTimeout(() => {
-        handleClose();
+      timerRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          handleClose();
+        }
       }, notification.display_duration);
-
-      return () => clearTimeout(timer);
     }
+
+    return () => {
+      clearTimeout(showTimer);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [notification.display_duration]);
 
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const handleClose = () => {
+    if (!mountedRef.current) return;
+    
+    // منع إغلاقات متعددة
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     setIsVisible(false);
-    setTimeout(() => onClose(), 300); // Wait for animation to complete
+    
+    // انتظار انتهاء الأنيميشن قبل الإزالة الكاملة
+    setTimeout(() => {
+      if (mountedRef.current) {
+        setShouldRender(false);
+        onClose();
+      }
+    }, 300);
   };
+
+  // عدم الرسم إذا تم تحديد عدم الرسم
+  if (!shouldRender) {
+    return null;
+  }
 
   const getPositionClasses = () => {
     switch (notification.position) {
@@ -46,15 +90,15 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
       case 'top-right':
         return 'top-4 right-4';
       case 'bottom-left':
-        return 'bottom-20 left-4'; // رفع فوق شريط الأخبار
+        return 'bottom-20 left-4';
       case 'bottom-right':
-        return 'bottom-20 right-4'; // رفع فوق شريط الأخبار
+        return 'bottom-20 right-4';
       case 'top-center':
         return 'top-4 left-1/2 -translate-x-1/2';
       case 'bottom-center':
-        return 'bottom-20 left-1/2 -translate-x-1/2'; // رفع فوق شريط الأخبار
+        return 'bottom-20 left-1/2 -translate-x-1/2';
       case 'center':
-        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'; // منتصف الشاشة الحقيقي
+        return 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2';
       default:
         return 'top-4 right-4';
     }
@@ -89,7 +133,6 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
         style={getCardStyles()}
       >
         <CardContent className={`relative ${notification.position === 'center' ? 'p-12' : 'p-4'}`}>
-          {/* زر الإغلاق */}
           <button
             onClick={handleClose}
             className={`absolute ${notification.position === 'center' ? 'top-6 right-6' : 'top-2 right-2'} 
@@ -100,7 +143,6 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
             <X className={`${notification.position === 'center' ? 'h-6 w-6' : 'h-4 w-4'} text-gray-600`} />
           </button>
 
-          {/* العنوان */}
           <div className={notification.position === 'center' ? 'mb-8 pr-12' : 'mb-4 pr-8'}>
             <h3 className={`font-bold text-gray-900 ${
               notification.position === 'center' ? 'text-4xl text-center' : 'text-lg'
@@ -109,7 +151,6 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
             </h3>
           </div>
 
-          {/* الصورة */}
           {notification.image_url && (
             <div className={`${notification.position === 'center' ? 'mb-8' : 'mb-4'} flex justify-center`}>
               <img
@@ -127,7 +168,6 @@ const NotificationPopup: React.FC<NotificationPopupProps> = ({ notification, onC
             </div>
           )}
 
-          {/* الرسالة */}
           {notification.message && (
             <div className={`text-center`}>
               <p className={`text-gray-700 leading-relaxed whitespace-pre-line ${

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import BreakTimerDisplay from './BreakTimerDisplay';
 
@@ -21,9 +22,11 @@ interface ActiveBreakTimersDisplayProps {
 const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ accountId }) => {
   const [activeTimers, setActiveTimers] = useState<BreakTimer[]>([]);
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+  const lastFetchRef = useRef<string>('');
 
   const fetchActiveTimers = async () => {
-    if (!accountId) return;
+    if (!accountId || !mountedRef.current) return;
 
     try {
       console.log('🔍 Fetching active break timers for account:', accountId);
@@ -40,43 +43,39 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
         return;
       }
 
+      if (!mountedRef.current) return;
+
+      // منع التحديثات المتكررة للبيانات المتطابقة
+      const dataSignature = JSON.stringify(data || []);
+      if (lastFetchRef.current === dataSignature) {
+        console.log('✅ Timer data unchanged, skipping update');
+        return;
+      }
+      
+      lastFetchRef.current = dataSignature;
       console.log('✅ Active break timers fetched:', data);
-      console.log('🔍 تفاصيل المؤقتات المستلمة من قاعدة البيانات:');
-      data?.forEach((timer, index) => {
-        console.log(`Timer ${index + 1}:`, {
-          id: timer.id,
-          title: timer.title,
-          start_time: timer.start_time,
-          end_time: timer.end_time,
-          is_active: timer.is_active,
-          position: timer.position
-        });
-      });
       setActiveTimers(data || []);
     } catch (error) {
       console.error('❌ Error in fetchActiveTimers:', error);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchActiveTimers();
     
-    // فحص دوري كل 30 ثانية لتحديث حالة المؤقتات
-    const timeCheckInterval = setInterval(() => {
-      console.log('🔄 فحص دوري لحالة المؤقتات - كل 30 ثانية');
-      setActiveTimers(prev => [...prev]); // إجبار إعادة الرسم
-    }, 30000);
-    
     return () => {
-      clearInterval(timeCheckInterval);
+      mountedRef.current = false;
     };
   }, [accountId]);
 
   // الاشتراك في التحديثات المباشرة
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId || !mountedRef.current) return;
 
     const channel = supabase
       .channel(`break_timers_display_${accountId}`)
@@ -89,8 +88,10 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
           filter: `account_id=eq.${accountId}`
         },
         () => {
-          console.log('📡 Break timer change detected, re-fetching.');
-          fetchActiveTimers();
+          if (mountedRef.current) {
+            console.log('📡 Break timer change detected, re-fetching.');
+            fetchActiveTimers();
+          }
         }
       )
       .subscribe();
@@ -101,19 +102,8 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
   }, [accountId]);
 
   const handleTimerClose = (timerId: string) => {
+    if (!mountedRef.current) return;
     setActiveTimers(prev => prev.filter(timer => timer.id !== timerId));
-  };
-
-  if (loading) {
-    return null;
-  }
-
-  // فلترة المؤقتات لعرض المؤقتات التي في وقتها الصحيح
-  const getCurrentTime = () => {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-    return { hours, minutes };
   };
 
   const isTimerActive = (timer: BreakTimer) => {
@@ -121,7 +111,6 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
     const currentHours = now.getHours();
     const currentMinutes = now.getMinutes();
     
-    // استخراج الوقت من قاعدة البيانات (إزالة الثواني إذا وجدت)
     const startTimeParts = timer.start_time.split(':');
     const endTimeParts = timer.end_time.split(':');
     
@@ -130,46 +119,20 @@ const ActiveBreakTimersDisplay: React.FC<ActiveBreakTimersDisplayProps> = ({ acc
     const endHours = parseInt(endTimeParts[0]);
     const endMinutes = parseInt(endTimeParts[1]);
     
-    // تحويل الوقت إلى دقائق للمقارنة
     const currentTotalMinutes = currentHours * 60 + currentMinutes;
     const startTotalMinutes = startHours * 60 + startMinutes;
     const endTotalMinutes = endHours * 60 + endMinutes;
     
-    console.log(`🔍 Timer Check: "${timer.title}"`);
-    console.log(`📅 Current Time: ${currentHours}:${currentMinutes.toString().padStart(2, '0')} (${currentTotalMinutes} minutes total)`);
-    console.log(`🟢 Start Time: ${startHours}:${startMinutes.toString().padStart(2, '0')} (${startTotalMinutes} minutes total)`);
-    console.log(`🔴 End Time: ${endHours}:${endMinutes.toString().padStart(2, '0')} (${endTotalMinutes} minutes total)`);
-    console.log(`📊 Database start_time raw: "${timer.start_time}"`);
-    console.log(`📊 Database end_time raw: "${timer.end_time}"`);
-    
-    // التحقق الصارم: يجب أن يكون الوقت الحالي بين وقت البداية والنهاية
-    const isInTimeRange = currentTotalMinutes >= startTotalMinutes && currentTotalMinutes < endTotalMinutes;
-    
-    console.log(`⏰ Timer "${timer.title}" is ${isInTimeRange ? '✅ ACTIVE' : '❌ INACTIVE'}`);
-    
-    if (!isInTimeRange) {
-      if (currentTotalMinutes < startTotalMinutes) {
-        console.log(`❌ سبب عدم الظهور: الوقت الحالي قبل وقت البداية بـ ${startTotalMinutes - currentTotalMinutes} دقيقة`);
-      } else {
-        console.log(`❌ سبب عدم الظهور: الوقت الحالي بعد وقت النهاية بـ ${currentTotalMinutes - endTotalMinutes} دقيقة`);
-      }
-    }
-    
-    return isInTimeRange;
+    return currentTotalMinutes >= startTotalMinutes && currentTotalMinutes < endTotalMinutes;
   };
 
-  const visibleTimers = activeTimers.filter(timer => {
-    const shouldShow = isTimerActive(timer);
-    console.log(`🎯 Filter result for "${timer.title}": ${shouldShow ? 'SHOW' : 'HIDE'}`);
-    return shouldShow;
-  });
-  
-  console.log(`📊 مجموع المؤقتات النشطة: ${activeTimers.length}`);
-  console.log(`👁️ المؤقتات المرئية بعد الفلترة: ${visibleTimers.length}`);
-  console.log(`🕐 الوقت الحالي الكامل: ${new Date().toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh' })}`);
+  if (loading || !mountedRef.current) {
+    return null;
+  }
+
+  const visibleTimers = activeTimers.filter(timer => isTimerActive(timer));
   
   if (visibleTimers.length === 0) {
-    console.log('✅ لا توجد مؤقتات للعرض - إرجاع null');
     return null;
   }
 

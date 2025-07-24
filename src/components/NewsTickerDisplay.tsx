@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface NewsItem {
@@ -20,8 +20,12 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [fade, setFade] = useState(true);
+  const mountedRef = useRef(true);
+  const lastDataRef = useRef<string>('');
 
   const fetchNews = async () => {
+    if (!accountId || !mountedRef.current) return;
+
     try {
       console.log('🔍 [NewsTickerDisplay] تحميل الأخبار النشطة للحساب:', accountId);
       const { data, error } = await supabase
@@ -36,28 +40,27 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         return;
       }
 
+      if (!mountedRef.current) return;
+
       const activeNews = data || [];
-      console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة:', activeNews.length, activeNews);
       
-      setNewsItems(prevNews => {
-        if (JSON.stringify(prevNews) !== JSON.stringify(activeNews)) {
-          console.log('🔄 [NewsTickerDisplay] تغيير في الأخبار - إعادة ضبط الفهرس');
-          
-          if (activeNews.length === 0) {
-            console.log('📭 [NewsTickerDisplay] لا توجد أخبار نشطة');
-            setCurrentIndex(0);
-            return activeNews;
-          }
-          
-          setCurrentIndex(prev => {
-            const newIndex = prev >= activeNews.length ? 0 : prev;
-            console.log('📍 [NewsTickerDisplay] تحديث الفهرس من', prev, 'إلى', newIndex);
-            return newIndex;
-          });
-        }
-        
-        return activeNews;
-      });
+      // منع التحديثات المتكررة للبيانات المتطابقة
+      const dataSignature = JSON.stringify(activeNews);
+      if (lastDataRef.current === dataSignature) {
+        console.log('✅ [NewsTickerDisplay] البيانات متطابقة، تخطي التحديث');
+        return;
+      }
+      
+      lastDataRef.current = dataSignature;
+      console.log('✅ [NewsTickerDisplay] الأخبار النشطة المحملة:', activeNews.length);
+      
+      setNewsItems(activeNews);
+      
+      // إعادة تعيين الفهرس إذا كانت هناك أخبار جديدة
+      if (activeNews.length > 0) {
+        setCurrentIndex(0);
+        setFade(true);
+      }
       
     } catch (error) {
       console.error('❌ [NewsTickerDisplay] خطأ في fetchNews:', error);
@@ -66,30 +69,20 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
 
   // تحميل أولي للأخبار
   useEffect(() => {
-    console.log('🚀 [NewsTickerDisplay] بدء التحميل الأولي للأخبار');
+    mountedRef.current = true;
     fetchNews();
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة - محسن للأداء
+  // الاشتراك في التحديثات المباشرة
   useEffect(() => {
-    if (!accountId) return;
+    if (!accountId || !mountedRef.current) return;
 
-    console.log('📡 [NewsTickerDisplay] إعداد قناة التحديثات المباشرة المحسنة');
-    
-    let isActive = true; // flag لمنع تحديثات غير ضرورية
-    let debounceTimeout: NodeJS.Timeout;
-    
-    const debouncedFetch = () => {
-      clearTimeout(debounceTimeout);
-      debounceTimeout = setTimeout(() => {
-        if (isActive) {
-          fetchNews();
-        }
-      }, 500); // debounce لمدة 500ms
-    };
-    
     const channel = supabase
-      .channel(`news_ticker_display_${accountId}_${Date.now()}`)
+      .channel(`news_ticker_display_${accountId}`)
       .on(
         'postgres_changes',
         {
@@ -98,111 +91,57 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           table: 'news_ticker',
           filter: `account_id=eq.${accountId}`
         },
-        (payload) => {
-          if (isActive) {
-            console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار:', {
-              event: payload.eventType,
-              new: payload.new,
-              old: payload.old
-            });
-            
-            debouncedFetch();
+        () => {
+          if (mountedRef.current) {
+            console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار');
+            fetchNews();
           }
         }
       )
-      .subscribe((status) => {
-        console.log('📡 [NewsTickerDisplay] حالة الاشتراك:', status);
-      });
-
-    // تحديث دوري كل 30 ثانية لتحسين الأداء
-    const interval = setInterval(() => {
-      if (isActive) {
-        console.log('⏰ [NewsTickerDisplay] تحديث دوري للأخبار');
-        fetchNews();
-      }
-    }, 30000);
+      .subscribe();
 
     return () => {
-      console.log('🧹 [NewsTickerDisplay] تنظيف الموارد');
-      isActive = false;
-      clearTimeout(debounceTimeout);
-      clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, [accountId]);
 
-  // تبديل الأخبار تلقائياً مع التحقق من صحة الفهرس - تغيير المدة إلى 10 ثوان
+  // تبديل الأخبار تلقائياً - 10 ثوان
   useEffect(() => {
-    if (newsItems.length <= 1) return;
+    if (!mountedRef.current || newsItems.length <= 1) return;
 
     const interval = setInterval(() => {
-      setCurrentIndex(prev => {
-        if (prev >= newsItems.length) {
-          console.log('⚠️ [NewsTickerDisplay] فهرس غير صحيح، إعادة تعيين إلى 0');
+      if (!mountedRef.current) return;
+      
+      setFade(false);
+      
+      setTimeout(() => {
+        if (mountedRef.current) {
+          setCurrentIndex(prev => (prev + 1) % newsItems.length);
           setFade(true);
-          return 0;
         }
-        
-        setFade(false);
-        
-        setTimeout(() => {
-          setFade(true);
-        }, 300);
-        
-        const nextIndex = (prev + 1) % newsItems.length;
-        console.log('🔄 [NewsTickerDisplay] الانتقال من الفهرس', prev, 'إلى', nextIndex);
-        return nextIndex;
-      });
-    }, 10000); // تغيير من 4000 إلى 10000 (10 ثوان)
+      }, 300);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [newsItems.length]);
 
-  // إعادة تعيين تأثير التلاشي مع التحقق من صحة الفهرس
-  useEffect(() => {
-    if (currentIndex < newsItems.length) {
-      setFade(true);
-    } else if (newsItems.length > 0) {
-      console.log('🔧 [NewsTickerDisplay] إصلاح فهرس خارج النطاق');
-      setCurrentIndex(0);
-    }
-  }, [currentIndex, newsItems.length]);
-
-  // عدم عرض أي شيء إذا لم توجد أخبار نشطة
-  if (!newsItems.length) {
-    console.log('🚫 [NewsTickerDisplay] لا توجد أخبار نشطة - إرجاع null');
+  // عدم عرض أي شيء إذا لم توجد أخبار نشطة أو المكون غير mounted
+  if (!mountedRef.current || !newsItems.length) {
     return null;
   }
 
-  // التحقق من صحة الفهرس الحالي
-  const safeCurrentIndex = currentIndex >= newsItems.length ? 0 : currentIndex;
-  const currentNews = newsItems[safeCurrentIndex];
+  const currentNews = newsItems[currentIndex];
   
   if (!currentNews) {
-    console.log('🚫 [NewsTickerDisplay] لا يوجد خبر حالي للفهرس', safeCurrentIndex);
     return null;
-  }
-
-  // تحديث الفهرس إذا كان غير صحيح
-  if (safeCurrentIndex !== currentIndex) {
-    console.log('🔧 [NewsTickerDisplay] تصحيح الفهرس من', currentIndex, 'إلى', safeCurrentIndex);
-    setCurrentIndex(safeCurrentIndex);
   }
 
   const newsText = currentNews.content 
     ? `${currentNews.title} - ${currentNews.content}` 
     : currentNews.title;
 
-  // استخدام الألوان المخصصة أو الافتراضية
   const backgroundColor = currentNews.background_color || '#2563eb';
   const textColor = currentNews.text_color || '#ffffff';
-
-  console.log('📺 [NewsTickerDisplay] عرض الخبر:', {
-    title: currentNews.title,
-    index: safeCurrentIndex,
-    total: newsItems.length,
-    actualCurrentIndex: currentIndex
-  });
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
@@ -234,7 +173,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
                   key={index}
                   className={`w-2 h-2 rounded-full transition-all duration-300`}
                   style={{
-                    backgroundColor: index === safeCurrentIndex ? textColor : `${textColor}80`
+                    backgroundColor: index === currentIndex ? textColor : `${textColor}80`
                   }}
                 />
               ))}
@@ -269,7 +208,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
                   key={index}
                   className={`w-1.5 h-1.5 rounded-full transition-all duration-300`}
                   style={{
-                    backgroundColor: index === safeCurrentIndex ? textColor : `${textColor}80`
+                    backgroundColor: index === currentIndex ? textColor : `${textColor}80`
                   }}
                 />
               ))}
