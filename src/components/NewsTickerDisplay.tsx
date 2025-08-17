@@ -26,12 +26,6 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
   const fetchNews = async () => {
     if (!accountId || !mountedRef.current) return;
 
-    // إذا كان الحساب "demo"، لا نحمل أي أخبار (عرض تجريبي فقط)
-    if (accountId === 'demo') {
-      console.log('🔍 [NewsTickerDisplay] حساب تجريبي - لا توجد أخبار');
-      setNewsItems([]);
-      return;
-    }
 
     try {
       console.log('🔍 [NewsTickerDisplay] تحميل الأخبار النشطة للحساب:', accountId);

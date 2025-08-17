@@ -16,11 +16,11 @@ const Index = () => {
       {/* الخلفية المتحركة */}
       <AnimatedBackground />
       
-      {/* شريط الأخبار */}
-      <NewsTickerDisplay accountId="demo" />
+      {/* شريط الأخبار - معطل في الصفحة الرئيسية */}
+      {/* <NewsTickerDisplay accountId="demo" /> */}
       
-      {/* مؤقتات الاستراحة النشطة */}
-      <ActiveBreakTimersDisplay accountId="demo" />
+      {/* مؤقتات الاستراحة النشطة - معطل في الصفحة الرئيسية */}
+      {/* <ActiveBreakTimersDisplay accountId="demo" /> */}
       
       {/* زر تغيير اللغة */}
       <Button
