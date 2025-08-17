@@ -83,7 +83,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     if (!accountId || !mountedRef.current) return;
 
     const channel = supabase
-      .channel(`news_ticker_display_${accountId}`)
+      .channel(`news_ticker_display_${accountId}_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -92,10 +92,15 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           table: 'news_ticker',
           filter: `account_id=eq.${accountId}`
         },
-        () => {
+        (payload) => {
           if (mountedRef.current) {
-            console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار');
-            fetchNews();
+            console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار:', payload);
+            // تحديث فوري بدون تأخير
+            setTimeout(() => {
+              if (mountedRef.current) {
+                fetchNews();
+              }
+            }, 100);
           }
         }
       )
@@ -126,6 +131,14 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     return () => clearInterval(interval);
   }, [newsItems.length]);
 
+  // تحديث فوري عند تغيير newsItems
+  useEffect(() => {
+    if (newsItems.length > 0) {
+      setCurrentIndex(0);
+      setFade(true);
+    }
+  }, [newsItems]);
+
   // عدم عرض أي شيء إذا لم توجد أخبار نشطة أو المكون غير mounted
   if (!mountedRef.current || !newsItems.length) {
     return null;
@@ -148,51 +161,16 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
       <div className="w-full" style={{ backgroundColor, color: textColor }}>
         {/* شاشات كبيرة - عرض كامل */}
-        <div className="hidden md:block px-8 py-2">
+        <div className="hidden md:block px-6 py-1.5">
           <div className="flex items-center justify-center">
             <div 
-              className={`text-lg font-semibold transition-opacity duration-300 text-center ${
+              className={`text-base font-semibold transition-opacity duration-300 text-center ${
                 fade ? 'opacity-100' : 'opacity-0'
               }`}
             >
               <div className="news-ticker-static">
                 <span 
-                  className="px-3 py-1 rounded-md text-sm font-bold ml-2"
-                  style={{ backgroundColor: textColor, color: backgroundColor }}
-                >
-                  أخبار
-                </span>
-                {newsText}
-              </div>
-            </div>
-          </div>
-          
-          {newsItems.length > 1 && (
-            <div className="flex justify-center mt-3 space-x-1 rtl:space-x-reverse">
-              {newsItems.map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-all duration-300`}
-                  style={{
-                    backgroundColor: index === currentIndex ? textColor : `${textColor}80`
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
-        <div className="block md:hidden px-4 py-2">
-          <div className="flex items-center justify-center">
-            <div 
-              className={`text-sm font-medium transition-opacity duration-300 text-center ${
-                fade ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              <div className="news-ticker-static">
-                <span 
-                  className="px-2 py-1 rounded text-xs font-bold ml-1"
+                  className="px-2 py-0.5 rounded text-xs font-bold ml-2"
                   style={{ backgroundColor: textColor, color: backgroundColor }}
                 >
                   أخبار
@@ -217,9 +195,44 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           )}
         </div>
 
+        {/* شاشات متوسطة وصغيرة - عرض مُحسَّن */}
+        <div className="block md:hidden px-3 py-1">
+          <div className="flex items-center justify-center">
+            <div 
+              className={`text-sm font-medium transition-opacity duration-300 text-center ${
+                fade ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <div className="news-ticker-static">
+                <span 
+                  className="px-1.5 py-0.5 rounded text-xs font-bold ml-1"
+                  style={{ backgroundColor: textColor, color: backgroundColor }}
+                >
+                  أخبار
+                </span>
+                {newsText}
+              </div>
+            </div>
+          </div>
+          
+          {newsItems.length > 1 && (
+            <div className="flex justify-center mt-1.5 space-x-1 rtl:space-x-reverse">
+              {newsItems.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-1 h-1 rounded-full transition-all duration-300`}
+                  style={{
+                    backgroundColor: index === currentIndex ? textColor : `${textColor}80`
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* شاشات صغيرة جداً - عرض مُبسَّط */}
         <div className="block sm:hidden">
-          <div className="px-3 py-1.5">
+          <div className="px-2 py-1">
             <div className="flex items-center justify-center">
               <div 
                 className={`text-xs font-medium transition-opacity duration-300 text-center ${
@@ -228,7 +241,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               >
                 <div className="news-ticker-static">
                   <span 
-                    className="px-1.5 py-0.5 rounded text-xs font-bold ml-1"
+                    className="px-1 py-0.5 rounded text-xs font-bold ml-1"
                     style={{ backgroundColor: textColor, color: backgroundColor }}
                   >
                     أخبار
