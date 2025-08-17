@@ -83,7 +83,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     if (!accountId || !mountedRef.current) return;
 
     const channel = supabase
-      .channel(`news_ticker_display_${accountId}_${Date.now()}`)
+      .channel(`news_ticker_realtime_${accountId}_${Math.random()}`)
       .on(
         'postgres_changes',
         {
@@ -94,19 +94,45 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         },
         (payload) => {
           if (mountedRef.current) {
-            console.log('📰 [NewsTickerDisplay] تحديث مباشر للأخبار:', payload);
-            // تحديث فوري بدون تأخير
+            console.log('📰 [NewsTickerDisplay] تحديث مباشر فوري:', payload);
+            
+            // تحديث فوري للحالة بناءً على نوع الحدث
+            if (payload.eventType === 'UPDATE' && payload.new) {
+              const updatedItem = payload.new as NewsItem;
+              
+              // تحديث فوري للقائمة المحلية
+              setNewsItems(prevItems => {
+                const updatedItems = prevItems.map(item => 
+                  item.id === updatedItem.id ? updatedItem : item
+                );
+                
+                // تصفية الأخبار النشطة فقط
+                const activeItems = updatedItems.filter(item => item.is_active);
+                
+                console.log('🔄 [NewsTickerDisplay] تحديث محلي فوري:', activeItems.length);
+                return activeItems;
+              });
+              
+              // إعادة تعيين الفهرس
+              setCurrentIndex(0);
+              setFade(true);
+            }
+            
+            // تحديث شامل بعد تأخير قصير للتأكد من التزامن
             setTimeout(() => {
               if (mountedRef.current) {
                 fetchNews();
               }
-            }, 100);
+            }, 50);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 [NewsTickerDisplay] حالة الاشتراك:', status);
+      });
 
     return () => {
+      console.log('🔌 [NewsTickerDisplay] إغلاق الاشتراك');
       supabase.removeChannel(channel);
     };
   }, [accountId]);
