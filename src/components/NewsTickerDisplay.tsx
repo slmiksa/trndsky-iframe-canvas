@@ -83,7 +83,7 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     if (!accountId || !mountedRef.current) return;
 
     const channel = supabase
-      .channel(`news_ticker_realtime_${accountId}_${Math.random()}`)
+      .channel(`news_ticker_realtime_${accountId}_${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -96,24 +96,63 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
           if (mountedRef.current) {
             console.log('📰 [NewsTickerDisplay] تحديث مباشر فوري:', payload);
             
-            // تحديث فوري للحالة بناءً على نوع الحدث
+            // معالجة التحديثات المختلفة
             if (payload.eventType === 'UPDATE' && payload.new) {
               const updatedItem = payload.new as NewsItem;
+              console.log('🔄 [NewsTickerDisplay] عنصر محدث:', updatedItem.id, 'نشط:', updatedItem.is_active);
               
-              // تحديث فوري للقائمة المحلية
               setNewsItems(prevItems => {
-                const updatedItems = prevItems.map(item => 
-                  item.id === updatedItem.id ? updatedItem : item
-                );
+                // إضافة أو تحديث العنصر
+                const itemExists = prevItems.find(item => item.id === updatedItem.id);
+                let updatedItems;
+                
+                if (itemExists) {
+                  // تحديث العنصر الموجود
+                  updatedItems = prevItems.map(item => 
+                    item.id === updatedItem.id ? updatedItem : item
+                  );
+                } else if (updatedItem.is_active) {
+                  // إضافة عنصر جديد نشط
+                  updatedItems = [...prevItems, updatedItem];
+                } else {
+                  // العنصر غير موجود وغير نشط
+                  updatedItems = prevItems;
+                }
                 
                 // تصفية الأخبار النشطة فقط
                 const activeItems = updatedItems.filter(item => item.is_active);
+                console.log('✅ [NewsTickerDisplay] تحديث فوري للقائمة - عدد الأخبار النشطة:', activeItems.length);
                 
-                console.log('🔄 [NewsTickerDisplay] تحديث محلي فوري:', activeItems.length);
                 return activeItems;
               });
               
               // إعادة تعيين الفهرس
+              setCurrentIndex(0);
+              setFade(true);
+            }
+            else if (payload.eventType === 'INSERT' && payload.new) {
+              const newItem = payload.new as NewsItem;
+              console.log('➕ [NewsTickerDisplay] خبر جديد:', newItem.id, 'نشط:', newItem.is_active);
+              
+              if (newItem.is_active) {
+                setNewsItems(prevItems => {
+                  const activeItems = [...prevItems, newItem].filter(item => item.is_active);
+                  console.log('✅ [NewsTickerDisplay] إضافة خبر جديد - عدد الأخبار النشطة:', activeItems.length);
+                  return activeItems;
+                });
+                setCurrentIndex(0);
+                setFade(true);
+              }
+            }
+            else if (payload.eventType === 'DELETE' && payload.old) {
+              const deletedItem = payload.old as NewsItem;
+              console.log('🗑️ [NewsTickerDisplay] حذف خبر:', deletedItem.id);
+              
+              setNewsItems(prevItems => {
+                const filteredItems = prevItems.filter(item => item.id !== deletedItem.id);
+                console.log('✅ [NewsTickerDisplay] حذف خبر - عدد الأخبار المتبقية:', filteredItems.length);
+                return filteredItems;
+              });
               setCurrentIndex(0);
               setFade(true);
             }
@@ -123,12 +162,17 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
               if (mountedRef.current) {
                 fetchNews();
               }
-            }, 50);
+            }, 200);
           }
         }
       )
       .subscribe((status) => {
         console.log('📡 [NewsTickerDisplay] حالة الاشتراك:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ [NewsTickerDisplay] اشتراك ناجح في التحديثات المباشرة');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ [NewsTickerDisplay] خطأ في الاشتراك');
+        }
       });
 
     return () => {
