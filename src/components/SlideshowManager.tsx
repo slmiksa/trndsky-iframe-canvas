@@ -674,7 +674,6 @@ const SlideshowManager: React.FC<SlideshowManagerProps> = ({ accountId }) => {
                       <SelectContent>
                         <SelectItem value="images">صور فقط</SelectItem>
                         <SelectItem value="videos">فيديوهات فقط</SelectItem>
-                        <SelectItem value="mixed">صور وفيديوهات</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
