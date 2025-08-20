@@ -81,9 +81,16 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
     };
   }, [accountId]);
 
-  // الاشتراك في التحديثات المباشرة
+  // الاشتراك في التحديثات المباشرة مع polling
   useEffect(() => {
     if (!accountId || !mountedRef.current) return;
+
+    // تحديث فوري كل ثانية
+    const pollInterval = setInterval(() => {
+      if (mountedRef.current) {
+        fetchNews();
+      }
+    }, 1000);
 
     const channel = supabase
       .channel(`news_ticker_realtime_${accountId}_${Date.now()}`)
@@ -97,24 +104,19 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
         },
         (payload) => {
           if (mountedRef.current) {
-            console.log('📰 [NewsTickerDisplay] تحديث مباشر فوري:', payload);
-            
-            // تحديث فوري بدون تأخير
+            console.log('📰 [NewsTickerDisplay] تحديث مباشر:', payload);
+            // تحديث فوري عند أي تغيير
             fetchNews();
           }
         }
       )
       .subscribe((status) => {
         console.log('📡 [NewsTickerDisplay] حالة الاشتراك:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ [NewsTickerDisplay] اشتراك ناجح في التحديثات المباشرة');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ [NewsTickerDisplay] خطأ في الاشتراك');
-        }
       });
 
     return () => {
-      console.log('🔌 [NewsTickerDisplay] إغلاق الاشتراك');
+      console.log('🔌 [NewsTickerDisplay] إغلاق الاشتراك والـ polling');
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [accountId]);
