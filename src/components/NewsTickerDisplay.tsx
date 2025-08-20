@@ -26,7 +26,6 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
   const fetchNews = async () => {
     if (!accountId || !mountedRef.current) return;
 
-
     try {
       console.log('🔍 [NewsTickerDisplay] تحميل الأخبار النشطة للحساب:', accountId);
       const { data, error } = await supabase
@@ -61,6 +60,10 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
       if (activeNews.length > 0) {
         setCurrentIndex(0);
         setFade(true);
+      } else {
+        // مهم: إذا لم توجد أخبار نشطة، إعادة تعيين الحالة
+        setCurrentIndex(0);
+        setFade(false);
       }
       
     } catch (error) {
@@ -210,7 +213,8 @@ const NewsTickerDisplay: React.FC<NewsTickerDisplayProps> = ({ accountId }) => {
   }, [newsItems]);
 
   // عدم عرض أي شيء إذا لم توجد أخبار نشطة أو المكون غير mounted
-  if (!mountedRef.current || !newsItems.length) {
+  if (!mountedRef.current || newsItems.length === 0) {
+    console.log('🚫 [NewsTickerDisplay] إخفاء الشريط - لا توجد أخبار نشطة');
     return null;
   }
 
