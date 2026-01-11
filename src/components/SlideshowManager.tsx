@@ -899,14 +899,23 @@ const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => 
 
   // دمج الصور والفيديوهات في مصفوفة واحدة
   const allMedia = [
-    ...(slideshow.images || []).map(url => ({ url, type: 'image' })),
-    ...(slideshow.video_urls || []).map(url => ({ url, type: 'video' }))
+    ...(slideshow.images || []).map(url => ({ url, type: 'image' as const })),
+    ...(slideshow.video_urls || []).map(url => ({ url, type: 'video' as const }))
   ];
 
-  useEffect(() => {
-    if (allMedia.length <= 1) return;
+  // التأكد من أن currentMediaIndex في النطاق الصحيح
+  const safeMediaIndex = allMedia.length > 0 ? Math.min(currentMediaIndex, allMedia.length - 1) : 0;
+  const currentMedia = allMedia[safeMediaIndex];
 
-    const currentMedia = allMedia[currentMediaIndex];
+  // إعادة تعيين المؤشر عند تغيير المحتوى
+  useEffect(() => {
+    if (currentMediaIndex >= allMedia.length && allMedia.length > 0) {
+      setCurrentMediaIndex(0);
+    }
+  }, [allMedia.length, currentMediaIndex]);
+
+  useEffect(() => {
+    if (allMedia.length <= 1 || !currentMedia) return;
     
     // إذا كان العنصر الحالي صورة، ننتقل بعد 15 ثانية
     if (currentMedia.type === 'image') {
@@ -926,9 +935,9 @@ const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => 
 
       return () => clearTimeout(timeout);
     }
-  }, [allMedia.length, currentMediaIndex, isVideoEnded]);
+  }, [allMedia.length, safeMediaIndex, isVideoEnded, currentMedia]);
 
-  if (allMedia.length === 0) {
+  if (allMedia.length === 0 || !currentMedia) {
     return (
       <div className="flex items-center justify-center h-full bg-gray-100 rounded-lg">
         <p className="text-gray-500">لا توجد وسائط</p>
@@ -936,14 +945,12 @@ const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => 
     );
   }
 
-  const currentMedia = allMedia[currentMediaIndex];
-
   return (
     <div className="relative h-full w-full rounded-lg overflow-hidden bg-black">
       {currentMedia.type === 'image' ? (
         <img 
           src={currentMedia.url} 
-          alt={`Media ${currentMediaIndex + 1}`}
+          alt={`Media ${safeMediaIndex + 1}`}
           className="w-full h-full object-cover"
         />
       ) : (
@@ -953,17 +960,22 @@ const SlideshowPreview: React.FC<{ slideshow: Slideshow }> = ({ slideshow }) => 
           className="w-full h-full object-cover"
           controls={false}
           autoPlay
-          muted={false}
+          muted
           onEnded={() => setIsVideoEnded(true)}
+          onCanPlay={(e) => {
+            const video = e.currentTarget;
+            video.muted = true;
+            video.play().catch(console.error);
+          }}
         />
       )}
       
       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2">
-        {allMedia.map((media, index) => (
+        {allMedia.map((_, index) => (
           <div 
             key={index} 
             className={`w-2 h-2 rounded-full ${
-              index === currentMediaIndex ? 'bg-white' : 'bg-white/50'
+              index === safeMediaIndex ? 'bg-white' : 'bg-white/50'
             }`} 
           />
         ))}
