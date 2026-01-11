@@ -368,37 +368,51 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
                 objectPosition: 'center'
               }}
               autoPlay
+              muted
               controls={false}
-              loop
+              loop={allMedia.length === 1}
               playsInline
               preload="auto"
               onCanPlay={() => {
-                // محاولة تشغيل الفيديو بالصوت أولاً
+                console.log('🎥 Video can play:', safeMediaIndex + 1, currentMedia.url);
                 if (videoRef.current) {
-                  videoRef.current.play().catch(() => {
-                    // إذا فشل تشغيل الفيديو بالصوت، اكتم الصوت وشغله
-                    console.log('تشغيل الفيديو بالصوت فشل، محاولة تشغيله بدون صوت');
-                    if (videoRef.current) {
-                      videoRef.current.muted = true;
-                      videoRef.current.play().catch(console.error);
-                    }
+                  videoRef.current.muted = true;
+                  videoRef.current.play().then(() => {
+                    console.log('✅ Video started playing successfully');
+                  }).catch((err) => {
+                    console.error('❌ Failed to play video:', err);
                   });
                 }
               }}
+              onPlay={() => {
+                console.log('▶️ Video playing:', safeMediaIndex + 1);
+              }}
               onEnded={() => {
                 console.log('✅ Video ended:', safeMediaIndex + 1, 'of', allMedia.length);
-                setIsVideoEnded(true);
+                if (allMedia.length > 1) {
+                  setIsVideoEnded(true);
+                }
               }}
               onLoadedData={() => {
                 console.log('✅ Video loaded:', safeMediaIndex + 1, 'of', allMedia.length, currentMedia.url);
-                // محاولة تشغيل الفيديو بعد التحميل
                 if (videoRef.current) {
+                  videoRef.current.muted = true;
                   videoRef.current.play().catch(console.error);
                 }
               }}
               onError={(e) => {
                 console.error('❌ Video failed to load:', safeMediaIndex + 1, currentMedia.url);
                 console.error('Error details:', e);
+                // التنقل للعنصر التالي عند فشل تحميل الفيديو
+                setTimeout(() => {
+                  if (allMedia.length > 1) {
+                    setMediaIndex(prevIndex => {
+                      const nextIndex = (prevIndex + 1) % allMedia.length;
+                      console.log(`🔄 Auto-advancing due to video error: ${prevIndex + 1} -> ${nextIndex + 1}`);
+                      return nextIndex;
+                    });
+                  }
+                }, 2000);
               }}
             />
           )}
