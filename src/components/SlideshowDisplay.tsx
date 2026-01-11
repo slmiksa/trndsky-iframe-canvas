@@ -433,9 +433,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
 
         <div className="absolute top-8 left-8 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-2">
           <h2 className="text-white text-xl font-semibold">{activeSlideshow.title}</h2>
-          <div className="text-white/80 text-sm">
-            <p>{currentMedia.type === 'image' ? 'صورة' : 'فيديو'} {safeMediaIndex + 1} من {allMedia.length}</p>
-          </div>
         </div>
 
         <div className="absolute bottom-0 left-0 w-full h-2 bg-white/20">
