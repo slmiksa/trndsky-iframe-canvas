@@ -74,9 +74,20 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         return `${slide.id}:${images}:${videos}:${interval}`;
       };
 
+      // تحويل البيانات من قاعدة البيانات إلى النوع المطلوب
+      const normalizedSlide: Slideshow | null = firstActiveSlide ? {
+        id: firstActiveSlide.id,
+        title: firstActiveSlide.title,
+        images: firstActiveSlide.images || [],
+        video_urls: (firstActiveSlide as any).video_urls || [],
+        media_type: ((firstActiveSlide as any).media_type || 'images') as 'images' | 'videos' | 'mixed',
+        interval_seconds: firstActiveSlide.interval_seconds,
+        is_active: firstActiveSlide.is_active
+      } : null;
+
       setActiveSlideshow(prevSlideshow => {
         const prevSignature = getSlideshowSignature(prevSlideshow);
-        const newSignature = getSlideshowSignature(firstActiveSlide);
+        const newSignature = getSlideshowSignature(normalizedSlide);
 
         if (prevSignature === newSignature) {
           console.log('✅ Slideshow content is identical, no update needed.');
@@ -91,7 +102,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         setMediaIndex(0);
         setIsVideoEnded(false);
         
-        return firstActiveSlide;
+        return normalizedSlide;
       });
 
       setConnectionError(false);
