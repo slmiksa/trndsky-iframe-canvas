@@ -7,458 +7,23 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
+  }
   public: {
     Tables: {
-      account_slideshows: {
-        Row: {
-          account_id: string
-          created_at: string
-          id: string
-          images: string[]
-          interval_seconds: number
-          is_active: boolean
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          id?: string
-          images?: string[]
-          interval_seconds?: number
-          is_active?: boolean
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          id?: string
-          images?: string[]
-          interval_seconds?: number
-          is_active?: boolean
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_slideshows_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      account_websites: {
-        Row: {
-          account_id: string | null
-          created_at: string | null
-          id: string
-          iframe_content: string | null
-          is_active: boolean | null
-          updated_at: string | null
-          website_title: string | null
-          website_url: string
-        }
-        Insert: {
-          account_id?: string | null
-          created_at?: string | null
-          id?: string
-          iframe_content?: string | null
-          is_active?: boolean | null
-          updated_at?: string | null
-          website_title?: string | null
-          website_url: string
-        }
-        Update: {
-          account_id?: string | null
-          created_at?: string | null
-          id?: string
-          iframe_content?: string | null
-          is_active?: boolean | null
-          updated_at?: string | null
-          website_title?: string | null
-          website_url?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_websites_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      accounts: {
-        Row: {
-          activation_end_date: string | null
-          activation_start_date: string | null
-          created_at: string | null
-          created_by: string | null
-          database_name: string
-          email: string
-          id: string
-          is_subscription_active: boolean | null
-          name: string
-          password_hash: string
-          rotation_interval: number
-          status: Database["public"]["Enums"]["account_status"] | null
-          updated_at: string | null
-        }
-        Insert: {
-          activation_end_date?: string | null
-          activation_start_date?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          database_name: string
-          email: string
-          id?: string
-          is_subscription_active?: boolean | null
-          name: string
-          password_hash: string
-          rotation_interval?: number
-          status?: Database["public"]["Enums"]["account_status"] | null
-          updated_at?: string | null
-        }
-        Update: {
-          activation_end_date?: string | null
-          activation_start_date?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          database_name?: string
-          email?: string
-          id?: string
-          is_subscription_active?: boolean | null
-          name?: string
-          password_hash?: string
-          rotation_interval?: number
-          status?: Database["public"]["Enums"]["account_status"] | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      break_timers: {
-        Row: {
-          account_id: string
-          created_at: string
-          end_time: string
-          id: string
-          is_active: boolean
-          position: string
-          start_time: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          end_time: string
-          id?: string
-          is_active?: boolean
-          position?: string
-          start_time: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          end_time?: string
-          id?: string
-          is_active?: boolean
-          position?: string
-          start_time?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "break_timers_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      gallery_images: {
-        Row: {
-          account_id: string
-          created_at: string
-          description: string | null
-          display_order: number | null
-          id: string
-          image_url: string
-          is_active: boolean | null
-          title: string | null
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          image_url: string
-          is_active?: boolean | null
-          title?: string | null
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          description?: string | null
-          display_order?: number | null
-          id?: string
-          image_url?: string
-          is_active?: boolean | null
-          title?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gallery_images_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      news_ticker: {
-        Row: {
-          account_id: string
-          content: string | null
-          created_at: string
-          display_order: number | null
-          id: string
-          is_active: boolean
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          content?: string | null
-          created_at?: string
-          display_order?: number | null
-          id?: string
-          is_active?: boolean
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          content?: string | null
-          created_at?: string
-          display_order?: number | null
-          id?: string
-          is_active?: boolean
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          account_id: string
-          created_at: string
-          display_duration: number
-          id: string
-          image_url: string | null
-          is_active: boolean
-          message: string | null
-          position: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          display_duration?: number
-          id?: string
-          image_url?: string | null
-          is_active?: boolean
-          message?: string | null
-          position?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          display_duration?: number
-          id?: string
-          image_url?: string | null
-          is_active?: boolean
-          message?: string | null
-          position?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_notifications_account"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      renewal_notifications: {
-        Row: {
-          account_id: string
-          created_at: string
-          id: string
-          notification_type: string
-          sent_at: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          id?: string
-          notification_type: string
-          sent_at?: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          id?: string
-          notification_type?: string
-          sent_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "renewal_notifications_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscription_requests: {
-        Row: {
-          company_name: string
-          created_at: string
-          email: string
-          full_name: string
-          id: string
-          phone: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          company_name: string
-          created_at?: string
-          email: string
-          full_name: string
-          id?: string
-          phone: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          company_name?: string
-          created_at?: string
-          email?: string
-          full_name?: string
-          id?: string
-          phone?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          account_id: string | null
-          created_at: string | null
-          id: string
-          role: string
-          user_id: string | null
-        }
-        Insert: {
-          account_id?: string | null
-          created_at?: string | null
-          id?: string
-          role: string
-          user_id?: string | null
-        }
-        Update: {
-          account_id?: string | null
-          created_at?: string | null
-          id?: string
-          role?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_roles_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      create_slideshow_bypass_rls: {
-        Args: {
-          p_account_id: string
-          p_title: string
-          p_images: string[]
-          p_interval_seconds?: number
-        }
-        Returns: string
-      }
-      get_active_slideshows_for_account: {
-        Args: { p_account_id: string }
-        Returns: {
-          account_id: string
-          created_at: string
-          id: string
-          images: string[]
-          interval_seconds: number
-          is_active: boolean
-          title: string
-          updated_at: string
-        }[]
-      }
-      get_all_slideshows_for_account: {
-        Args: { p_account_id: string }
-        Returns: {
-          account_id: string
-          created_at: string
-          id: string
-          images: string[]
-          interval_seconds: number
-          is_active: boolean
-          title: string
-          updated_at: string
-        }[]
-      }
-      is_current_user_super_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_super_admin: {
-        Args: { user_id: string }
-        Returns: boolean
-      }
-      user_owns_account: {
-        Args: { user_id: string; account_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
-      account_status: "active" | "suspended" | "pending"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -466,21 +31,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -498,14 +67,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -521,14 +92,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -544,14 +117,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -559,22 +134,22 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
-    Enums: {
-      account_status: ["active", "suspended", "pending"],
-    },
+    Enums: {},
   },
 } as const
