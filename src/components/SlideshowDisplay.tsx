@@ -136,9 +136,12 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
     }
   }, [accountId, onActivityChange]);
 
+  const fetchRef = useRef(fetchActiveSlideshow);
+  fetchRef.current = fetchActiveSlideshow;
+
   const debouncedFetch = useCallback(
-    debounce(fetchActiveSlideshow, 500),
-    [fetchActiveSlideshow]
+    debounce(() => fetchRef.current(), 1000),
+    []
   );
 
   // Realtime listener and polling
