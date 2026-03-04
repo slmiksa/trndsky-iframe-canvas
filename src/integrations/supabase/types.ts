@@ -455,15 +455,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_slideshow_bypass_rls: {
-        Args: {
-          p_account_id: string
-          p_images: string[]
-          p_interval_seconds?: number
-          p_title: string
-        }
-        Returns: string
-      }
+      create_slideshow_bypass_rls:
+        | {
+            Args: {
+              p_account_id: string
+              p_images: string[]
+              p_interval_seconds?: number
+              p_media_type?: string
+              p_title?: string
+              p_video_urls?: string[]
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_account_id: string
+              p_images: string[]
+              p_interval_seconds?: number
+              p_title: string
+            }
+            Returns: string
+          }
       get_active_slideshows_for_account: {
         Args: { p_account_id: string }
         Returns: {
