@@ -29,6 +29,9 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
   const isActiveRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const loadingRef = useRef(false);
+  const retryCountRef = useRef(0);
+
   // تحسين دالة التحميل مع مراقبة الأداء ومعالجة محسنة للأخطاء
   const fetchActiveSlideshow = useCallback(async () => {
     try {
@@ -56,7 +59,7 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         
         if (!hasImages && !hasVideos) {
           console.warn('⚠️ Active slideshow has no media content');
-          firstActiveSlide.is_active = false; // إلغاء تفعيل السلايدة الفارغة
+          firstActiveSlide.is_active = false;
         }
       }
 
@@ -95,10 +98,6 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
         }
         
         console.log('🔄 Slideshow content changed, resetting state');
-        console.log('Previous:', prevSignature);
-        console.log('New:', newSignature);
-        
-        // إعادة تعيين جميع المؤشرات والحالات
         setMediaIndex(0);
         setIsVideoEnded(false);
         
@@ -106,33 +105,43 @@ const SlideshowDisplay: React.FC<SlideshowDisplayProps> = ({ accountId, onActivi
       });
 
       setConnectionError(false);
+      retryCountRef.current = 0;
       performanceMonitor.end('slideshow-fetch');
       
     } catch (error) {
       console.error('❌ Error fetching slideshow:', error);
+      retryCountRef.current += 1;
       setConnectionError(true);
       
-      // تنظيف الحالة عند حدوث خطأ
-      if (isActiveRef.current) {
-        onActivityChange(false);
-        isActiveRef.current = false;
+      // لا نحذف السلايدشو الحالي عند خطأ مؤقت - نبقيه ظاهراً
+      // فقط نحذفه إذا تكرر الخطأ أكثر من 5 مرات متتالية
+      if (retryCountRef.current > 5) {
+        console.error('❌ Too many consecutive errors, clearing slideshow');
+        if (isActiveRef.current) {
+          onActivityChange(false);
+          isActiveRef.current = false;
+        }
+        setActiveSlideshow(null);
+        setMediaIndex(0);
+        setIsVideoEnded(false);
       }
-      setActiveSlideshow(null);
-      setMediaIndex(0);
-      setIsVideoEnded(false);
       
       performanceMonitor.end('slideshow-fetch');
     } finally {
-      if (loading) {
+      if (loadingRef.current || loading) {
         console.log('🎬 Initial loading completed');
+        loadingRef.current = false;
         setLoading(false);
       }
     }
-  }, [accountId, onActivityChange, loading]);
+  }, [accountId, onActivityChange]);
+
+  const fetchRef = useRef(fetchActiveSlideshow);
+  fetchRef.current = fetchActiveSlideshow;
 
   const debouncedFetch = useCallback(
-    debounce(fetchActiveSlideshow, 500),
-    [fetchActiveSlideshow]
+    debounce(() => fetchRef.current(), 1000),
+    []
   );
 
   // Realtime listener and polling
